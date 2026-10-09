@@ -1,0 +1,52 @@
+# --- Python / backend --------------------------------------------------------
+backend/.venv/
+/.venv/
+/venv/
+backend/instance/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+migrations/versions/__pycache__/
+
+# --- Node / frontend -----------------------------------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+.vercel/
+
+# High-poly source models are not loaded by the game; it uses the optimized
+# counterparts, which are kept in the repository.
+/frontend/public/assets/models/arboles.glb
+/frontend/public/assets/models/edificio_colon_-_modelo_3d.glb
+/frontend/public/assets/models/mercenary_astronaut.glb
+/frontend/public/assets/models/mies_van_der_rohe_oficina_bacardi.glb
+/frontend/public/assets/models/space_shuttle_nasa.glb
+
+# --- Env files (never commit real secrets) --------------------------------
+.env
+.env.local
+.env.*
+.env.*.local
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# --- Editors / OS ---------------------------------------------------------
+.DS_Store
+.vscode/
+.idea/
+*.log
+/tmp/
+
+# --- Session/scratch ---------------------------------------------------------
+*.sqlite
+*.db

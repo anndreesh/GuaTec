@@ -1,0 +1,311 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.7.33",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "wooden_bucket_02"
+    },
+    {
+      "mesh": 1,
+      "name": "wooden_bucket_02_handle_02",
+      "translation": [
+        0.29324859380722046,
+        0.2572847008705139,
+        0.0009642299264669418
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "wooden_bucket_02_handle_01",
+      "translation": [
+        -0.2936750054359436,
+        0.2570136487483978,
+        0.0009642299264669418
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "wooden_bucket_02",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.002",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Plane.003",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Plane.004",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_bucket_02_nor_gl",
+      "uri": "textures/wooden_bucket_02_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_bucket_02_diff",
+      "uri": "textures/wooden_bucket_02_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_bucket_02_metal-wooden_bucket_02_rough",
+      "uri": "textures/wooden_bucket_02_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 5034,
+      "max": [
+        0.3075416684150696,
+        0.3506869375705719,
+        0.30760839581489563
+      ],
+      "min": [
+        -0.3077849745750427,
+        0.000261455774307251,
+        -0.3086950480937958
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 5034,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 5034,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 19716,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 352,
+      "max": [
+        0.0034078359603881836,
+        0.0026351213455200195,
+        0.0691978856921196
+      ],
+      "min": [
+        -0.0041068196296691895,
+        -0.057280659675598145,
+        -0.06886958330869675
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 352,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 352,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 1020,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 352,
+      "max": [
+        0.004279017448425293,
+        0.0033052563667297363,
+        0.06731092929840088
+      ],
+      "min": [
+        -0.0029658377170562744,
+        -0.05722625553607941,
+        -0.07084359228610992
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 352,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 352,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 1020,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 60408,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 60408,
+      "byteOffset": 60408
+    },
+    {
+      "buffer": 0,
+      "byteLength": 40272,
+      "byteOffset": 120816
+    },
+    {
+      "buffer": 0,
+      "byteLength": 39432,
+      "byteOffset": 161088
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4224,
+      "byteOffset": 200520
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4224,
+      "byteOffset": 204744
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2816,
+      "byteOffset": 208968
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2040,
+      "byteOffset": 211784
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4224,
+      "byteOffset": 213824
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4224,
+      "byteOffset": 218048
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2816,
+      "byteOffset": 222272
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2040,
+      "byteOffset": 225088
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 227128,
+      "uri": "wooden_bucket_02.bin"
+    }
+  ]
+}
