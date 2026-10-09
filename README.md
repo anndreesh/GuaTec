@@ -214,10 +214,11 @@ Configura las variables de entorno reales (OAuth, `SECRET_KEY`, `JWT_SECRET`,
 
 ## Publicar con GitHub, Vercel y Supabase
 
-La configuración de [`vercel.json`](vercel.json) publica el frontend estático y
-la API Flask en el mismo dominio. Supabase se usa como PostgreSQL para los
-datos del Proyecto; el inicio de sesión continúa gestionándose en Flask (correo,
-Google, GitHub e invitado), no mediante Supabase Auth.
+El frontend estático se publica en Vercel, la API Flask en Render y PostgreSQL
+en Supabase. El inicio de sesión continúa gestionándose en Flask (correo,
+Google, GitHub e invitado), no mediante Supabase Auth. [`render.yaml`](render.yaml)
+define el servicio web de Render; [`vercel.json`](vercel.json) configura el build
+estático de Vite.
 
 ### 1. Subir el proyecto a GitHub
 
@@ -237,62 +238,43 @@ proveedor correspondiente. También se excluyen los modelos 3D originales de
 alta resolución (incluido uno que excede el límite de 100 MB de GitHub); el
 Proyecto carga las variantes `_optimized.glb`, que sí se incluyen.
 
-### 2. Crear la base de datos en Supabase
+### 2. Conectar la base de datos de Supabase
 
-1. Crea un proyecto en Supabase y define una contraseña para la base de datos.
-2. En **Project Settings → Database**, copia la URI de conexión PostgreSQL.
-   Para Vercel, usa la URI del **Transaction pooler** (puerto `6543`), indicada
-   por Supabase para funciones serverless. La aplicación desactiva las
-   sentencias preparadas, limita el pool local de cada función a una conexión
-   y exige SSL automáticamente.
-3. La aplicación convierte automáticamente `postgres://` o `postgresql://`
-   al controlador psycopg instalado. La URI completa —incluida la contraseña—
-   se configura únicamente como variable de entorno `DATABASE_URL` en Vercel.
+En Supabase, abre **Connect → Direct connection string** y copia la URI
+PostgreSQL. Guárdala como `DATABASE_URL` en el servicio web de Render; no la
+configures en Vercel ni la subas a GitHub. Render y Supabase admiten conexiones
+directas a PostgreSQL. Si la red donde corre el servicio necesita un pooler,
+usa el pooler de sesión de Supabase y su URI compatible con psycopg.
 
 Al iniciar la API se crean las tablas que falten. Conserva los permisos de
 escritura del usuario de base de datos usado por la aplicación.
 
-### 3. Desplegar en Vercel
+### 3. Desplegar el backend en Render
 
-1. Importa en Vercel el repositorio de GitHub. Deja **Root Directory** en la
-   raíz del repositorio y usa la configuración de build/output de
-   [`vercel.json`](vercel.json).
-2. En **Project Settings → Environment Variables**, define estas variables
-   para Production (y Preview si quieres que las previews usen la base real):
+En Render, crea un Blueprint desde este repositorio y usa `render.yaml`. El
+servicio necesita estas variables:
 
    | Variable | Valor |
    | --- | --- |
-   | `FLASK_ENV` | `production` |
    | `DATABASE_URL` | URI PostgreSQL de Supabase |
-   | `SECRET_KEY` | Secreto aleatorio único, mínimo 32 caracteres |
-   | `JWT_SECRET` | Otro secreto aleatorio único, mínimo 32 caracteres |
-   | `FRONTEND_URL` | Origen público, por ejemplo `https://tu-proyecto.vercel.app` (sin `/` final) |
-   | `GOOGLE_REDIRECT_URI` | `https://tu-proyecto.vercel.app/api/auth/google/callback` (si activas Google) |
-   | `GITHUB_REDIRECT_URI` | `https://tu-proyecto.vercel.app/api/auth/github/callback` (si activas GitHub) |
+   | `FRONTEND_URL` | Origen público Vercel, sin `/` final |
+   | `CORS_ORIGINS` | El mismo origen público Vercel |
 
-   Puedes generar cada secreto localmente con `openssl rand -hex 32`. No
-   configures la variable `VERCEL`: la plataforma la establece automáticamente.
-3. Para habilitar OAuth, añade `GOOGLE_CLIENT_ID` y
-   `GOOGLE_CLIENT_SECRET`, y/o `GITHUB_CLIENT_ID` y
-   `GITHUB_CLIENT_SECRET`. Configura también las URI de callback en cada
-   proveedor:
+`render.yaml` genera `SECRET_KEY` y `JWT_SECRET` y configura `FLASK_ENV=production`.
+El chequeo de salud está en `/api/health`.
 
-   ```text
-   https://tu-proyecto.vercel.app/api/auth/google/callback
-   https://tu-proyecto.vercel.app/api/auth/github/callback
-   ```
+### 4. Desplegar el frontend en Vercel
 
-   Si usas un dominio propio, reemplaza el dominio en `FRONTEND_URL` y en las
-   URI de callback. `NASA_API_KEY` también puede definirse en Vercel; si se
-   omite, la API usa `DEMO_KEY`.
-4. Despliega y verifica `https://tu-proyecto.vercel.app/api/health`. Debe
-   responder `{"status":"ok"}`. El frontend usa `/api` en el mismo dominio,
-   por lo que `VITE_API_BASE_URL` se deja sin definir en Vercel.
+Importa el repositorio conectado y deja **Root Directory** en `frontend`. El
+build es `npm ci && npm run build`, y la carpeta de salida es `dist`. Define
+`VITE_API_BASE_URL` en Vercel con la URL pública de Render seguida de `/api`,
+por ejemplo `https://guatec-api.onrender.com/api`. En Render, define
+`FRONTEND_URL` y `CORS_ORIGINS` con el dominio de Vercel. Las credenciales OAuth
+son opcionales; si se habilitan, registra las rutas `/api/auth/google/callback`
+y `/api/auth/github/callback` del dominio de Render en sus proveedores.
 
-En producción, la función valida que la conexión PostgreSQL y los secretos
-obligatorios estén configurados; no usa SQLite ni acepta los secretos de
-ejemplo. Las variables de entorno se administran en Vercel y no se suben a
-GitHub.
+Las variables con credenciales se administran en el proveedor correspondiente
+y nunca se suben al repositorio.
 
 ## Validación realizada
 
