@@ -1307,7 +1307,11 @@ button.mission-map-location:focus-visible {
   #ui-root {
     align-items: flex-start;
     justify-content: flex-start;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
     padding: max(8px, env(safe-area-inset-top)) 8px 8px max(8px, env(safe-area-inset-left));
   }
   .mission1-screen {
@@ -1384,5 +1388,55 @@ button.mission-map-location:focus-visible {
     bottom: 180px;
     max-width: calc(100vw - 30px);
     text-align: center;
+  }
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  #ui-root {
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  #ui-root > .screen {
+    flex: 0 0 auto;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .splash-screen,
+  .mission-select-screen {
+    width: 100%;
+    padding: clamp(16px, 4vw, 24px);
+  }
+  .splash-title {
+    font-size: clamp(2rem, 9vw, 3rem);
+    overflow-wrap: anywhere;
+  }
+  .mission-select-screen {
+    max-width: 900px;
+  }
+  .mission-select-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .mission-select-actions {
+    flex-wrap: wrap;
+  }
+  .mission-carousel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .mission-card {
+    min-width: 0;
+  }
+  .nasa-carousel-viewport {
+    touch-action: pan-y pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
   }
 }

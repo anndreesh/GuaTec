@@ -112,7 +112,10 @@ export class MissionSelectScreen implements Screen {
         : [];
     if (stories.length === 0) return;
     const card = el("section", { className: "nasa-briefing nasa-carousel" });
-    const viewport = el("div", { className: "nasa-carousel-viewport" });
+    const viewport = el("div", {
+      className: "nasa-carousel-viewport",
+      attrs: { role: "group", "aria-label": t("Carrusel de reportes NASA"), tabindex: "0" },
+    });
     const track = el("div", { className: "nasa-carousel-track" });
     const dots = el("div", { className: "nasa-carousel-dots" });
     let activeIndex = 0;
@@ -195,6 +198,23 @@ export class MissionSelectScreen implements Screen {
     const next = el("button", { className: "nasa-carousel-control", text: "›", attrs: { type: "button", "aria-label": "Siguiente historia" } });
     previous.addEventListener("click", () => renderSlide(activeIndex - 1));
     next.addEventListener("click", () => renderSlide(activeIndex + 1));
+    let swipeStart: { x: number; y: number } | null = null;
+    viewport.addEventListener("pointerdown", (event) => {
+      swipeStart = { x: event.clientX, y: event.clientY };
+    });
+    viewport.addEventListener("pointerup", (event) => {
+      if (!swipeStart) return;
+      const dx = event.clientX - swipeStart.x;
+      const dy = event.clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      renderSlide(activeIndex + (dx < 0 ? 1 : -1));
+    });
+    viewport.addEventListener("pointercancel", () => { swipeStart = null; });
+    viewport.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") renderSlide(activeIndex - 1);
+      if (event.key === "ArrowRight") renderSlide(activeIndex + 1);
+    });
     stories.forEach((_, index) => {
       const dot = el("button", { className: "nasa-carousel-dot", text: "", attrs: { type: "button", "aria-label": `Historia ${index + 1}` } });
       dot.addEventListener("click", () => renderSlide(index));
