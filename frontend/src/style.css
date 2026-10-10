@@ -31,6 +31,7 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
 }
 
 .language-menu {
@@ -1223,6 +1224,143 @@ button.mission-map-location:focus-visible {
   gap: 8px;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* Touch controls for the third-person mission. */
+.mobile-game-controls { display: none; }
+.tutorial-control-mobile { display: none; }
+
+@media (pointer: coarse), (max-width: 900px) {
+  .tutorial-control-desktop { display: none; }
+  .tutorial-control-mobile { display: list-item; }
+  .mobile-game-controls {
+    position: fixed;
+    inset: 0;
+    z-index: 8;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    pointer-events: none;
+  }
+  .mobile-stick {
+    position: relative;
+    width: clamp(104px, 22vw, 142px);
+    height: clamp(104px, 22vw, 142px);
+    flex: 0 0 auto;
+    border: 2px solid rgba(255, 255, 255, .42);
+    border-radius: 50%;
+    background: rgba(5, 10, 22, .55);
+    box-shadow: inset 0 0 24px rgba(255, 255, 255, .08), 0 8px 28px rgba(0, 0, 0, .28);
+    touch-action: none;
+    pointer-events: auto;
+  }
+  .mobile-stick-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, .65);
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .mobile-stick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 43%;
+    height: 43%;
+    border: 1px solid rgba(255, 255, 255, .5);
+    border-radius: 50%;
+    background: rgba(255, 122, 69, .78);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, .35);
+    transform: translate(0, 0);
+    margin: -21.5% 0 0 -21.5%;
+    pointer-events: none;
+  }
+  .mobile-action-buttons {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .mobile-action-button {
+    min-width: 72px;
+    min-height: 48px;
+    padding: 9px 14px;
+    border: 1px solid rgba(255, 255, 255, .38);
+    border-radius: 999px;
+    background: rgba(8, 13, 27, .78);
+    color: var(--text);
+    font-size: .82rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .32);
+    touch-action: none;
+    pointer-events: auto;
+  }
+  .mobile-action-button--active { background: rgba(255, 122, 69, .9); color: #160a05; }
+  .mobile-interact-button--hidden { display: none; }
+  .interaction-prompt { display: none; }
+}
+
+@media (pointer: coarse) and (orientation: landscape), (max-width: 900px) and (orientation: landscape) {
+  #ui-root {
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow: hidden;
+    padding: max(8px, env(safe-area-inset-top)) 8px 8px max(8px, env(safe-area-inset-left));
+  }
+  .mission1-screen {
+    width: min(390px, 43vw);
+    max-width: 43vw;
+    max-height: calc(100dvh - 168px);
+    overflow: auto;
+    padding: 12px;
+    border-radius: 12px;
+    scrollbar-width: thin;
+  }
+  .mission1-header { gap: 4px; }
+  .mission1-header .screen-title { font-size: .95rem; }
+  .mission1-header .mission-panel-restart,
+  .mission1-header .mission-panel-toggle,
+  .mission1-header > .btn { padding: 5px 7px; font-size: .68rem; }
+  .mission1-screen .tick-label { margin: 0 0 6px; font-size: .7rem; }
+  .mission1-screen .phase-stepper { gap: 4px; }
+  .mission1-screen .phase-panel,
+  .mission1-screen .mission-objectives,
+  .mission1-screen .resources-panel,
+  .mission1-screen .log-panel { margin-top: 6px; margin-bottom: 6px; }
+  .mission1-screen .log-panel { max-height: 66px; }
+  .mission-map-button { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); bottom: auto; padding: 8px 12px; }
+  .flight-metrics { top: 54px; right: max(8px, env(safe-area-inset-right)); bottom: auto; width: min(220px, 27vw); padding: 9px; }
+  .flight-metrics-note { display: none; }
+  .flight-metrics-phase { margin-bottom: 5px; }
+  .flight-metric-row { padding: 3px 0; }
+  .mission-panel-restore { left: 8px; bottom: 8px; }
+  .gameplay-toast { bottom: auto; top: 10px; left: 50%; max-width: 36vw; font-size: .75rem; }
+  .mobile-action-buttons { flex-direction: row; align-items: flex-end; gap: 9px; }
+  .mobile-action-button { min-width: 62px; min-height: 46px; padding: 8px 12px; }
+  .mobile-interact-button { max-width: min(240px, 32vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (pointer: coarse) and (orientation: portrait), (max-width: 900px) and (orientation: portrait) {
+  .mobile-game-controls::before {
+    content: "Gira el dispositivo para jugar en horizontal";
+    position: fixed;
+    top: max(56px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 177, 153, .45);
+    border-radius: 999px;
+    background: rgba(4, 6, 15, .82);
+    color: var(--text);
+    font-size: .75rem;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .mission1-screen { max-height: calc(100dvh - 150px); overflow-y: auto; }
+  .mobile-game-controls { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
 }
 
 @media (max-width: 760px) {

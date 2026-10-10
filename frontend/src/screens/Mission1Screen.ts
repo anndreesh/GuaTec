@@ -56,6 +56,7 @@ export class Mission1Screen implements Screen {
   private phaseStepper: HTMLElement | null = null;
   private objectivePanel: HTMLElement | null = null;
   private interactionPrompt: HTMLElement | null = null;
+  private mobileInteractButton: HTMLButtonElement | null = null;
   private toast: HTMLElement | null = null;
   private gameplay: GameplayHandle | null = null;
   private flightMetrics: HTMLElement | null = null;
@@ -180,6 +181,7 @@ export class Mission1Screen implements Screen {
     this.flightMetrics = el("aside", { className: "flight-metrics", attrs: { "aria-label": t("Instrumentos de vuelo") } });
     container.append(this.flightMetrics);
     this.createMissionMap(container);
+    this.createMobileControls(container);
     window.addEventListener("keydown", this.onMapKey);
 
     this.renderResources();
@@ -229,6 +231,64 @@ export class Mission1Screen implements Screen {
     if (resetWorld) this.gameplay.reset();
     this.gameplay.setDesign(this.state.engineering.structure, this.state.engineering.instrumentation);
     this.gameplay.setMissionProgress(this.state.progressPercent() / 100);
+  }
+
+  private createMobileControls(container: HTMLElement): void {
+    const controls = el("div", { className: "mobile-game-controls", attrs: { "aria-label": t("Controles táctiles") } });
+    const stick = el("div", { className: "mobile-stick", attrs: { role: "group", "aria-label": t("Joystick de movimiento") } });
+    const knob = el("span", { className: "mobile-stick-knob" });
+    stick.append(el("span", { className: "mobile-stick-hint", text: "▲" }), knob);
+    const actions = el("div", { className: "mobile-action-buttons" });
+    const jump = el("button", { className: "btn mobile-action-button", text: t("Saltar"), attrs: { type: "button" } });
+    const sprint = el("button", { className: "btn mobile-action-button", text: t("Correr"), attrs: { type: "button" } });
+    const interact = el("button", { className: "btn mobile-action-button mobile-interact-button mobile-interact-button--hidden", text: t("Examinar"), attrs: { type: "button" } });
+    this.mobileInteractButton = interact;
+    jump.addEventListener("click", () => this.gameplay?.jump());
+    interact.addEventListener("click", () => this.gameplay?.interact());
+    const releaseSprint = () => {
+      this.gameplay?.setTouchSprint(false);
+      sprint.classList.remove("mobile-action-button--active");
+    };
+    sprint.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      sprint.setPointerCapture(event.pointerId);
+      this.gameplay?.setTouchSprint(true);
+      sprint.classList.add("mobile-action-button--active");
+    });
+    sprint.addEventListener("pointerup", releaseSprint);
+    sprint.addEventListener("pointercancel", releaseSprint);
+    sprint.addEventListener("lostpointercapture", releaseSprint);
+    actions.append(interact, jump, sprint);
+    controls.append(stick, actions);
+    container.append(controls);
+
+    const moveStick = (event: PointerEvent) => {
+      const rect = stick.getBoundingClientRect();
+      const radius = rect.width * 0.36;
+      const dx = event.clientX - (rect.left + rect.width / 2);
+      const dy = event.clientY - (rect.top + rect.height / 2);
+      const distance = Math.hypot(dx, dy);
+      const scale = distance > radius ? radius / distance : 1;
+      const x = (dx * scale) / radius;
+      const y = (-dy * scale) / radius;
+      knob.style.transform = `translate(${x * radius}px, ${-y * radius}px)`;
+      this.gameplay?.setTouchMovement(x, y);
+    };
+    const releaseStick = (event: PointerEvent) => {
+      if (stick.hasPointerCapture(event.pointerId)) stick.releasePointerCapture(event.pointerId);
+      knob.style.transform = "translate(0, 0)";
+      this.gameplay?.setTouchMovement(0, 0);
+    };
+    stick.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      stick.setPointerCapture(event.pointerId);
+      moveStick(event);
+    });
+    stick.addEventListener("pointermove", (event) => {
+      if (stick.hasPointerCapture(event.pointerId)) moveStick(event);
+    });
+    stick.addEventListener("pointerup", releaseStick);
+    stick.addEventListener("pointercancel", releaseStick);
   }
 
   private createMissionMap(container: HTMLElement): void {
@@ -369,6 +429,8 @@ export class Mission1Screen implements Screen {
   }
 
   private updateInteractionPrompt(poi: NearbyPoi | null): void {
+    this.mobileInteractButton?.classList.toggle("mobile-interact-button--hidden", !poi);
+    if (this.mobileInteractButton) this.mobileInteractButton.textContent = poi ? `${t("Examinar")} · ${poi.label}` : t("Examinar");
     if (!this.interactionPrompt) return;
     if (!poi) {
       this.interactionPrompt.classList.add("interaction-prompt--hidden");
@@ -628,12 +690,16 @@ export class Mission1Screen implements Screen {
     );
     const list = el("ul", { className: "tutorial-controls-list" });
     list.append(
-      el("li", { text: t("W A S D — Mover al ingeniero") }),
-      el("li", { text: t("Shift izquierdo — Correr") }),
-      el("li", { text: t("Barra espaciadora — Saltar (gravedad terrestre)") }),
-      el("li", { text: t("Arrastra el mouse — Orbitar la cámara") }),
-      el("li", { text: t("E — Examinar instrumentos, planos y plataforma") }),
-      el("li", { text: t("H — Minimizar o restaurar el panel de misión") }),
+      el("li", { className: "tutorial-control-desktop", text: t("W A S D — Mover al ingeniero") }),
+      el("li", { className: "tutorial-control-desktop", text: t("Shift izquierdo — Correr") }),
+      el("li", { className: "tutorial-control-desktop", text: t("Barra espaciadora — Saltar (gravedad terrestre)") }),
+      el("li", { className: "tutorial-control-desktop", text: t("Arrastra el mouse — Orbitar la cámara") }),
+      el("li", { className: "tutorial-control-desktop", text: t("E — Examinar instrumentos, planos y plataforma") }),
+      el("li", { className: "tutorial-control-desktop", text: t("H — Minimizar o restaurar el panel de misión") }),
+      el("li", { className: "tutorial-control-mobile", text: t("Joystick — Desplazarte por el campo") }),
+      el("li", { className: "tutorial-control-mobile", text: t("Correr / Saltar — Botones de acción") }),
+      el("li", { className: "tutorial-control-mobile", text: t("Acércate a una estación y pulsa Examinar") }),
+      el("li", { className: "tutorial-control-mobile", text: t("Arrastra la escena para girar la cámara; abre el mapa para encontrar objetivos") }),
     );
     card.append(list);
     const dismiss = el("button", { className: "btn btn-primary btn-large", text: t("Comenzar"), attrs: { type: "button" } });
@@ -934,5 +1000,6 @@ export class Mission1Screen implements Screen {
     this.restorePanelButton = null;
     this.missionPanel = null;
     this.flightMetrics = null;
+    this.mobileInteractButton = null;
   }
 }

@@ -26,6 +26,10 @@ export interface GameplayHandle {
   setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "extended"): void;
   playLaunch(): void;
   setMissionProgress(progress: number): void;
+  setTouchMovement(x: number, y: number): void;
+  setTouchSprint(active: boolean): void;
+  jump(): void;
+  interact(): void;
   getWeather(): AuburnWeather;
 }
 
@@ -778,6 +782,8 @@ export function createGameplayLayer(
   let verticalVelocity = 0;
   let grounded = true;
   let leftShiftDown = false;
+  let touchMoveX = 0;
+  let touchMoveY = 0;
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
 
@@ -849,6 +855,9 @@ export function createGameplayLayer(
         velocity.set(0, 0, 0);
         verticalVelocity = 0;
         grounded = true;
+        touchMoveX = 0;
+        touchMoveY = 0;
+        leftShiftDown = false;
         navigationPath = [];
         rocketRoot.position.copyFrom(rocketStart);
         rocketRoot.scaling.setAll(1);
@@ -897,6 +906,24 @@ export function createGameplayLayer(
           morning,
         );
       },
+      setTouchMovement(x, y) {
+        touchMoveX = Math.max(-1, Math.min(1, x));
+        touchMoveY = Math.max(-1, Math.min(1, y));
+        if (Math.hypot(touchMoveX, touchMoveY) > 0.12) navigationPath = [];
+      },
+      setTouchSprint(active) { leftShiftDown = active; },
+      jump() {
+        if (grounded && enabled) {
+          verticalVelocity = JUMP_SPEED;
+          grounded = false;
+        }
+      },
+      interact() {
+        if (nearestPoi) {
+          navigationPath = [];
+          interactCallback?.(nearestPoi.poi.id);
+        }
+      },
       getWeather() { return weather.label; },
     },
     enable() {
@@ -924,6 +951,8 @@ export function createGameplayLayer(
       enabled = false;
       keysDown.clear();
       leftShiftDown = false;
+      touchMoveX = 0;
+      touchMoveY = 0;
       velocity.set(0, 0, 0);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
@@ -956,6 +985,8 @@ export function createGameplayLayer(
       const right = new BABYLONNS.Vector3(forward.z, 0, -forward.x);
       let moveX = 0;
       let moveZ = 0;
+      moveX += right.x * touchMoveX - forward.x * touchMoveY;
+      moveZ += right.z * touchMoveX - forward.z * touchMoveY;
       if (keysDown.has("w") || keysDown.has("arrowup")) {
         moveX -= forward.x;
         moveZ -= forward.z;
@@ -973,13 +1004,14 @@ export function createGameplayLayer(
         moveZ += right.z;
       }
 
+      let movementStrength = Math.min(1, Math.hypot(moveX, moveZ));
       if (navigationPath.length > 0) {
         const waypoint = navigationPath[0]!;
         const dx = waypoint.x - astronaut.root.position.x;
         const dz = waypoint.z - astronaut.root.position.z;
         const distance = Math.hypot(dx, dz);
         if (distance <= 0.85) navigationPath.shift();
-        else { moveX = dx / distance; moveZ = dz / distance; }
+        else { moveX = dx / distance; moveZ = dz / distance; movementStrength = 1; }
       }
 
       const moveLenSq = moveX * moveX + moveZ * moveZ;
@@ -988,7 +1020,7 @@ export function createGameplayLayer(
         const invLen = 1 / Math.sqrt(moveLenSq);
         moveX *= invLen;
         moveZ *= invLen;
-        const speed = leftShiftDown ? RUN_SPEED : MOVE_SPEED;
+        const speed = (leftShiftDown ? RUN_SPEED : MOVE_SPEED) * movementStrength;
         const targetX = moveX * speed;
         const targetZ = moveZ * speed;
         velocity.x += (targetX - velocity.x) * Math.min(1, MOVE_ACCELERATION * deltaSeconds);
