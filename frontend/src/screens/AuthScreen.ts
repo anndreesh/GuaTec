@@ -5,6 +5,7 @@ import type { GameApp } from "@/core/GameApp";
 import type { Screen } from "@/screens/Screen";
 import type { Credentials, ProviderInfo } from "@/types";
 import { getLanguage, t } from "@/core/i18n";
+import { API_BASE_URL } from "@/config/gameConfig";
 
 /** Provider-choice screen: email/password, Google, GitHub, or Guest. */
 export class AuthScreen implements Screen {
@@ -223,9 +224,7 @@ export class AuthScreen implements Screen {
       return;
     }
 
-    const { authorizeUrl } =
-      providerId === "google" ? await authApi.loginGoogle() : await authApi.loginGithub();
-    window.location.href = authorizeUrl;
+    window.location.href = `${API_BASE_URL}/auth/${providerId}/login`;
   }
 
   private extractErrorMessage(err: unknown): string {

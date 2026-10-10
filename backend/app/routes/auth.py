@@ -66,7 +66,7 @@ def google_login():
     except OAuthNotConfiguredError:
         return jsonify({"error": "google_not_configured"}), 501
     _remember_oauth_state("google", state)
-    return jsonify({"authorizeUrl": url, "state": state})
+    return redirect(url)
 
 
 @auth_bp.get("/google/callback")
@@ -107,7 +107,7 @@ def github_login():
     except OAuthNotConfiguredError:
         return jsonify({"error": "github_not_configured"}), 501
     _remember_oauth_state("github", state)
-    return jsonify({"authorizeUrl": url, "state": state})
+    return redirect(url)
 
 
 @auth_bp.get("/github/callback")
