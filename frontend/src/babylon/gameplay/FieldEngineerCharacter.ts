@@ -3,7 +3,7 @@ import type * as BABYLON from "@babylonjs/core";
 /** Babylon.js module shape as returned by the dynamic `import("@babylonjs/core")`. */
 export type BabylonNamespace = typeof BABYLON;
 
-export interface AstronautCharacter {
+export interface FieldEngineerCharacter {
   /** Root transform node other systems (camera, controller) attach to / read position from. */
   root: BABYLON.TransformNode;
   setMovementState(walking: boolean, running: boolean): void;
@@ -13,18 +13,22 @@ export interface AstronautCharacter {
 }
 
 /** Procedural early-1920s field engineer; no Blender export is required. */
-export function createAstronautCharacter(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): AstronautCharacter {
+export function createFieldEngineer(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): FieldEngineerCharacter {
   const root = new BABYLONNS.TransformNode("field-engineer-root", scene);
 
   const coatMat = new BABYLONNS.PBRMaterial("engineer-wool-coat", scene);
   coatMat.albedoTexture = createWoolTexture(BABYLONNS, scene);
-  coatMat.albedoColor = BABYLONNS.Color3.FromHexString("#f2f2ef");
+  coatMat.albedoColor = BABYLONNS.Color3.FromHexString("#f7efdb");
   coatMat.roughness = 0.96;
+  const capMat = new BABYLONNS.PBRMaterial("engineer-tweed-cap", scene);
+  capMat.albedoTexture = coatMat.albedoTexture;
+  capMat.albedoColor = BABYLONNS.Color3.FromHexString("#b8a17a");
+  capMat.roughness = 0.98;
   const shirtMat = new BABYLONNS.PBRMaterial("engineer-cotton-shirt", scene);
   shirtMat.albedoColor = BABYLONNS.Color3.FromHexString("#b7ad93");
   shirtMat.roughness = 0.94;
   const trouserMat = new BABYLONNS.PBRMaterial("engineer-wool-trousers", scene);
-  trouserMat.albedoColor = BABYLONNS.Color3.FromHexString("#3c443f");
+  trouserMat.albedoColor = BABYLONNS.Color3.FromHexString("#535447");
   trouserMat.roughness = 0.97;
   const leatherMat = new BABYLONNS.PBRMaterial("engineer-aged-leather", scene);
   leatherMat.albedoColor = BABYLONNS.Color3.FromHexString("#5b3825");
@@ -97,6 +101,7 @@ export function createAstronautCharacter(BABYLONNS: BabylonNamespace, scene: BAB
   neck.material = skinMat;
   neck.parent = root;
   const head = BABYLONNS.MeshBuilder.CreateSphere("engineer-head", { diameter: 0.42, segments: 16 }, scene);
+  head.scaling = new BABYLONNS.Vector3(0.9, 1.08, 0.88);
   head.position.y = 1.73;
   head.material = skinMat;
   head.parent = root;
@@ -119,11 +124,11 @@ export function createAstronautCharacter(BABYLONNS: BabylonNamespace, scene: BAB
   const cap = BABYLONNS.MeshBuilder.CreateSphere("engineer-rounded-wool-cap", { diameter: 0.46, segments: 16 }, scene);
   cap.scaling.y = 0.42;
   cap.position.y = 1.99;
-  cap.material = coatMat;
+  cap.material = capMat;
   cap.parent = root;
   const capBrim = BABYLONNS.MeshBuilder.CreateBox("engineer-cap-brim", { width: 0.3, height: 0.045, depth: 0.16 }, scene);
   capBrim.position = new BABYLONNS.Vector3(0, 1.92, 0.18);
-  capBrim.material = coatMat;
+  capBrim.material = capMat;
   capBrim.parent = root;
 
   for (let i = 0; i < 4; i++) {
@@ -207,10 +212,10 @@ export function createAstronautCharacter(BABYLONNS: BabylonNamespace, scene: BAB
 function createWoolTexture(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BABYLON.Texture {
   const texture = new BABYLONNS.DynamicTexture("engineer-wool-weave", { width: 256, height: 256 }, scene, false);
   const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
-  ctx.fillStyle = "#3f4a43"; ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 2200; i++) {
-    ctx.globalAlpha = 0.03 + Math.random() * 0.11;
-    ctx.fillStyle = Math.random() < 0.5 ? "#d1c8a7" : "#101916";
+  ctx.fillStyle = "#c2b18e"; ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    ctx.globalAlpha = 0.025 + Math.random() * 0.075;
+    ctx.fillStyle = Math.random() < 0.62 ? "#eee1c1" : "#5a4e3a";
     const x = Math.random() * 256; const y = Math.random() * 256;
     ctx.fillRect(x, y, 1 + Math.random() * 4, 1 + Math.random() * 2);
   }

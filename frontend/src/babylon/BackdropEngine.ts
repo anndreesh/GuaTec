@@ -51,10 +51,12 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
   camera.inputs.clear(); // ambient backdrop only, not user-controlled by default
 
   const ambient = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0.3), scene);
-  ambient.intensity = 0.42;
+  ambient.intensity = 0.5;
+  ambient.groundColor = BABYLON.Color3.FromHexString("#6d705e");
   const sun = new BABYLON.DirectionalLight("morningSun", new BABYLON.Vector3(-0.35, -1, 0.45), scene);
   sun.position = new BABYLON.Vector3(18, 24, -20);
-  sun.intensity = 1.35;
+  sun.diffuse = BABYLON.Color3.FromHexString("#f2dfbd");
+  sun.intensity = 1.2;
   const shadowGenerator = new BABYLON.ShadowGenerator(2048, sun);
   shadowGenerator.useBlurExponentialShadowMap = true;
   shadowGenerator.blurKernel = 24;
@@ -72,7 +74,7 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
   starMaterial.disableLighting = true;
   starfield.material = starMaterial;
 
-  // The playable third-person layer (procedural astronaut, terrain, POIs,
+  // The playable third-person layer (fictional 1920s engineer, terrain, POIs,
   // WASD + follow camera) is built lazily the first time it's needed so the
   // ambient-only modes (splash/mission-select/report) stay cheap.
   let gameplayLayer: ReturnType<typeof createGameplayLayer> | null = null;
@@ -132,9 +134,9 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           starfield.setEnabled(true);
           break;
         case "mission1-gameplay":
-          // The bundled shuttle and its launch frame cast an oversized
-          // shadow at dawn. Keep this small test range evenly lit and readable.
-          scene.shadowsEnabled = false;
+          // The unrelated shuttle asset is no longer part of the 1926 field;
+          // keep soft shadows on the period props, trees, and work tables.
+          scene.shadowsEnabled = true;
           planet.setEnabled(false);
           starfield.setEnabled(false);
           if (!fieldEnvironment) {
@@ -153,15 +155,11 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           scene.meshes.forEach((mesh) => {
             let node: Node | null = mesh;
             let belongsToGameplay = false;
-            let castsSceneBlockingShadow = false;
             while (node) {
               if (node.name === "gameplay-root") belongsToGameplay = true;
-              if (node.name === "1926-launch-frame" || node.name === "nasa-shuttle-model" || node.name === "mercenary-avatar-model") {
-                castsSceneBlockingShadow = true;
-              }
               node = node.parent;
             }
-            if (belongsToGameplay && !castsSceneBlockingShadow && mesh.name !== "auburn-sky-dome") {
+            if (belongsToGameplay && mesh.name !== "auburn-sky-dome") {
               shadowGenerator.addShadowCaster(mesh, true);
               mesh.receiveShadows = true;
             }

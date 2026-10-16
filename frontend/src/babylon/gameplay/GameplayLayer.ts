@@ -1,6 +1,6 @@
 import type * as BABYLON from "@babylonjs/core";
 import type { MissionPointOfInterest } from "@/config/gameConfig";
-import { createAstronautCharacter, type BabylonNamespace } from "@/babylon/gameplay/AstronautCharacter";
+import { createFieldEngineer, type BabylonNamespace } from "@/babylon/gameplay/FieldEngineerCharacter";
 import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 
 export interface NearbyPoi {
@@ -26,6 +26,7 @@ export interface GameplayHandle {
   setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "extended"): void;
   playLaunch(): void;
   setMissionProgress(progress: number): void;
+  playMissionEndingShot(): void;
   setTouchMovement(x: number, y: number): void;
   setTouchSprint(active: boolean): void;
   jump(): void;
@@ -60,7 +61,7 @@ const PLAYER_COLLISION_RADIUS = 0.48;
 
 /**
  * Builds the full third-person exploration layer for a playable mission:
- * mercenary astronaut, level Auburn field terrain with rural props, a small
+ * fictional 1920s field engineer, rolling Auburn field terrain with rural props, a small
  * 1920s experimental range, fixed points of interest, WASD
  * camera-relative movement and an ArcRotateCamera-based follow camera.
  *
@@ -86,66 +87,22 @@ export function createGameplayLayer(
   terrain.ground.parent = root;
   scene.fogMode = BABYLONNS.Scene.FOGMODE_EXP2;
   const weatherOptions: Array<{ label: AuburnWeather; fogDensity: number; lightFactor: number }> = [
-    { label: "CLEAR", fogDensity: 0.0018, lightFactor: 1.06 },
-    { label: "CLOUDY", fogDensity: 0.004, lightFactor: 0.88 },
-    { label: "LIGHT MIST", fogDensity: 0.009, lightFactor: 0.78 },
-    { label: "WINDY", fogDensity: 0.003, lightFactor: 0.96 },
+    { label: "CLEAR", fogDensity: 0.000035, lightFactor: 1.06 },
+    { label: "CLOUDY", fogDensity: 0.00006, lightFactor: 0.88 },
+    { label: "LIGHT MIST", fogDensity: 0.000095, lightFactor: 0.78 },
+    { label: "WINDY", fogDensity: 0.000045, lightFactor: 0.96 },
   ];
   const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)]!;
   scene.fogDensity = weather.fogDensity;
-  scene.fogColor = BABYLONNS.Color3.FromHexString("#aeb5b5");
+  scene.fogColor = BABYLONNS.Color3.FromHexString("#c1a48c");
 
-  const astronaut = createAstronautCharacter(BABYLONNS, scene);
-  astronaut.root.parent = root;
-  const proceduralAvatarMeshes = astronaut.root.getChildMeshes(false);
-  astronaut.root.position = new BABYLONNS.Vector3(
+  const fieldEngineer = createFieldEngineer(BABYLONNS, scene);
+  fieldEngineer.root.parent = root;
+  fieldEngineer.root.position = new BABYLONNS.Vector3(
     PLAYER_START.x,
     terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z),
     PLAYER_START.z,
   );
-  let avatarAnimationGroups: BABYLON.AnimationGroup[] = [];
-  let activeAvatarAnimation: BABYLON.AnimationGroup | null = null;
-  const playAvatarAnimation = (walking: boolean, running: boolean, jumping = false): void => {
-    if (!avatarAnimationGroups.length) return;
-    const hasJumpAnimation = jumping && avatarAnimationGroups.some((group) => group.name.toLowerCase().includes("jump"));
-    const wanted = hasJumpAnimation ? "jump" : running ? "running" : walking ? "walk" : "idle";
-    const next = avatarAnimationGroups.find((group) => group.name.toLowerCase().includes(wanted));
-    if (!next || next === activeAvatarAnimation) return;
-    activeAvatarAnimation?.stop();
-    activeAvatarAnimation = next;
-    next.start(true);
-  };
-  async function loadAnimatedAvatar(): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "mercenary_astronaut_optimized.glb", scene);
-      const avatarRoot = new BABYLONNS.TransformNode("mercenary-avatar-model", scene);
-      avatarRoot.parent = astronaut.root;
-      for (const mesh of result.meshes) {
-        if (!mesh.parent) mesh.parent = avatarRoot;
-        mesh.receiveShadows = true;
-        // Imported rig bounds include animation extents; casting their shadow
-        // produces a field-long black wedge at the low dawn sun angle.
-      }
-      avatarRoot.computeWorldMatrix(true);
-      let bounds = avatarRoot.getHierarchyBoundingVectors(true);
-      const height = Math.max(0.01, bounds.max.y - bounds.min.y);
-      avatarRoot.scaling.setAll(1.78 / height);
-      avatarRoot.computeWorldMatrix(true);
-      bounds = avatarRoot.getHierarchyBoundingVectors(true);
-      avatarRoot.position.x += astronaut.root.position.x - (bounds.min.x + bounds.max.x) / 2;
-      avatarRoot.position.y += astronaut.root.position.y - bounds.min.y;
-      avatarRoot.position.z += astronaut.root.position.z - (bounds.min.z + bounds.max.z) / 2;
-      proceduralAvatarMeshes.forEach((mesh) => mesh.setEnabled(false));
-      avatarAnimationGroups = result.animationGroups;
-      avatarAnimationGroups.forEach((group) => group.stop());
-      playAvatarAnimation(false, false);
-      console.info("[Mission 01] Mercenary astronaut loaded; idle, walk, and run animations ready.", { height, center: [bounds.min.x, bounds.min.y, bounds.min.z] });
-    } catch (error) {
-      console.warn("[Mission 01] Could not load mercenary astronaut; procedural engineer remains active.", error);
-    }
-  }
-  void loadAnimatedAvatar();
 
   // --- Set dressing: a small 1920s test vehicle, launch frame and field stations ---
   const propMat = new BABYLONNS.PBRMaterial("gameplay-aged-steel", scene);
@@ -157,6 +114,10 @@ export function createGameplayLayer(
   markerMat.albedoColor = BABYLONNS.Color3.FromHexString("#9a563d");
   markerMat.metallic = 0.12;
   markerMat.roughness = 0.82;
+  const rocketSkinMat = new BABYLONNS.PBRMaterial("1926-rocket-aged-aluminum", scene);
+  rocketSkinMat.albedoColor = BABYLONNS.Color3.FromHexString("#aaa797");
+  rocketSkinMat.metallic = 0.28;
+  rocketSkinMat.roughness = 0.78;
 
   const poiRoot = new BABYLONNS.TransformNode("gameplay-poi-root", scene);
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
@@ -176,12 +137,11 @@ export function createGameplayLayer(
   rocketRoot.parent = root;
   const proceduralRocketRoot = new BABYLONNS.TransformNode("procedural-rocket-fallback", scene);
   proceduralRocketRoot.parent = rocketRoot;
-  const shuttleModelRoot = new BABYLONNS.TransformNode("nasa-shuttle-model", scene);
-  shuttleModelRoot.parent = rocketRoot;
-  shuttleModelRoot.setEnabled(false);
-  const rocketBody = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-body", { height: 3.2, diameter: 0.38, tessellation: 12 }, scene);
+  // Keep the vehicle appropriate to the 1926 setting: a modest early test
+  // rocket with a weathered metal skin, not the unrelated modern shuttle GLB.
+  const rocketBody = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-body", { height: 3.2, diameterTop: 0.34, diameterBottom: 0.38, tessellation: 24 }, scene);
   rocketBody.position.y = 1.6;
-  rocketBody.material = propMat;
+  rocketBody.material = rocketSkinMat;
   rocketBody.parent = proceduralRocketRoot;
   const rocketNose = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-nose", { height: 0.55, diameterTop: 0, diameterBottom: 0.38, tessellation: 12 }, scene);
   rocketNose.position.y = 3.47;
@@ -391,7 +351,7 @@ export function createGameplayLayer(
 
   const woodMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-weathered-wood", "#75583f", "wood");
   const darkMetalMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-oxidized-metal", "#3d4543", "metal");
-  const plasterMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-lime-plaster", "#b9b099", "plaster");
+  const plasterMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-weatherboard-siding", "#8d8776", "plaster");
   const glassMat = new BABYLONNS.PBRMaterial("gameplay-old-window-glass", scene);
   glassMat.albedoColor = BABYLONNS.Color3.FromHexString("#8eaaa8");
   glassMat.alpha = 0.62;
@@ -482,6 +442,28 @@ export function createGameplayLayer(
       mullion.position = new BABYLONNS.Vector3(windowX, 1.34, depth / 2 + 0.095);
       mullion.material = woodMat;
       mullion.parent = building;
+      for (const shutterSide of [-1, 1]) {
+        const shutter = BABYLONNS.MeshBuilder.CreateBox(`${name}-window-shutter-${side}-${shutterSide}`, { width: 0.13, height: 0.5, depth: 0.045 }, scene);
+        shutter.position = new BABYLONNS.Vector3(windowX + shutterSide * 0.42, 1.34, depth / 2 + 0.065);
+        shutter.material = woodMat;
+        shutter.parent = building;
+      }
+    }
+    // Weatherboard siding gives the closed field buildings the familiar
+    // horizontal profile of an early New England workshop.
+    for (let board = 0; board < 9; board++) {
+      const y = 0.32 + board * 0.22;
+      const frontSiding = BABYLONNS.MeshBuilder.CreateBox(`${name}-front-siding-${board}`, { width: width - 0.12, height: 0.035, depth: 0.018 }, scene);
+      frontSiding.position = new BABYLONNS.Vector3(0, y, depth / 2 + 0.008);
+      frontSiding.material = plasterMat;
+      frontSiding.parent = building;
+      for (const side of [-1, 1]) {
+        const sideSiding = BABYLONNS.MeshBuilder.CreateBox(`${name}-side-siding-${side}-${board}`, { width: depth - 0.12, height: 0.035, depth: 0.018 }, scene);
+        sideSiding.position = new BABYLONNS.Vector3(side * (width / 2 + 0.008), y, 0);
+        sideSiding.rotation.y = Math.PI / 2;
+        sideSiding.material = plasterMat;
+        sideSiding.parent = building;
+      }
     }
     for (const side of [-1, 1]) {
       const timber = BABYLONNS.MeshBuilder.CreateBox(`${name}-corner-timber-${side}`, { width: 0.14, height: 2.22, depth: 0.14 }, scene);
@@ -497,12 +479,14 @@ export function createGameplayLayer(
     return building;
   };
 
-  const fallbackBuildings = [
+  const fieldBuildings = [
     buildZone("laboratory", -11, -9, 10, 7.5),
     buildZone("storage", 11, -8, 3.2, 2.6),
-    buildZone("workshop", 11, 9, 9, 7),
+    buildZone("workshop", 25, 16, 9, 7),
   ];
+  fieldBuildings.forEach((building) => building.getChildMeshes(false).forEach((mesh) => { mesh.isPickable = false; }));
 
+  const proceduralTreeRoots: BABYLON.TransformNode[] = [];
   async function loadEnvironmentModels(): Promise<void> {
     try {
       await import("@babylonjs/loaders/glTF");
@@ -522,84 +506,12 @@ export function createGameplayLayer(
         const clone = treeRoot.clone(`model-tree-${index}`, root);
         if (clone) clone.position = new BABYLONNS.Vector3(position[0], treeRoot.position.y, position[1]);
       }
+      proceduralTreeRoots.forEach((tree) => tree.dispose(false, false));
     } catch (error) {
-      console.warn("[Mission 01] Could not load environment models; using procedural buildings and vegetation.", error);
+      console.warn("[Mission 01] Could not load the bundled trees; using procedural field vegetation.", error);
     }
   }
   void loadEnvironmentModels();
-
-  async function loadBuildingModel(file: string, name: string, x: number, z: number, targetWidth: number): Promise<BABYLON.TransformNode> {
-    const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", file, scene);
-    const modelRoot = new BABYLONNS.TransformNode(`building-model-${name}`, scene);
-    modelRoot.parent = root;
-    for (const mesh of result.meshes) {
-      if (!mesh.parent) mesh.parent = modelRoot;
-      mesh.checkCollisions = false; // Player physics uses matching full-footprint AABBs.
-      mesh.receiveShadows = true;
-    }
-    result.animationGroups.forEach((animation) => animation.stop());
-    modelRoot.computeWorldMatrix(true);
-    let bounds = modelRoot.getHierarchyBoundingVectors(true);
-    const span = Math.max(0.01, bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z);
-    modelRoot.scaling.setAll(targetWidth / span);
-    modelRoot.computeWorldMatrix(true);
-    bounds = modelRoot.getHierarchyBoundingVectors(true);
-    const groundY = terrain.getHeightAt(x, z);
-    modelRoot.position.set(x - (bounds.min.x + bounds.max.x) / 2, groundY - bounds.min.y, z - (bounds.min.z + bounds.max.z) / 2);
-    return modelRoot;
-  }
-
-  async function loadRequestedBuildings(): Promise<void> {
-    const models: BABYLON.TransformNode[] = [];
-    try {
-      await import("@babylonjs/loaders/glTF");
-      models.push(await loadBuildingModel("edificio_colon_-_modelo_3d_optimized.glb", "project-house", -11, -9, 10.8));
-      models.push(await loadBuildingModel("mies_van_der_rohe_oficina_bacardi_optimized.glb", "workshop-house", 11, 9, 9.6));
-      models.push(await loadBuildingModel("mies_van_der_rohe_oficina_bacardi_optimized.glb", "storage-house", 11, -8, 7.2));
-      fallbackBuildings.forEach((building) => building.dispose(false, true));
-    } catch (error) {
-      models.forEach((model) => model.dispose(false, true));
-      console.warn("[Mission 01] Building model load failed; keeping the procedural houses.", error);
-    }
-  }
-  void loadRequestedBuildings();
-
-  async function loadRequestedShuttle(): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "space_shuttle_nasa_optimized.glb", scene);
-      for (const mesh of result.meshes) {
-        if (!mesh.parent) mesh.parent = shuttleModelRoot;
-        mesh.receiveShadows = true;
-        // The shuttle's source mesh has a very large shadow volume; keep it
-        // lit by the field sun without obscuring the launch area with a wedge.
-      }
-      result.animationGroups.forEach((animation) => animation.stop());
-      shuttleModelRoot.computeWorldMatrix(true);
-      let bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      const dimensions = [bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z];
-      const longAxis = dimensions.indexOf(Math.max(...dimensions));
-      if (longAxis === 0) shuttleModelRoot.rotation.z = -Math.PI / 2;
-      else if (longAxis === 2) shuttleModelRoot.rotation.x = Math.PI / 2;
-      shuttleModelRoot.computeWorldMatrix(true);
-      bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      const longest = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z);
-      shuttleModelRoot.scaling.setAll(8.5 / Math.max(0.01, longest));
-      shuttleModelRoot.computeWorldMatrix(true);
-      bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      shuttleModelRoot.position.set(
-        rocketRoot.position.x - (bounds.min.x + bounds.max.x) / 2,
-        rocketRoot.position.y - bounds.min.y,
-        rocketRoot.position.z - (bounds.min.z + bounds.max.z) / 2,
-      );
-      shuttleModelRoot.setEnabled(true);
-      proceduralRocketRoot.setEnabled(false);
-      console.info("[Mission 01] NASA shuttle asset loaded and aligned vertically on the launch frame.");
-    } catch (error) {
-      console.warn("[Mission 01] Could not load NASA shuttle; procedural rocket remains active.", error);
-    }
-  }
-  void loadRequestedShuttle();
 
   const observationDeck = BABYLONNS.MeshBuilder.CreateBox("observation-deck", {
     width: 3.8,
@@ -625,6 +537,7 @@ export function createGameplayLayer(
     const tree = new BABYLONNS.TransformNode(name, scene);
     tree.position = new BABYLONNS.Vector3(x, y, z);
     tree.parent = root;
+    proceduralTreeRoots.push(tree);
     const trunk = BABYLONNS.MeshBuilder.CreateCylinder(`${name}-trunk`, { height: 2.5 * scale, diameter: 0.22 * scale, tessellation: 7 }, scene);
     trunk.position.y = 1.25 * scale;
     trunk.material = woodMat;
@@ -665,16 +578,6 @@ export function createGameplayLayer(
       rail.material = woodMat;
       rail.parent = fenceRoot;
     }
-  }
-
-  const trackMat = new BABYLONNS.StandardMaterial("dirt-road-mat", scene);
-  trackMat.diffuseColor = BABYLONNS.Color3.FromHexString("#817462");
-  trackMat.roughness = 1;
-  for (const z of [-10, -4, 2, 8]) {
-    const path = BABYLONNS.MeshBuilder.CreateGround(`field-path-${z}`, { width: 0.55, height: 14, subdivisions: 1 }, scene);
-    path.position = new BABYLONNS.Vector3(2, terrain.getHeightAt(2, z) + 0.035, z);
-    path.material = trackMat;
-    path.parent = root;
   }
 
   // CC0 photogrammetry props are bundled locally; there are no runtime CDN dependencies.
@@ -765,7 +668,7 @@ export function createGameplayLayer(
     { x: 18.4, z: 8.4, radius: 0.65, speed: 0.27, phase: 2.1 },
     { x: -5.3, z: 10.5, radius: 0.55, speed: 0.3, phase: 4.2 },
   ].map((worker) => {
-    const character = createAstronautCharacter(BABYLONNS, scene);
+    const character = createFieldEngineer(BABYLONNS, scene);
     character.root.parent = root;
     character.root.scaling.setAll(0.78);
     character.root.position = new BABYLONNS.Vector3(worker.x, terrain.getHeightAt(worker.x, worker.z), worker.z);
@@ -776,9 +679,9 @@ export function createGameplayLayer(
   root.setEnabled(false);
 
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
-  const cameraOffsetRadius = 7;
+  const cameraOffsetRadius = 8.4;
   camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 12;
+  camera.upperRadiusLimit = 24;
   camera.lowerBetaLimit = 0.02;
   camera.upperBetaLimit = Math.PI - 0.02;
 
@@ -793,8 +696,14 @@ export function createGameplayLayer(
   let touchMoveY = 0;
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
+  let endingShotElapsed = -1;
+  let endingShotStart: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 } | null = null;
 
   function onKeyDown(ev: KeyboardEvent): void {
+    if (endingShotElapsed >= 0) {
+      ev.preventDefault();
+      return;
+    }
     const key = ev.key.toLowerCase();
     keysDown.add(key);
     if (launchElapsed >= 0 && ["1", "2", "3"].includes(key)) {
@@ -826,8 +735,8 @@ export function createGameplayLayer(
   function updateNearestPoi(): void {
     let closest: { poi: MissionPointOfInterest; position: BABYLON.Vector3; distSq: number } | null = null;
     for (const entry of poiMeshes) {
-      const dx = entry.position.x - astronaut.root.position.x;
-      const dz = entry.position.z - astronaut.root.position.z;
+      const dx = entry.position.x - fieldEngineer.root.position.x;
+      const dz = entry.position.z - fieldEngineer.root.position.z;
       const distSq = dx * dx + dz * dz;
       if (distSq <= INTERACT_RADIUS * INTERACT_RADIUS && (!closest || distSq < closest.distSq)) {
         closest = { poi: entry.poi, position: entry.position, distSq };
@@ -849,7 +758,7 @@ export function createGameplayLayer(
       onMapStateChange(cb) {
         mapStateCallback = cb;
         cb({
-          player: { x: astronaut.root.position.x, z: astronaut.root.position.z, direction: astronaut.root.rotation.y },
+          player: { x: fieldEngineer.root.position.x, z: fieldEngineer.root.position.z, direction: fieldEngineer.root.rotation.y },
           points: getMapPoints(),
         });
       },
@@ -857,8 +766,8 @@ export function createGameplayLayer(
         interactCallback = cb;
       },
       reset() {
-        astronaut.root.position.set(PLAYER_START.x, terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z), PLAYER_START.z);
-        astronaut.root.rotation.set(0, 0, 0);
+        fieldEngineer.root.position.set(PLAYER_START.x, terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z), PLAYER_START.z);
+        fieldEngineer.root.rotation.set(0, 0, 0);
         velocity.set(0, 0, 0);
         verticalVelocity = 0;
         grounded = true;
@@ -869,12 +778,13 @@ export function createGameplayLayer(
         rocketRoot.position.copyFrom(rocketStart);
         rocketRoot.scaling.setAll(1);
         launchElapsed = -1;
+        endingShotElapsed = -1;
+        endingShotStart = null;
         launchSmoke.stop();
-        camera.alpha = -Math.PI / 2;
-        camera.beta = 1.1;
+        camera.alpha = Math.PI / 2;
+        camera.beta = 1.34;
         camera.radius = cameraOffsetRadius;
-        camera.target.copyFrom(astronaut.root.position);
-        playAvatarAnimation(false, false);
+        camera.target.copyFrom(fieldEngineer.root.position);
         this.setDesign("balanced", "basic");
       },
       setDesign(structure, instrumentation) {
@@ -893,7 +803,7 @@ export function createGameplayLayer(
                 configuredPoi.position.z,
               )
             : null);
-        navigationPath = target ? findWalkPath(astronaut.root.position, target) : [];
+        navigationPath = target ? findWalkPath(fieldEngineer.root.position, target) : [];
       },
       playLaunch() {
         launchElapsed = 0;
@@ -916,10 +826,23 @@ export function createGameplayLayer(
           ).normalize();
         }
         scene.fogColor = BABYLONNS.Color3.Lerp(
-          BABYLONNS.Color3.FromHexString("#aeb5b5"),
+          BABYLONNS.Color3.FromHexString("#c1a48c"),
           BABYLONNS.Color3.FromHexString("#c1b49b"),
           morning,
         );
+      },
+      playMissionEndingShot() {
+        endingShotElapsed = 0;
+        endingShotStart = {
+          alpha: camera.alpha,
+          beta: camera.beta,
+          radius: camera.radius,
+          target: camera.target.clone(),
+        };
+        navigationPath = [];
+        keysDown.clear();
+        velocity.set(0, 0, 0);
+        leftShiftDown = false;
       },
       setTouchMovement(x, y) {
         touchMoveX = Math.max(-1, Math.min(1, x));
@@ -934,7 +857,7 @@ export function createGameplayLayer(
         }
       },
       interact() {
-        if (nearestPoi) {
+        if (nearestPoi && endingShotElapsed < 0) {
           navigationPath = [];
           interactCallback?.(nearestPoi.poi.id);
         }
@@ -957,9 +880,9 @@ export function createGameplayLayer(
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
       camera.radius = cameraOffsetRadius;
-      camera.alpha = -Math.PI / 2;
-      camera.beta = 1.1;
-      camera.target = astronaut.root.position.clone();
+      camera.alpha = Math.PI / 2;
+      camera.beta = 1.34;
+      camera.target = fieldEngineer.root.position.clone();
     },
     disable() {
       if (!enabled) return;
@@ -1020,10 +943,14 @@ export function createGameplayLayer(
       }
 
       let movementStrength = Math.min(1, Math.hypot(moveX, moveZ));
-      if (navigationPath.length > 0) {
+      if (endingShotElapsed >= 0) {
+        moveX = 0;
+        moveZ = 0;
+        movementStrength = 0;
+      } else if (navigationPath.length > 0) {
         const waypoint = navigationPath[0]!;
-        const dx = waypoint.x - astronaut.root.position.x;
-        const dz = waypoint.z - astronaut.root.position.z;
+        const dx = waypoint.x - fieldEngineer.root.position.x;
+        const dz = waypoint.z - fieldEngineer.root.position.z;
         const distance = Math.hypot(dx, dz);
         if (distance <= 0.85) navigationPath.shift();
         else { moveX = dx / distance; moveZ = dz / distance; movementStrength = 1; }
@@ -1046,25 +973,24 @@ export function createGameplayLayer(
         velocity.z *= damping;
       }
       const walking = velocity.lengthSquared() > 0.02;
-      astronaut.root.position.x += velocity.x * deltaSeconds;
-      astronaut.root.position.z += velocity.z * deltaSeconds;
-      astronaut.root.position.x = Math.max(-FIELD_HALF_SIZE, Math.min(FIELD_HALF_SIZE, astronaut.root.position.x));
-      astronaut.root.position.z = Math.max(-FIELD_HALF_SIZE, Math.min(FIELD_HALF_SIZE, astronaut.root.position.z));
-      const collision = resolveObjectCollisions(astronaut.root.position);
+      fieldEngineer.root.position.x += velocity.x * deltaSeconds;
+      fieldEngineer.root.position.z += velocity.z * deltaSeconds;
+      fieldEngineer.root.position.x = Math.max(-FIELD_HALF_SIZE, Math.min(FIELD_HALF_SIZE, fieldEngineer.root.position.x));
+      fieldEngineer.root.position.z = Math.max(-FIELD_HALF_SIZE, Math.min(FIELD_HALF_SIZE, fieldEngineer.root.position.z));
+      const collision = resolveObjectCollisions(fieldEngineer.root.position);
       if (collision.x) velocity.x = 0;
       if (collision.z) velocity.z = 0;
       verticalVelocity -= EARTH_GRAVITY * deltaSeconds;
-      astronaut.root.position.y += verticalVelocity * deltaSeconds;
-      const groundY = terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z);
-      if (astronaut.root.position.y <= groundY) {
-        astronaut.root.position.y = groundY;
+      fieldEngineer.root.position.y += verticalVelocity * deltaSeconds;
+      const groundY = terrain.getHeightAt(fieldEngineer.root.position.x, fieldEngineer.root.position.z);
+      if (fieldEngineer.root.position.y <= groundY) {
+        fieldEngineer.root.position.y = groundY;
         verticalVelocity = 0;
         grounded = true;
       }
-      if (walking) astronaut.root.rotation.y = Math.atan2(velocity.x, velocity.z);
-      astronaut.setMovementState(walking, walking && leftShiftDown);
-      playAvatarAnimation(walking, walking && leftShiftDown, !grounded);
-      astronaut.update(deltaSeconds);
+      if (walking) fieldEngineer.root.rotation.y = Math.atan2(velocity.x, velocity.z);
+      fieldEngineer.setMovementState(walking, walking && leftShiftDown);
+      fieldEngineer.update(deltaSeconds);
       for (const worker of fieldCrew) {
         const angle = elapsed * worker.speed + worker.phase;
         const x = worker.x + Math.cos(angle) * worker.radius;
@@ -1076,20 +1002,34 @@ export function createGameplayLayer(
         worker.character.update(deltaSeconds);
       }
 
-      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14;
-      camera.target.copyFrom(cameraTracksRocket ? rocketRoot.position : astronaut.root.position);
-      camera.target.y += cameraTracksRocket ? 1.8 : 1.2;
-      if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
+      if (endingShotElapsed >= 0 && endingShotStart) {
+        endingShotElapsed = Math.min(5.8, endingShotElapsed + deltaSeconds);
+        const progress = Math.min(1, endingShotElapsed / 5.8);
+        const eased = progress * progress * (3 - 2 * progress);
+        camera.alpha = endingShotStart.alpha + 0.34 * eased;
+        camera.beta = endingShotStart.beta + (1.28 - endingShotStart.beta) * eased;
+        camera.radius = endingShotStart.radius + (22 - endingShotStart.radius) * eased;
+        camera.target.copyFrom(BABYLONNS.Vector3.Lerp(
+          endingShotStart.target,
+          new BABYLONNS.Vector3(0, 1.2, 0),
+          eased,
+        ));
+      } else {
+        const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14;
+        camera.target.copyFrom(cameraTracksRocket ? rocketRoot.position : fieldEngineer.root.position);
+        camera.target.y += cameraTracksRocket ? 1.8 : 1.2;
+        if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
+      }
 
       updateNearestPoi();
       mapStateCallback?.({
-        player: { x: astronaut.root.position.x, z: astronaut.root.position.z, direction: astronaut.root.rotation.y },
+        player: { x: fieldEngineer.root.position.x, z: fieldEngineer.root.position.z, direction: fieldEngineer.root.rotation.y },
         points: getMapPoints(),
       });
     },
   dispose() {
       this.disable();
-      astronaut.dispose();
+      fieldEngineer.dispose();
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();
       smokeTexture.dispose();
@@ -1106,11 +1046,11 @@ export function createGameplayLayer(
       plasterMat.dispose(false, true);
       paperMat.dispose();
       markerMat.dispose();
+      rocketSkinMat.dispose();
       glassMat.dispose();
       grassMat.dispose();
       leafMat.dispose();
       sky.dispose(false, true);
-      trackMat.dispose();
       root.dispose(false, true);
     },
   };
@@ -1126,18 +1066,25 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   const texture = new BABYLONNS.DynamicTexture("auburn-overcast-sky", { width: 1024, height: 512 }, scene, false);
   const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
   const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-  gradient.addColorStop(0, "#667988");
-  gradient.addColorStop(0.46, "#a9b8bf");
-  gradient.addColorStop(0.78, "#d1d3cc");
-  gradient.addColorStop(1, "#b4b9b1");
+  gradient.addColorStop(0, "#43566a");
+  gradient.addColorStop(0.34, "#788b9b");
+  gradient.addColorStop(0.56, "#b8a18f");
+  gradient.addColorStop(0.72, "#e4b58c");
+  gradient.addColorStop(0.84, "#d7bc9c");
+  gradient.addColorStop(1, "#a8a896");
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1024, 512);
-  for (let i = 0; i < 54; i++) {
+  const sunrise = ctx.createRadialGradient(690, 365, 6, 690, 365, 195);
+  sunrise.addColorStop(0, "rgba(255, 218, 166, 0.52)");
+  sunrise.addColorStop(0.35, "rgba(242, 185, 137, 0.24)");
+  sunrise.addColorStop(1, "rgba(230, 174, 132, 0)");
+  ctx.fillStyle = sunrise; ctx.fillRect(0, 210, 1024, 230);
+  for (let i = 0; i < 105; i++) {
     const x = Math.random() * 1024;
-    const y = 80 + Math.random() * 220;
-    const w = 45 + Math.random() * 170;
-    const h = 6 + Math.random() * 22;
-    ctx.globalAlpha = 0.025 + Math.random() * 0.055;
-    ctx.fillStyle = i % 3 ? "#f2eee3" : "#6e8088";
+    const y = 70 + Math.random() * 260;
+    const w = 55 + Math.random() * 210;
+    const h = 4 + Math.random() * 18;
+    ctx.globalAlpha = 0.065 + Math.random() * 0.065;
+    ctx.fillStyle = i % 3 ? "#f7e8d5" : "#516a7a";
     ctx.beginPath(); ctx.ellipse(x, y, w, h, (Math.random() - 0.5) * 0.08, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1; texture.update();
@@ -1145,6 +1092,7 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   material.diffuseTexture = texture;
   material.emissiveTexture = texture;
   material.disableLighting = true;
+  material.fogEnabled = false;
   material.backFaceCulling = false;
   sky.material = material;
   sky.isPickable = false;
@@ -1166,7 +1114,7 @@ function createWeatheredMaterial(
     ? ["#34281e", "#b08b5b", "#4c3828", "#c2a071"]
     : style === "metal"
       ? ["#252f2e", "#744a32", "#9b6946", "#62665d"]
-      : ["#e1d9c4", "#8c8068", "#aa9b7d", "#f0e7d0"];
+      : ["#b8b09a", "#68675c", "#8f8773", "#c7bca4"];
   for (let i = 0; i < 1850; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;

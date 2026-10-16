@@ -775,6 +775,8 @@ export class Mission1Screen implements Screen {
   private runMissionEnding(): void {
     if (!this.modalRoot) return;
     this.paused = true;
+    this.gameplay?.playMissionEndingShot();
+    this.modalRoot.classList.add("mission-ending-overlay--cinematic");
     this.modalRoot.classList.remove("modal-overlay--hidden");
     this.modalRoot.innerHTML = "";
     const card = el("div", { className: "modal-card mission-ending-card" });
