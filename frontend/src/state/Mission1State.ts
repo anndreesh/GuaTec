@@ -28,6 +28,10 @@ export class Mission1State {
   objectives = new Set<MissionObjectiveId>();
   records = new Set<string>();
   analyzed = new Set<string>();
+  crewMembers = new Set<string>();
+  testingChecks = new Set<string>();
+  diagnosticChecks = new Set<string>();
+  launchChecks = new Set<string>();
   engineering: EngineeringProfile = { ...DEFAULT_ENGINEERING };
   checkpoint = "Arrival";
   flightResult: FlightResult | null = null;
@@ -49,6 +53,10 @@ export class Mission1State {
         this.objectives = new Set(extra.objectives as MissionObjectiveId[]);
         this.records = new Set(extra.records);
         this.analyzed = new Set(extra.analyzed);
+        this.crewMembers = new Set(extra.crewMembers ?? []);
+        this.testingChecks = new Set(extra.testingChecks ?? []);
+        this.diagnosticChecks = new Set(extra.diagnosticChecks ?? []);
+        this.launchChecks = new Set(extra.launchChecks ?? []);
         this.engineering = { ...DEFAULT_ENGINEERING, ...extra.engineering };
         this.checkpoint = extra.checkpoint;
         this.flightResult = extra.flightResult;
@@ -107,7 +115,7 @@ export class Mission1State {
     const objective = MISSION_01_OBJECTIVES.find((item) => item.id === id);
     if (objective) this.checkpoint = objective.checkpoint;
     const phaseTick: Record<MissionObjectiveId, number> = {
-      lab: 2, discover: 5, prototype: 8, design: 13,
+      lab: 2, discover: 5, team: 7, prototype: 9, design: 14,
       testing: 20, prepare: 26, flight: 32, analysis: 38,
     };
     this.tick = Math.max(this.tick, phaseTick[id]);
@@ -131,6 +139,31 @@ export class Mission1State {
   analyzeData(topic: string): void {
     this.analyzed.add(topic);
     this.addLogEntry(`ANALYSIS — ${topic} reviewed.`);
+  }
+
+  completeTestCheck(id: string): boolean {
+    if (this.testingChecks.has(id)) return false;
+    this.testingChecks.add(id);
+    return true;
+  }
+
+  completeDiagnosticCheck(id: string): boolean {
+    if (this.diagnosticChecks.has(id)) return false;
+    this.diagnosticChecks.add(id);
+    return true;
+  }
+
+  completeLaunchCheck(id: string): boolean {
+    if (this.launchChecks.has(id)) return false;
+    this.launchChecks.add(id);
+    return true;
+  }
+
+  meetCrewMember(id: string): void {
+    this.crewMembers.add(id);
+    if (["propulsion", "structural", "data"].every((member) => this.crewMembers.has(member))) {
+      this.completeObjective("team");
+    }
   }
 
   isFailed(): boolean {
@@ -174,6 +207,10 @@ export class Mission1State {
         objectives: [...this.objectives], records: [...this.records],
         engineering: this.engineering, checkpoint: this.checkpoint,
         analyzed: [...this.analyzed], flightResult: this.flightResult,
+        crewMembers: [...this.crewMembers],
+        testingChecks: [...this.testingChecks],
+        diagnosticChecks: [...this.diagnosticChecks],
+        launchChecks: [...this.launchChecks],
       },
     };
   }

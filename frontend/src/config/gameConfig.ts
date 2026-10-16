@@ -275,6 +275,18 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
     position: { x: -8, z: -1 },
   },
   {
+    id: "prototype-area",
+    label: "Plataforma exterior del prototipo",
+    flavorText: "El vehículo experimental está montado sobre una estructura baja en el campo. Su configuración se presenta como una abstracción de juego.",
+    position: { x: 2, z: -12 },
+  },
+  {
+    id: "instrument-station",
+    label: "Mesa de instrumentación",
+    flavorText: "Un registrador mecánico y sus hojas de lectura esperan junto a la zona de pruebas.",
+    position: { x: -6, z: 12 },
+  },
+  {
     id: "engine-selection",
     label: "Banco de ingeniería",
     flavorText: "Una mesa de trabajo al aire libre sostiene los esquemas del prototipo. Las opciones son abstracciones de juego, no instrucciones de fabricación.",
@@ -297,6 +309,12 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
     label: "Área de observación",
     flavorText: "El pequeño registrador debe convertir unos segundos de vuelo en evidencia útil. Desde aquí el equipo seguirá el vehículo.",
     position: { x: 8, z: -23 },
+  },
+  {
+    id: "analysis-area",
+    label: "Mesa exterior de análisis",
+    flavorText: "Una mesa técnica exterior espera el registro de vuelo, las notas estructurales y las observaciones de la tripulación.",
+    position: { x: 15, z: -14 },
   },
 ];
 

@@ -161,7 +161,13 @@ export function createGameplayLayer(
   const poiRoot = new BABYLONNS.TransformNode("gameplay-poi-root", scene);
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
   const getMapPoints = () => [
-    ...poiMeshes.map(({ poi, position }) => ({ id: poi.id, label: poi.label, x: position.x, z: position.z, navigable: true })),
+    ...pois.map((poi) => ({
+      id: poi.id,
+      label: poi.label,
+      x: poi.position.x,
+      z: poi.position.z,
+      navigable: true,
+    })),
     { id: "prototype-platform", label: "Plataforma del prototipo", x: 0, z: ROCKET_PLATFORM_Z, navigable: false },
   ];
 
@@ -706,6 +712,7 @@ export function createGameplayLayer(
     { name: "engineering-bench", x: 18.5, z: 8, width: 2.8 },
     { name: "test-instruments", x: -6, z: 9, width: 2.4 },
     { name: "observation-table", x: 8, z: -23, width: 2.4 },
+    { name: "analysis-table", x: 15, z: -14, width: 2.4 },
   ];
   for (const station of fieldStations) {
     collisionObstacles.push({
@@ -877,8 +884,16 @@ export function createGameplayLayer(
         instruments.setEnabled(instrumentation === "extended");
       },
       navigateTo(poiId) {
-        const target = poiMeshes.find((entry) => entry.poi.id === poiId);
-        navigationPath = target ? findWalkPath(astronaut.root.position, target.position) : [];
+        const configuredPoi = pois.find((poi) => poi.id === poiId);
+        const target = poiMeshes.find((entry) => entry.poi.id === poiId)?.position
+          ?? (configuredPoi
+            ? new BABYLONNS.Vector3(
+                configuredPoi.position.x,
+                terrain.getHeightAt(configuredPoi.position.x, configuredPoi.position.z),
+                configuredPoi.position.z,
+              )
+            : null);
+        navigationPath = target ? findWalkPath(astronaut.root.position, target) : [];
       },
       playLaunch() {
         launchElapsed = 0;

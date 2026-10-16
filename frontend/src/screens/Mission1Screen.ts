@@ -27,12 +27,13 @@ const MISSION_SLUG = MISSION_SLUGS.mission1;
 const MAP_OBJECTIVE_TARGET: Record<string, string> = {
   lab: "project-area",
   discover: "project-area",
-  prototype: "project-area",
+  team: "prototype-area",
+  prototype: "prototype-area",
   design: "engine-selection",
   testing: "pressure-test",
   prepare: "launch-window",
-  flight: "launch-window",
-  analysis: "telemetry-fluctuation",
+  flight: "telemetry-fluctuation",
+  analysis: "analysis-area",
 };
 
 /** The playable Mission 1 loop: a third-person Earth test-range scene
@@ -327,13 +328,24 @@ export class Mission1Screen implements Screen {
   }
 
   private updateMissionMap(state: GameplayMapState): void {
-    this.mapState = state;
+    const configuredPoints = MISSION_1_POIS.map((poi) => ({
+      id: poi.id,
+      label: poi.label,
+      x: poi.position.x,
+      z: poi.position.z,
+      navigable: true,
+    }));
+    const points = [...state.points];
+    for (const poi of configuredPoints) {
+      if (!points.some((point) => point.id === poi.id)) points.push(poi);
+    }
+    this.mapState = { ...state, points };
     if (!this.mapPlayer) return;
-    if (this.mapGrid && this.mapGrid.querySelectorAll(".mission-map-point").length !== state.points.length) {
+    if (this.mapGrid && this.mapGrid.querySelectorAll(".mission-map-point").length !== points.length) {
       this.mapGrid.querySelectorAll(".mission-map-point").forEach((point) => point.remove());
       if (this.mapLocations) this.mapLocations.innerHTML = "";
       this.mapLocations?.append(el("h3", { className: "mission-map-locations-title", text: t("ALL LOCATIONS") }));
-      for (const [index, point] of state.points.entries()) {
+      for (const [index, point] of points.entries()) {
         const label = t(point.label);
         const number = String(index + 1);
         const marker = el("span", { className: "mission-map-point", text: number, attrs: { title: `${number} · ${label}`, "aria-label": `${number}. ${label}` } });
@@ -375,7 +387,7 @@ export class Mission1Screen implements Screen {
     if (!objective) return;
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
     this.renderedMapObjectiveId = pending?.id ?? "complete";
-    const targetId = pending ? MAP_OBJECTIVE_TARGET[pending.id] : null;
+    const targetId = pending ? this.mapTargetForObjective(pending.id) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     objective.innerHTML = "";
     this.mapDistance = el("p", { className: "mission-map-distance" });
@@ -407,7 +419,7 @@ export class Mission1Screen implements Screen {
 
   private updateMapDistance(): void {
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
-    const targetId = pending ? MAP_OBJECTIVE_TARGET[pending.id] : null;
+    const targetId = pending ? this.mapTargetForObjective(pending.id) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     const distance = target && this.mapState
       ? Math.round(Math.hypot(target.x - this.mapState.player.x, target.z - this.mapState.player.z))
@@ -426,6 +438,18 @@ export class Mission1Screen implements Screen {
       this.mapRoute.style.width = `${Math.hypot(dx, dy)}%`;
       this.mapRoute.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
     }
+  }
+
+  private mapTargetForObjective(objectiveId: string): string | null {
+    if (objectiveId === "team") {
+      if (!this.state.crewMembers.has("structural")) return "prototype-area";
+      if (!this.state.crewMembers.has("data")) return "instrument-station";
+      return "project-area";
+    }
+    if (objectiveId === "testing" && this.state.testingChecks.size === 3 && this.state.diagnosticChecks.size < 3) {
+      return "prototype-area";
+    }
+    return MAP_OBJECTIVE_TARGET[objectiveId] ?? null;
   }
 
   private updateInteractionPrompt(poi: NearbyPoi | null): void {
@@ -449,23 +473,62 @@ export class Mission1Screen implements Screen {
     if (poiId === "project-area") {
       this.state.completeObjective("lab");
       this.state.completeObjective("discover");
+      this.state.meetCrewMember("propulsion");
       this.state.collectRecord("The project — outdoor field notebook");
       this.showEngineeringLeadDialogue(() => {
         this.showChoice("PROJECT AREA · FIELD NOTE", `${poi.flavorText}\n\n${MISSION_01_DIALOGUE.director[0]}\n\nThe fictional team is trying to prove controlled liquid-fuel flight, not reach space.`, [
-          { label: "Review the prototype", run: () => { this.state.completeObjective("prototype"); this.state.collectRecord("Prototype sketch"); this.showToast("Prototype inspected. The design is experimental and data is limited."); } },
+          { label: "Review the project notes", run: () => { this.state.collectRecord("Project brief — field notebook"); this.showToast("FIELD NOTE RECORDED · Inspect the prototype and instruments around the outdoor work area."); } },
           { label: "Talk to the propulsion engineer", run: () => { this.state.addLogEntry("ING. ANDREW WELLS · PROPULSION — We can make it stronger. And heavier."); this.showToast("The engineer points toward the outdoor engineering bench."); } },
-        ]);
+        ], false);
       });
+      return;
+    }
+    if (poiId === "prototype-area") {
+      if (this.state.testingChecks.size === 3 && !this.state.objectives.has("testing")) {
+        this.openTesting(true);
+        return;
+      }
+      const firstInspection = !this.state.objectives.has("prototype");
+      this.state.meetCrewMember("structural");
+      this.state.completeObjective("prototype");
+      if (firstInspection) this.state.collectRecord("Prototype sketch — experimental vehicle");
+      this.state.collectRecord("Prototype status — untested");
+      this.showChoice("EXPERIMENTAL VEHICLE · STATUS UNTESTED", `${poi.flavorText}\n\nING. ELENA BROOKS · STRUCTURAL ENGINEER: “The frame is small. We will learn more from the readings than from its size.”\n\nThe flight asks whether the propulsion system can lift a vehicle clear of the ground. Design values are fictional game abstractions.`, [
+        { label: "Record the prototype inspection", run: () => this.showToast("PROTOTYPE INSPECTED · The structural engineer asks you to meet the data technician before design review.") },
+      ], false);
+      return;
+    }
+    if (poiId === "instrument-station") {
+      this.state.meetCrewMember("data");
+      this.state.collectRecord("Instrument sheet — limited data coverage");
+      this.collectSample({ sampleKey: "field-recorder-1926", label: "Outdoor instrument readiness sheet", type: "telemetry", quality: this.state.engineering.instrumentation === "extended" ? 0.86 : 0.62 });
+      this.showChoice("MARA REED · DATA TECHNICIAN", `${poi.flavorText}\n\n“The recorder can only preserve what we remember to measure. I'll mark the trace and keep a separate observation sheet.”`, [
+        { label: "Add the instrument sheet to the mission log", run: () => this.showToast("DATA COLLECTION · LIMITED · The instrument sheet is in the mission log. The team is ready for its briefing.") },
+      ], false);
       return;
     }
     if (poiId === "engine-selection") { this.openEngineering(); return; }
     if (poiId === "pressure-test") { this.openTesting(); return; }
     if (poiId === "launch-window") { this.openLaunchPreparation(); return; }
-    if (poiId === "telemetry-fluctuation") { this.openAnalysis(); return; }
+    if (poiId === "telemetry-fluctuation") {
+      if (this.state.engineering.launchDecision === "proceed" && !this.state.objectives.has("flight")) {
+        this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry);
+        this.state.completeObjective("flight");
+        this.collectSample({ sampleKey: "flight-observation-1926", label: "Launch day flight observation", type: "flight-record", quality: this.state.resources.telemetry / 100 });
+        this.state.addLogEntry("OBSERVATION AREA — The crew is in position. The flight recorder is ready.");
+        this.renderObjectives();
+        void this.autosave();
+        this.runLaunchSequence();
+        return;
+      }
+      this.showToast("FLIGHT OBSERVATION RECORDED · Return to the outdoor analysis table to review the data.");
+      return;
+    }
+    if (poiId === "analysis-area") { this.openAnalysis(); return; }
     this.showToast(poi.flavorText);
   }
 
-  private showChoice(title: string, description: string, options: { label: string; run: () => void }[]): void {
+  private showChoice(title: string, description: string, options: { label: string; run: () => void }[], countsAsDecision = true): void {
     if (!this.modalRoot) return;
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
@@ -478,7 +541,7 @@ export class Mission1Screen implements Screen {
       button.addEventListener("click", () => {
         this.modalRoot?.classList.add("modal-overlay--hidden");
         this.paused = false;
-        this.state.decisionsMade += 1;
+        if (countsAsDecision) this.state.decisionsMade += 1;
         option.run();
         this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
         void this.autosave();
@@ -498,11 +561,13 @@ export class Mission1Screen implements Screen {
       lines[0]!,
       lines.slice(1).join("\n\n"),
       [{ label: "Continue · review the outdoor field notes", run: onContinue }],
+      false,
     );
   }
 
   private openEngineering(): void {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
+    if (!this.state.objectives.has("team")) { this.showToast("MEET THE STRUCTURAL ENGINEER AND DATA TECHNICIAN BEFORE THE DESIGN REVIEW."); return; }
     const stats = calculateEngineering(this.state.engineering);
     this.showChoice("ENGINEERING · ABSTRACT DESIGN", `Structure: ${this.state.engineering.structure.toUpperCase()} · Instrumentation: ${this.state.engineering.instrumentation.toUpperCase()}\n\nMass ${stats.mass}% · Stability ${stats.stability}% · Data ${stats.data}% · Reliability ${stats.reliability}% · Budget use ${stats.cost}%\n\nThese are game values, not construction instructions. Choose a trade-off; a heavy reinforced structure improves margin but uses more budget.`, [
       { label: "LIGHT structure · lower mass, lower margin", run: () => this.chooseDesign("light") },
@@ -526,14 +591,61 @@ export class Mission1Screen implements Screen {
     this.showToast(`DESIGN LOCKED · ${line}`);
   }
 
-  private openTesting(): void {
+  private openTesting(atPrototype = false): void {
     if (!this.state.objectives.has("design")) { this.showToast("CONFIGURE THE VEHICLE AT THE OUTDOOR ENGINEERING BENCH BEFORE TESTING."); return; }
     const metrics = calculateEngineering(this.state.engineering);
     const structural = metrics.stability >= 65 ? "STRUCTURAL TEST · PASS WITH MARGIN" : "STRUCTURAL TEST · LIMITED MARGIN";
     const dataStatus = this.state.engineering.instrumentation === "extended" ? "DATA RECORDING · READY" : "DATA RECORDING · BASIC COVERAGE";
-    this.showChoice("TEST AREA · SYSTEMS REVIEW", `${structural}\n${dataStatus}\nPROPULSION SIMULATION · ABSTRACT INDICATORS NORMAL\n\nING. JOSE VEGA: “That fluctuation wasn't there before.”\nING. ELENA BROOKS: “Check the frame and the instruments.”\n\nA brief fluctuation appears on the recorder. Diagnose the issue through your design choice. Continuing is possible, but leaves a consequence in the report.`, [
-      { label: "Modify design · spend remaining budget to add margin", run: () => { this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 12); this.state.setEngineering({ structure: "reinforced", testResponse: "modify" }); this.gameplay?.setDesign("reinforced", this.state.engineering.instrumentation); this.state.collectRecord("Test sheet — structural margin revised"); this.state.completeObjective("testing"); this.showToast("ENGINEERING INSIGHT · Reinforcement improved stability; mass increased."); } },
-      { label: "Run another systems test · consume time", run: () => { this.state.engineering.testResponse = "retest"; this.state.collectRecord("Test sheet — second systems review"); this.state.completeObjective("testing"); this.showToast("RETEST COMPLETE · Data quality improved; launch preparation is delayed."); this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 10); this.collectSample({ sampleKey: "pressure-trace-1926", label: "Systems test recorder trace", type: "telemetry", quality: 0.84 }); } },
+    const tests = [
+      { id: "system", label: "Run the system test", note: "SYSTEM TEST — The abstract propulsion indicators stay within the expected range." },
+      { id: "instrumentation", label: "Run the instrumentation test", note: "INSTRUMENTATION TEST — The field recorder catches a brief fluctuation." },
+      { id: "stability", label: "Run the stability check", note: `${structural} — The prototype remains on its exterior support.` },
+    ];
+    const missing = tests.filter((test) => !this.state.testingChecks.has(test.id));
+    if (missing.length) {
+      this.showChoice("TEST AREA · SYSTEM CHECKS", `${dataStatus}\n\nComplete each exterior check before diagnosing the recorder anomaly.\n\n${tests.map((test) => `${this.state.testingChecks.has(test.id) ? "✓" : "□"} ${test.label}`).join("\n")}`, missing.map((test) => ({
+        label: test.label,
+        run: () => {
+          this.state.completeTestCheck(test.id);
+          this.state.collectRecord(`Test sheet — ${test.id} check`);
+          if (test.id === "instrumentation") {
+            this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 6);
+            this.collectSample({ sampleKey: "instrumentation-check-1926", label: "Instrumentation test recorder trace", type: "telemetry", quality: this.state.engineering.instrumentation === "extended" ? 0.88 : 0.65 });
+          }
+          this.state.addLogEntry(test.note);
+          this.showToast(test.note);
+          this.openTesting();
+        },
+      })), false);
+      return;
+    }
+    if (!atPrototype) {
+      this.showToast("THREE TESTS COMPLETE · Walk back to the prototype platform to investigate the recorder anomaly.");
+      this.renderMapObjective();
+      return;
+    }
+    const inspections = [
+      { id: "balance", label: "Inspect the prototype's balance", note: "FIELD INSPECTION — The crew finds a slight imbalance in the fictional support arrangement." },
+      { id: "recorder", label: "Inspect the recorder trace", note: "RECORDER INSPECTION — The trace is real, but the basic setup leaves some uncertainty about its source." },
+      { id: "supports", label: "Inspect the exterior supports", note: "SUPPORT INSPECTION — The frame remains secure; the readings do not point to a support failure." },
+    ];
+    const remainingInspections = inspections.filter((inspection) => !this.state.diagnosticChecks.has(inspection.id));
+    if (remainingInspections.length) {
+      this.showChoice("TEST ANOMALY · FIELD INVESTIGATION", `The team has completed the system, recorder, and stability checks. Walk around the exterior prototype and inspect the evidence before deciding what to change.\n\n${inspections.map((inspection) => `${this.state.diagnosticChecks.has(inspection.id) ? "✓" : "□"} ${inspection.label}`).join("\n")}`, remainingInspections.map((inspection) => ({
+        label: inspection.label,
+        run: () => {
+          this.state.completeDiagnosticCheck(inspection.id);
+          this.state.collectRecord(`Anomaly investigation — ${inspection.id}`);
+          this.state.addLogEntry(inspection.note);
+          this.showToast(inspection.note);
+          this.openTesting(true);
+        },
+      })), false);
+      return;
+    }
+    this.showChoice("WARNING · UNEXPECTED INSTABILITY", `${structural}\n${dataStatus}\nSYSTEM TEST · COMPLETE\n\nING. JOSE VEGA: “That fluctuation wasn't there before.”\nING. ELENA BROOKS: “We have checked the system, recorder, and frame. The trace still points to a balance issue.”\n\nChoose how the fictional team will respond. Each option affects the experiment record.`, [
+      { label: "Correct the balance finding · spend budget to add margin", run: () => { this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 12); this.state.setEngineering({ structure: "reinforced", testResponse: "modify" }); this.gameplay?.setDesign("reinforced", this.state.engineering.instrumentation); this.state.collectRecord("Test sheet — structural margin revised"); this.state.completeObjective("testing"); this.showToast("DIAGNOSIS CONFIRMED · The balance adjustment improved stability; mass increased."); } },
+      { label: "Choose another cause · run an extra test", run: () => { this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 5); this.state.advanceTick(); this.state.engineering.testResponse = "retest"; this.state.collectRecord("Test sheet — additional diagnostic test"); this.state.completeObjective("testing"); this.showToast("DIAGNOSTIC ERROR · The extra check cost time and budget. The team recorded the balance finding for later review."); } },
       { label: "Accept the risk · keep current configuration", run: () => { this.state.engineering.testResponse = "accept-risk"; this.state.engineering.riskTolerance = 80; this.state.collectRecord("Test sheet — instability accepted for observation"); this.state.completeObjective("testing"); this.showToast("RISK RECORDED · The team will monitor the instability during flight."); } },
     ]);
   }
@@ -541,26 +653,50 @@ export class Mission1Screen implements Screen {
   private openLaunchPreparation(): void {
     if (!this.state.objectives.has("testing")) { this.showToast("COMPLETE THE SYSTEMS REVIEW BEFORE PREPARING THE LAUNCH."); return; }
     const weather = this.gameplay?.getWeather() ?? "CLOUDY";
-    this.showChoice("LAUNCH FIELD · FINAL REVIEW", `□ Inspect the vehicle\n□ Check observation instruments\n□ Confirm telemetry\n\nWEATHER · ${weather}\nTIME · ${this.state.tick < 20 ? "DAWN" : this.state.tick < 32 ? "MORNING" : "LATE MORNING"}\n\nMARA REED · DATA TECHNICIAN: “Recorder ready.”\nING. TOMÁS ELDRICH · DIRECTOR: “Are we ready?”\n\nThe historical reference flight took place on March 16, 1926, in Auburn, Massachusetts. Your character and team are fictional.`, [
-      { label: "Proceed · attempt the flight", run: () => { this.state.engineering.launchDecision = "proceed"; this.state.collectRecord("Launch checklist — conditions and instruments confirmed"); this.state.completeObjective("prepare"); this.state.completeObjective("flight"); this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry); this.state.addLogEntry("LAUNCH DECISION — Proceed. The team takes its positions."); this.collectSample({ sampleKey: "flight-observation-1926", label: "Launch day flight observation", type: "flight-record", quality: this.state.resources.telemetry / 100 }); this.renderObjectives(); void this.autosave(); this.runLaunchSequence(); } },
-      { label: "Delay · recheck instruments and accept the cost", run: () => { this.state.engineering.launchDecision = "delay"; this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 8); this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 12); this.state.collectRecord("Launch checklist — delay and recalibration noted"); this.state.completeObjective("prepare"); this.state.completeObjective("flight"); this.state.flightResult = "delayed"; this.state.addLogEntry("LAUNCH DECISION — Delay. Additional instrument review completed; today's attempt is recorded as delayed."); this.showToast("LAUNCH DELAYED · Additional data recovered. Review the flight record at the observation station."); } },
+    const checklist = [
+      { id: "vehicle", label: "Inspect vehicle", note: "VEHICLE CHECK — The fictional crew records the prototype's status." },
+      { id: "instruments", label: "Check instruments", note: "INSTRUMENT CHECK — Mechanical recorder and observation station are ready." },
+      { id: "conditions", label: "Review conditions", note: `CONDITIONS CHECK — ${weather} weather; the crew notes the morning launch window.` },
+      { id: "observation", label: "Confirm observation area", note: "OBSERVATION CHECK — The team confirms its outdoor viewing positions." },
+      { id: "telemetry", label: "Confirm telemetry", note: `TELEMETRY CHECK — ${Math.round(this.state.resources.telemetry)}% data capacity available.` },
+    ];
+    const missing = checklist.filter((item) => !this.state.launchChecks.has(item.id));
+    if (missing.length) {
+      this.showChoice("LAUNCH FIELD · CHECKLIST", `WEATHER · ${weather}\nTIME · ${this.state.tick < 20 ? "DAWN" : this.state.tick < 32 ? "MORNING" : "LATE MORNING"}\n\n${checklist.map((item) => `${this.state.launchChecks.has(item.id) ? "✓" : "□"} ${item.label}`).join("\n")}\n\nComplete each exterior check before the launch decision.`, missing.map((item) => ({
+        label: `Check · ${item.label}`,
+        run: () => {
+          this.state.completeLaunchCheck(item.id);
+          this.state.collectRecord(`Launch checklist — ${item.label.toLowerCase()}`);
+          this.state.addLogEntry(item.note);
+          this.openLaunchPreparation();
+        },
+      })), false);
+      return;
+    }
+    this.showChoice("LAUNCH FIELD · FINAL REVIEW", `${checklist.map((item) => `✓ ${item.label}`).join("\n")}\n\nWEATHER · ${weather}\nTIME · ${this.state.tick < 20 ? "DAWN" : this.state.tick < 32 ? "MORNING" : "LATE MORNING"}\n\nMARA REED · DATA TECHNICIAN: “Recorder ready.”\nING. TOMÁS ELDRICH · DIRECTOR: “Are we ready?”\n\nThe historic flight took place March 16, 1926, in Auburn, Massachusetts. Your character and team are fictional.`, [
+      { label: "Proceed · walk to the observation area", run: () => { this.state.engineering.launchDecision = "proceed"; this.state.collectRecord("Launch checklist — conditions and instruments confirmed"); this.state.completeObjective("prepare"); this.state.addLogEntry("LAUNCH DECISION — Proceed. The team takes its positions at the observation area."); this.renderObjectives(); void this.autosave(); this.showToast("PROCEEDING · Walk to the observation area to begin the countdown."); } },
+      { label: "Delay · recheck instruments and accept the cost", run: () => { this.state.engineering.launchDecision = "delay"; this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 8); this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 12); this.state.collectRecord("Launch checklist — delay and recalibration noted"); this.state.completeObjective("prepare"); this.state.completeObjective("flight"); this.state.flightResult = "delayed"; this.state.addLogEntry("LAUNCH DECISION — Delay. Additional instrument review completed; today's attempt is recorded as delayed."); this.showToast("LAUNCH DELAYED · Additional data recovered. Return to the outdoor analysis table to review it."); } },
     ]);
   }
 
   private openAnalysis(): void {
     if (!this.state.objectives.has("flight")) { this.showToast("THE FLIGHT RECORD WILL BE AVAILABLE AFTER THE LAUNCH DECISION."); return; }
     const result = this.state.flightResult ?? resolveFlight(this.state.engineering, this.state.resources.telemetry);
+    const evidence = ["Propulsion data", "Structural data", "Flight record"];
+    const missingEvidence = evidence.filter((topic) => !this.state.analyzed.has(topic));
     this.showChoice("FLIGHT ANALYSIS", `FLIGHT RESULT · ${result.toUpperCase()}\n\n${MISSION_01_DIALOGUE.historicalNote}\n\nThe historical figures are reference context; the simulated outcome is fictional. Review the evidence sets to complete the analysis.`, [
-      { label: "Analyze propulsion data", run: () => this.state.analyzeData("Propulsion data") },
-      { label: "Analyze structural data", run: () => this.state.analyzeData("Structural data") },
-      { label: "Recover flight record", run: () => { this.state.analyzeData("Flight record"); this.state.collectRecord("Launch day — flight observation"); this.state.completeObjective("analysis"); } },
+      ...missingEvidence.map((topic) => ({ label: `${topic === "Flight record" ? "Recover and review" : "Analyze"} · ${topic.toLowerCase()}`, run: () => {
+        this.state.analyzeData(topic);
+        if (topic === "Flight record") this.state.collectRecord("Launch day — flight observation");
+        this.showToast(`EVIDENCE REVIEWED · ${topic.toUpperCase()}`);
+      } })),
       { label: "Conclude mission · save report", run: () => {
-        const required = ["lab", "discover", "prototype", "design", "testing", "prepare", "flight", "analysis"] as const;
+        const required = ["lab", "discover", "team", "prototype", "design", "testing", "prepare", "flight"] as const;
         const missing = required.filter((id) => !this.state.objectives.has(id));
-        if (missing.length) { this.showToast(`MISSION INCOMPLETE · ${missing.length} objective(s) still need attention.`); return; }
+        if (missing.length || evidence.some((topic) => !this.state.analyzed.has(topic))) { this.showToast(`MISSION INCOMPLETE · ${missing.length ? `${missing.length} objective(s)` : "Review all three evidence sets"} still need attention.`); this.openAnalysis(); return; }
         this.state.analyzeData("Flight report"); this.state.completeObjective("analysis"); this.renderObjectives(); this.runMissionEnding();
       } },
-    ]);
+    ], false);
   }
 
   private runLaunchSequence(): void {
@@ -629,7 +765,7 @@ export class Mission1Screen implements Screen {
           this.state.addLogEntry(`FLIGHT OBSERVATION — ${this.state.flightResult ?? "recorded"}. The vehicle continued climbing throughout the observation window; displayed altitude and velocity are abstract game values. Historical reference: 41 ft / 12.5 m and 184 ft / 56 m.`);
           this.renderLog();
           this.renderFlightMetrics();
-          this.showToast("The crew is quiet for a moment. ‘It flew.’ Return to the observation table to review the record.");
+          this.showToast("The crew is quiet for a moment. ‘It flew.’ Walk to the outdoor analysis table to review the record.");
           void this.autosave();
         }
       }, 200);
@@ -643,17 +779,27 @@ export class Mission1Screen implements Screen {
     this.modalRoot.innerHTML = "";
     const card = el("div", { className: "modal-card mission-ending-card" });
     const result = this.state.flightResult ?? "incomplete-data";
-    const engineerLine = result === "delayed"
+    const delayed = result === "delayed";
+    const title = delayed
+      ? "TODAY'S FLIGHT WAS DELAYED. THE WORK CONTINUES."
+      : result === "stable-flight"
+        ? "THE FLIGHT WAS SMALL. THE POSSIBILITY WAS NOT."
+        : result === "incomplete-data"
+          ? "THE RECORD IS INCOMPLETE. THE QUESTION REMAINS."
+          : result === "underperformance"
+            ? "THE FLIGHT FELL SHORT. THE EVIDENCE REMAINS."
+            : "THE FLIGHT DEVIATED. THE EVIDENCE REMAINS.";
+    const engineerLine = delayed
       ? "We have a clearer record. We still need a flight."
       : "We still have work to do.";
     card.append(
       el("p", { className: "mission-launch-kicker", text: t("FIELD NOTES · AUBURN, 1926") }),
-      el("h2", { className: "mission-ending-title", text: t("THE FLIGHT WAS SMALL. THE POSSIBILITY WAS NOT.") }),
+      el("h2", { className: "mission-ending-title", text: t(title) }),
       el("p", { className: "mission-ending-dialogue", text: `${t("ING. ELENA BROOKS · STRUCTURAL ENGINEER")}\n“${t(engineerLine)}”` }),
       el("p", { className: "mission-ending-dialogue", text: `${t("ING. TOMÁS ELDRICH · PROJECT DIRECTOR")}\n“${t("Of course. That's how this begins.") }”` }),
       el("p", { className: "mission-ending-caption", text: t("The 1926 historical flight was brief. This fictional team's choices and simulated result belong to the game.") }),
     );
-    const finish = el("button", { className: "btn btn-primary btn-large", text: t("MISSION 01 COMPLETE"), attrs: { type: "button" } });
+    const finish = el("button", { className: "btn btn-primary btn-large", text: t("FINISH MISSION 01"), attrs: { type: "button" } });
     finish.addEventListener("click", () => {
       this.modalRoot?.classList.add("modal-overlay--hidden");
       this.paused = false;

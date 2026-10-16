@@ -93,6 +93,10 @@ export interface MissionSaveState {
     engineering: import("@/state/Mission01Engineering").EngineeringProfile;
     checkpoint: string;
     analyzed: string[];
+    crewMembers?: string[];
+    testingChecks?: string[];
+    diagnosticChecks?: string[];
+    launchChecks?: string[];
     flightResult: import("@/state/Mission01Launch").FlightResult | null;
   };
 }

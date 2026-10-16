@@ -2,6 +2,7 @@
 export const MISSION_01_OBJECTIVES = [
   { id: "lab", label: "Find the outdoor project area", checkpoint: "Arrival" },
   { id: "discover", label: "Learn what the experiment must prove", checkpoint: "Project discovery" },
+  { id: "team", label: "Meet the outdoor project team", checkpoint: "Project discovery" },
   { id: "prototype", label: "Inspect the prototype and field notes", checkpoint: "Project discovery" },
   { id: "design", label: "Configure the vehicle at the open workbench", checkpoint: "Engineering" },
   { id: "testing", label: "Investigate the test anomaly", checkpoint: "Testing" },
