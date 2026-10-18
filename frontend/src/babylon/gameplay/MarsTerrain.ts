@@ -55,36 +55,96 @@ export function createMarsTerrain(
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_nor_gl_1k.jpg",
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_arm_1k.jpg", 1.4);
   const surfaceRoot = new BABYLONNS.TransformNode("auburn-surface-variation", scene);
-  for (let i = 0; i < 18; i++) {
-    const x = -28 + (i % 6) * 11;
-    const z = -24 + Math.floor(i / 6) * 15;
+  for (let i = 0; i < 28; i++) {
+    const x = -30 + (i % 7) * 9.8;
+    const z = -26 + Math.floor(i / 7) * 14.5;
     const patch = BABYLONNS.MeshBuilder.CreateDisc(`field-surface-patch-${i}`, {
-      radius: 1.5 + (i % 3) * 0.45,
-      tessellation: 12,
+      radius: 1.8 + (i % 4) * 0.45,
+      tessellation: 14,
     }, scene);
     patch.rotation.x = Math.PI / 2;
     patch.position = new BABYLONNS.Vector3(x, terrainHeight(x, z) + 0.015, z);
-    patch.scaling.y = 0.55;
+    patch.scaling.y = 0.65;
     patch.material = i % 2 === 0 ? mudMat : grassMat;
     patch.parent = surfaceRoot;
   }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 14; i++) {
     const track = BABYLONNS.MeshBuilder.CreateBox(`field-wheel-track-${i}`, {
-      width: 0.34,
+      width: 0.38,
       height: 0.025,
-      depth: 3.4,
+      depth: 3.8,
     }, scene);
-    const z = -20 + i * 4.8;
-    track.position = new BABYLONNS.Vector3(-12, terrainHeight(-12, z) + 0.025, z);
+    const z = -24 + i * 3.6;
+    track.position = new BABYLONNS.Vector3(-12, terrainHeight(-12, z) + 0.02, z);
     track.material = mudMat;
     track.parent = surfaceRoot;
   }
+
+  // Wooden duckboard walkways connecting outdoor stations over muddy March soil
+  const woodPlankMat = new BABYLONNS.PBRMaterial("duckboard-wood-mat", scene);
+  woodPlankMat.albedoColor = BABYLONNS.Color3.FromHexString("#5a422e");
+  woodPlankMat.roughness = 0.92;
+  woodPlankMat.metallic = 0.02;
+
+  // Path 1: From main building/work area to launch field (z: -2 to -22)
+  for (let i = 0; i < 24; i++) {
+    const z = -2 - i * 0.95;
+    const plank = BABYLONNS.MeshBuilder.CreateBox(`duckboard-main-${i}`, {
+      width: 1.15,
+      height: 0.04,
+      depth: 0.28,
+    }, scene);
+    plank.position = new BABYLONNS.Vector3(-2.5 + Math.sin(i * 0.25) * 0.4, terrainHeight(-2.5, z) + 0.025, z);
+    plank.rotation.y = (Math.random() - 0.5) * 0.08;
+    plank.material = woodPlankMat;
+    plank.parent = surfaceRoot;
+    plank.receiveShadows = true;
+  }
+
+  // Path 2: From work area to test area (z: -1 to 8)
+  for (let i = 0; i < 12; i++) {
+    const z = 0 + i * 0.8;
+    const plank = BABYLONNS.MeshBuilder.CreateBox(`duckboard-test-${i}`, {
+      width: 1.0,
+      height: 0.04,
+      depth: 0.26,
+    }, scene);
+    plank.position = new BABYLONNS.Vector3(-6 + (i % 2) * 0.05, terrainHeight(-6, z) + 0.025, z);
+    plank.material = woodPlankMat;
+    plank.parent = surfaceRoot;
+    plank.receiveShadows = true;
+  }
+
+  // Scattered field stones along the edge of paths
+  const stoneMat = new BABYLONNS.PBRMaterial("field-stone-mat", scene);
+  stoneMat.albedoColor = BABYLONNS.Color3.FromHexString("#787a74");
+  stoneMat.roughness = 0.88;
+  stoneMat.metallic = 0.05;
+
+  const stoneCoords: [number, number][] = [
+    [-3.8, -4], [-1.2, -7], [-4.1, -12], [-1.5, -17], [-7.2, 3], [-4.8, 6],
+    [5.5, -14], [8.2, -18], [-9.5, -3], [-14.2, 2], [12.4, 5], [17.1, 4]
+  ];
+  stoneCoords.forEach(([sx, sz], idx) => {
+    const stone = BABYLONNS.MeshBuilder.CreateSphere(`field-stone-${idx}`, {
+      diameter: 0.22 + (idx % 3) * 0.12,
+      segments: 5,
+    }, scene);
+    stone.position = new BABYLONNS.Vector3(sx, terrainHeight(sx, sz) + 0.08, sz);
+    stone.scaling = new BABYLONNS.Vector3(1.2, 0.6, 0.9);
+    stone.rotation.y = idx * 0.7;
+    stone.material = stoneMat;
+    stone.parent = surfaceRoot;
+    stone.receiveShadows = true;
+  });
 
   return {
     ground,
     getHeightAt: terrainHeight,
     dispose() {
       surfaceRoot.dispose(false, true);
+      woodPlankMat.dispose(false, true);
+      stoneMat.dispose(false, true);
       groundMat.dispose(false, true);
       mudMat.dispose(false, true);
       grassMat.dispose(false, true);

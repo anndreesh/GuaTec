@@ -12,13 +12,32 @@ export interface AstronautCharacter {
   dispose(): void;
 }
 
-/** Procedural early-1920s field engineer; no Blender export is required. */
-export function createAstronautCharacter(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): AstronautCharacter {
+export interface CharacterOptions {
+  coatColor?: string;
+  trouserColor?: string;
+  role?: "engineer" | "director" | "propulsion" | "structural" | "data";
+}
+
+/** Procedural early-1920s field engineer or project staff; no Blender export is required. */
+export function createAstronautCharacter(
+  BABYLONNS: BabylonNamespace,
+  scene: BABYLON.Scene,
+  options: CharacterOptions = {},
+): AstronautCharacter {
   const root = new BABYLONNS.TransformNode("field-engineer-root", scene);
 
-  const coatMat = new BABYLONNS.PBRMaterial("engineer-wool-coat", scene);
+  const roleCoatColors: Record<string, string> = {
+    director: "#232931",
+    propulsion: "#4e3825",
+    structural: "#3e4752",
+    data: "#2e3b33",
+    engineer: "#f2f2ef",
+  };
+  const coatColorHex = options.coatColor ?? roleCoatColors[options.role ?? "engineer"] ?? "#f2f2ef";
+
+  const coatMat = new BABYLONNS.PBRMaterial(`engineer-wool-coat-${options.role ?? "generic"}`, scene);
   coatMat.albedoTexture = createWoolTexture(BABYLONNS, scene);
-  coatMat.albedoColor = BABYLONNS.Color3.FromHexString("#f2f2ef");
+  coatMat.albedoColor = BABYLONNS.Color3.FromHexString(coatColorHex);
   coatMat.roughness = 0.96;
   const shirtMat = new BABYLONNS.PBRMaterial("engineer-cotton-shirt", scene);
   shirtMat.albedoColor = BABYLONNS.Color3.FromHexString("#b7ad93");

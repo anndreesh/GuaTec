@@ -6,6 +6,7 @@ import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 export interface NearbyPoi {
   id: string;
   label: string;
+  prompt?: string;
 }
 
 export interface GameplayMapState {
@@ -25,12 +26,15 @@ export interface GameplayHandle {
   navigateTo(poiId: string): void;
   setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "extended"): void;
   playLaunch(): void;
+  playOpeningCinematic(onDone?: () => void): void;
+  setPeakAltitude(meters: number): void;
   setMissionProgress(progress: number): void;
   setTouchMovement(x: number, y: number): void;
   setTouchSprint(active: boolean): void;
   jump(): void;
   interact(): void;
   getWeather(): AuburnWeather;
+  setCameraMode(mode: "cinematic" | "observation" | "telemetry"): void;
 }
 
 export interface GameplayLayerController {
@@ -242,7 +246,52 @@ export function createGameplayLayer(
   launchSmoke.direction1 = new BABYLONNS.Vector3(-0.8, -1.7, -0.8);
   launchSmoke.direction2 = new BABYLONNS.Vector3(0.8, -0.5, 0.8);
   launchSmoke.gravity = new BABYLONNS.Vector3(0, -0.45, 0);
+
+  // High-intensity rocket engine flame
+  const launchFlame = new BABYLONNS.ParticleSystem("1926-launch-flame", 160, scene);
+  launchFlame.particleTexture = smokeTexture;
+  launchFlame.emitter = rocketNozzle;
+  launchFlame.minEmitBox = new BABYLONNS.Vector3(-0.06, -0.15, -0.06);
+  launchFlame.maxEmitBox = new BABYLONNS.Vector3(0.06, 0.05, 0.06);
+  launchFlame.color1 = new BABYLONNS.Color4(1.0, 0.82, 0.22, 0.95);
+  launchFlame.color2 = new BABYLONNS.Color4(0.96, 0.42, 0.08, 0.75);
+  launchFlame.colorDead = new BABYLONNS.Color4(0.28, 0.12, 0.04, 0);
+  launchFlame.minSize = 0.14;
+  launchFlame.maxSize = 0.48;
+  launchFlame.minLifeTime = 0.12;
+  launchFlame.maxLifeTime = 0.35;
+  launchFlame.emitRate = 140;
+  launchFlame.minEmitPower = 1.6;
+  launchFlame.maxEmitPower = 3.2;
+  launchFlame.direction1 = new BABYLONNS.Vector3(-0.25, -2.4, -0.25);
+  launchFlame.direction2 = new BABYLONNS.Vector3(0.25, -3.2, 0.25);
+
+  // Ambient morning atmospheric dust/pollen motes catching dawn light
+  const ambientDust = new BABYLONNS.ParticleSystem("auburn-morning-dust", 85, scene);
+  ambientDust.particleTexture = smokeTexture;
+  ambientDust.emitter = new BABYLONNS.Vector3(0, 1.5, 0);
+  ambientDust.minEmitBox = new BABYLONNS.Vector3(-30, 0.6, -30);
+  ambientDust.maxEmitBox = new BABYLONNS.Vector3(30, 3.8, 30);
+  ambientDust.color1 = new BABYLONNS.Color4(0.94, 0.90, 0.78, 0.18);
+  ambientDust.color2 = new BABYLONNS.Color4(0.88, 0.84, 0.72, 0.12);
+  ambientDust.colorDead = new BABYLONNS.Color4(0.65, 0.65, 0.65, 0);
+  ambientDust.minSize = 0.03;
+  ambientDust.maxSize = 0.12;
+  ambientDust.minLifeTime = 3.5;
+  ambientDust.maxLifeTime = 7.0;
+  ambientDust.emitRate = 16;
+  ambientDust.minEmitPower = 0.04;
+  ambientDust.maxEmitPower = 0.18;
+  ambientDust.direction1 = new BABYLONNS.Vector3(-0.25, 0.04, 0.15);
+  ambientDust.direction2 = new BABYLONNS.Vector3(0.25, 0.10, 0.55);
+  ambientDust.start();
+
   let launchElapsed = -1;
+  let launchPeakAltitude = 12.5;
+  let openingElapsed = -1;
+  let openingDone: (() => void) | null = null;
+  let activeCameraMode: "cinematic" | "observation" | "telemetry" = "cinematic";
+
   const instrumentMat = new BABYLONNS.StandardMaterial("gameplay-instrument-mat", scene);
   instrumentMat.diffuseColor = BABYLONNS.Color3.FromHexString("#b39a66");
   instrumentMat.emissiveColor = BABYLONNS.Color3.FromHexString("#302513");
@@ -267,6 +316,97 @@ export function createGameplayLayer(
   testStand.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, 0) + 0.07, ROCKET_PLATFORM_Z);
   testStand.material = markerMat;
   testStand.parent = root;
+
+  // Flame blast deflector plate beneath the nozzle
+  const blastDeflector = BABYLONNS.MeshBuilder.CreateBox("blast-deflector-bucket", { width: 0.85, height: 0.22, depth: 0.85 }, scene);
+  blastDeflector.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, ROCKET_PLATFORM_Z) + 0.16, ROCKET_PLATFORM_Z);
+  blastDeflector.rotation.x = 0.28;
+  blastDeflector.material = propMat;
+  blastDeflector.parent = root;
+
+  // Pressurized nitrogen bottle and pressure regulator
+  const nitrogenBottle = BABYLONNS.MeshBuilder.CreateCapsule("launch-nitrogen-tank", { height: 1.35, radius: 0.15 }, scene);
+  nitrogenBottle.position = new BABYLONNS.Vector3(1.4, terrain.getHeightAt(1.4, ROCKET_PLATFORM_Z) + 0.68, ROCKET_PLATFORM_Z + 0.7);
+  const tankMat = new BABYLONNS.PBRMaterial("nitrogen-tank-mat", scene);
+  tankMat.albedoColor = BABYLONNS.Color3.FromHexString("#2e4839");
+  tankMat.metallic = 0.62;
+  tankMat.roughness = 0.58;
+  nitrogenBottle.material = tankMat;
+  nitrogenBottle.parent = root;
+
+  // Liquid oxygen and gasoline glass/metal carboys
+  const carboyMat = new BABYLONNS.PBRMaterial("propellant-carboy-mat", scene);
+  carboyMat.albedoColor = BABYLONNS.Color3.FromHexString("#4a585a");
+  carboyMat.metallic = 0.2;
+  carboyMat.roughness = 0.4;
+  for (const [cx, cz] of [[-1.3, ROCKET_PLATFORM_Z + 0.6], [-1.7, ROCKET_PLATFORM_Z + 0.5]]) {
+    const carboy = BABYLONNS.MeshBuilder.CreateCylinder(`carboy-${cx}`, { height: 0.52, diameter: 0.26, tessellation: 12 }, scene);
+    carboy.position = new BABYLONNS.Vector3(cx, terrain.getHeightAt(cx, cz) + 0.26, cz);
+    carboy.material = carboyMat;
+    carboy.parent = root;
+  }
+
+  // Safety barrier posts around launch perimeter
+  const barrierPosts = new BABYLONNS.TransformNode("launch-barrier-posts", scene);
+  barrierPosts.parent = root;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    const bx = Math.cos(angle) * 5.8;
+    const bz = ROCKET_PLATFORM_Z + Math.sin(angle) * 5.8;
+    const post = BABYLONNS.MeshBuilder.CreateCylinder(`barrier-post-${i}`, { height: 1.05, diameter: 0.075 }, scene);
+    post.position = new BABYLONNS.Vector3(bx, terrain.getHeightAt(bx, bz) + 0.52, bz);
+    post.material = propMat;
+    post.parent = barrierPosts;
+    const flag = BABYLONNS.MeshBuilder.CreateBox(`barrier-flag-${i}`, { width: 0.28, height: 0.16, depth: 0.02 }, scene);
+    flag.position = new BABYLONNS.Vector3(bx + 0.12, post.position.y + 0.42, bz);
+    flag.material = markerMat;
+    flag.parent = barrierPosts;
+  }
+
+  // Weather station with spinning anemometer cups at test area
+  const anemometerRoot = new BABYLONNS.TransformNode("weather-anemometer-root", scene);
+  anemometerRoot.position = new BABYLONNS.Vector3(-6, terrain.getHeightAt(-6, 12), 12);
+  anemometerRoot.parent = root;
+  const mast = BABYLONNS.MeshBuilder.CreateCylinder("anemometer-mast", { height: 3.1, diameter: 0.065 }, scene);
+  mast.position.y = 1.55;
+  mast.material = propMat;
+  mast.parent = anemometerRoot;
+  const cupHead = new BABYLONNS.TransformNode("anemometer-cups", scene);
+  cupHead.position.y = 3.05;
+  cupHead.parent = anemometerRoot;
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI * 2) / 3;
+    const arm = BABYLONNS.MeshBuilder.CreateCylinder(`cup-arm-${i}`, { height: 0.26, diameter: 0.018 }, scene);
+    arm.rotation.z = Math.PI / 2;
+    arm.rotation.y = angle;
+    arm.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.13, 0, Math.sin(angle) * 0.13);
+    arm.material = propMat;
+    arm.parent = cupHead;
+    const cup = BABYLONNS.MeshBuilder.CreateSphere(`cup-bowl-${i}`, { diameter: 0.08, segments: 6 }, scene);
+    cup.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.26, 0, Math.sin(angle) * 0.26);
+    cup.material = markerMat;
+    cup.parent = cupHead;
+  }
+
+  // Surveyor theodolite / telescope on tripod at Observation Area
+  const theodoliteRoot = new BABYLONNS.TransformNode("observation-theodolite", scene);
+  theodoliteRoot.position = new BABYLONNS.Vector3(7.4, terrain.getHeightAt(7.4, -22), -22);
+  theodoliteRoot.parent = root;
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI * 2) / 3;
+    const leg = BABYLONNS.MeshBuilder.CreateCylinder(`theodolite-leg-${i}`, { height: 1.3, diameter: 0.04 }, scene);
+    leg.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.22, 0.65, Math.sin(angle) * 0.22);
+    leg.rotation.z = Math.cos(angle) * 0.22;
+    leg.rotation.x = Math.sin(angle) * 0.22;
+    leg.material = propMat;
+    leg.parent = theodoliteRoot;
+  }
+  const theodoliteScope = BABYLONNS.MeshBuilder.CreateCylinder("theodolite-scope", { height: 0.52, diameterTop: 0.055, diameterBottom: 0.085 }, scene);
+  theodoliteScope.position.y = 1.35;
+  theodoliteScope.rotation.x = 0.32;
+  theodoliteScope.material = markerMat;
+  theodoliteScope.parent = theodoliteRoot;
+
   const frameRoot = new BABYLONNS.TransformNode("1926-launch-frame", scene);
   frameRoot.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, 0), ROCKET_PLATFORM_Z);
   frameRoot.parent = root;
@@ -558,42 +698,10 @@ export function createGameplayLayer(
   }
   void loadRequestedBuildings();
 
-  async function loadRequestedShuttle(): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "space_shuttle_nasa_optimized.glb", scene);
-      for (const mesh of result.meshes) {
-        if (!mesh.parent) mesh.parent = shuttleModelRoot;
-        mesh.receiveShadows = true;
-        // The shuttle's source mesh has a very large shadow volume; keep it
-        // lit by the field sun without obscuring the launch area with a wedge.
-      }
-      result.animationGroups.forEach((animation) => animation.stop());
-      shuttleModelRoot.computeWorldMatrix(true);
-      let bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      const dimensions = [bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z];
-      const longAxis = dimensions.indexOf(Math.max(...dimensions));
-      if (longAxis === 0) shuttleModelRoot.rotation.z = -Math.PI / 2;
-      else if (longAxis === 2) shuttleModelRoot.rotation.x = Math.PI / 2;
-      shuttleModelRoot.computeWorldMatrix(true);
-      bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      const longest = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, bounds.max.z - bounds.min.z);
-      shuttleModelRoot.scaling.setAll(8.5 / Math.max(0.01, longest));
-      shuttleModelRoot.computeWorldMatrix(true);
-      bounds = shuttleModelRoot.getHierarchyBoundingVectors(true);
-      shuttleModelRoot.position.set(
-        rocketRoot.position.x - (bounds.min.x + bounds.max.x) / 2,
-        rocketRoot.position.y - bounds.min.y,
-        rocketRoot.position.z - (bounds.min.z + bounds.max.z) / 2,
-      );
-      shuttleModelRoot.setEnabled(true);
-      proceduralRocketRoot.setEnabled(false);
-      console.info("[Mission 01] NASA shuttle asset loaded and aligned vertically on the launch frame.");
-    } catch (error) {
-      console.warn("[Mission 01] Could not load NASA shuttle; procedural rocket remains active.", error);
-    }
-  }
-  void loadRequestedShuttle();
+  // Keep the 1926-scale procedural vehicle. A modern shuttle asset is historically
+  // the wrong silhouette for this mission and is left unused on purpose.
+  shuttleModelRoot.setEnabled(false);
+  proceduralRocketRoot.setEnabled(true);
 
   const observationDeck = BABYLONNS.MeshBuilder.CreateBox("observation-deck", {
     width: 3.8,
@@ -603,6 +711,24 @@ export function createGameplayLayer(
   observationDeck.position = new BABYLONNS.Vector3(11, terrain.getHeightAt(11, -25) + 0.06, -25);
   observationDeck.material = woodMat;
   observationDeck.parent = root;
+  const shed = new BABYLONNS.TransformNode("open-equipment-shed", scene);
+  shed.position = new BABYLONNS.Vector3(14.2, terrain.getHeightAt(14.2, -2.8), -2.8);
+  shed.parent = root;
+  const shedRoof = BABYLONNS.MeshBuilder.CreateBox("open-shed-roof", { width: 3.4, height: 0.08, depth: 2.2 }, scene);
+  shedRoof.position.y = 2.15;
+  shedRoof.rotation.z = -0.08;
+  shedRoof.material = woodMat;
+  shedRoof.parent = shed;
+  for (const x of [-1.5, 1.5]) {
+    const post = BABYLONNS.MeshBuilder.CreateBox(`open-shed-post-${x}`, { width: 0.12, height: 2.1, depth: 0.12 }, scene);
+    post.position = new BABYLONNS.Vector3(x, 1.05, 0.9);
+    post.material = darkMetalMat;
+    post.parent = shed;
+  }
+  const crate = BABYLONNS.MeshBuilder.CreateBox("open-shed-crate", { width: 0.7, height: 0.45, depth: 0.55 }, scene);
+  crate.position.y = 0.24;
+  crate.material = woodMat;
+  crate.parent = shed;
   for (let i = 0; i < 4; i++) {
     const post = BABYLONNS.MeshBuilder.CreateBox(`observation-post-${i}`, { width: 0.1, height: 1.1, depth: 0.1 }, scene);
     post.position = new BABYLONNS.Vector3(
@@ -740,13 +866,22 @@ export function createGameplayLayer(
     const { x, z } = poi.position;
     const y = terrain.getHeightAt(x, z);
 
-    const marker = BABYLONNS.MeshBuilder.CreateCylinder(`gameplay-poi-${poi.id}`, { height: 1.1, diameter: 0.7, tessellation: 8 }, scene);
-    marker.position = new BABYLONNS.Vector3(x, y + 0.55, z);
+    const isRecord = poi.id.startsWith("record-");
+    const marker = BABYLONNS.MeshBuilder.CreateCylinder(`gameplay-poi-${poi.id}`, {
+      height: isRecord ? 0.55 : 1.1,
+      diameter: isRecord ? 0.28 : 0.55,
+      tessellation: 8,
+    }, scene);
+    marker.position = new BABYLONNS.Vector3(x, y + (isRecord ? 0.28 : 0.55), z);
     marker.material = markerMat;
     marker.parent = poiRoot;
 
-    const flag = BABYLONNS.MeshBuilder.CreateBox(`gameplay-poi-flag-${poi.id}`, { width: 0.5, height: 0.35, depth: 0.02 }, scene);
-    flag.position = new BABYLONNS.Vector3(x + 0.25, y + 1.2, z);
+    const flag = BABYLONNS.MeshBuilder.CreateBox(`gameplay-poi-flag-${poi.id}`, {
+      width: isRecord ? 0.28 : 0.42,
+      height: isRecord ? 0.18 : 0.3,
+      depth: 0.02,
+    }, scene);
+    flag.position = new BABYLONNS.Vector3(x + 0.18, y + (isRecord ? 0.62 : 1.15), z);
     flag.material = markerMat;
     flag.parent = poiRoot;
 
@@ -754,11 +889,12 @@ export function createGameplayLayer(
   });
 
   const fieldCrew = [
-    { x: -6.9, z: -1.2, radius: 0.8, speed: 0.34, phase: 0.2 },
-    { x: 18.4, z: 8.4, radius: 0.65, speed: 0.27, phase: 2.1 },
-    { x: -5.3, z: 10.5, radius: 0.55, speed: 0.3, phase: 4.2 },
+    { x: 16.8, z: 9.4, radius: 0.55, speed: 0.28, phase: 0.2, role: "propulsion" as const },
+    { x: 5.1, z: -12.2, radius: 0.7, speed: 0.22, phase: 2.1, role: "structural" as const },
+    { x: 6.6, z: -21.2, radius: 0.5, speed: 0.26, phase: 4.2, role: "data" as const },
+    { x: -5.2, z: 2.2, radius: 0.35, speed: 0.18, phase: 1.1, role: "director" as const },
   ].map((worker) => {
-    const character = createAstronautCharacter(BABYLONNS, scene);
+    const character = createAstronautCharacter(BABYLONNS, scene, { role: worker.role });
     character.root.parent = root;
     character.root.scaling.setAll(0.78);
     character.root.position = new BABYLONNS.Vector3(worker.x, terrain.getHeightAt(worker.x, worker.z), worker.z);
@@ -830,7 +966,7 @@ export function createGameplayLayer(
     const changed = next?.poi.id !== nearestPoi?.poi.id;
     nearestPoi = next;
     if (changed) {
-      nearestPoiCallback?.(next ? { id: next.poi.id, label: next.poi.label } : null);
+      nearestPoiCallback?.(next ? { id: next.poi.id, label: next.poi.label, prompt: next.poi.prompt } : null);
     }
   }
 
@@ -862,7 +998,9 @@ export function createGameplayLayer(
         rocketRoot.position.copyFrom(rocketStart);
         rocketRoot.scaling.setAll(1);
         launchElapsed = -1;
+        openingElapsed = -1;
         launchSmoke.stop();
+        launchFlame.stop();
         camera.alpha = -Math.PI / 2;
         camera.beta = 1.1;
         camera.radius = cameraOffsetRadius;
@@ -872,9 +1010,11 @@ export function createGameplayLayer(
       },
       setDesign(structure, instrumentation) {
         rocketRoot.scaling.y = structure === "light" ? 0.92 : structure === "reinforced" ? 1.12 : 1;
-        rocketRoot.scaling.x = structure === "reinforced" ? 1.08 : 1;
-        rocketRoot.scaling.z = structure === "reinforced" ? 1.08 : 1;
+        rocketRoot.scaling.x = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
+        rocketRoot.scaling.z = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
         instruments.setEnabled(instrumentation === "extended");
+        frameRoot.setEnabled(structure !== "light");
+        frameRoot.scaling.setAll(structure === "reinforced" ? 1.12 : 1);
       },
       navigateTo(poiId) {
         const target = poiMeshes.find((entry) => entry.poi.id === poiId);
@@ -886,6 +1026,37 @@ export function createGameplayLayer(
         camera.radius = 8.5;
         camera.beta = 1.05;
         launchSmoke.start();
+        launchFlame.start();
+      },
+      setCameraMode(mode) {
+        activeCameraMode = mode;
+        if (mode === "observation") {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.alpha = -Math.PI * 0.45;
+          camera.beta = 1.25;
+          camera.radius = 16;
+        } else if (mode === "telemetry") {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.alpha = -Math.PI / 3;
+          camera.beta = 1.45;
+          camera.radius = 4.2;
+        } else {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.alpha = -Math.PI / 2;
+          camera.beta = 1.1;
+          camera.radius = 8.5;
+        }
+      },
+      playOpeningCinematic(onDone) {
+        openingElapsed = 0;
+        openingDone = onDone ?? null;
+        camera.radius = 22;
+        camera.beta = 0.85;
+        camera.alpha = -Math.PI * 0.15;
+        camera.target = new BABYLONNS.Vector3(0, 1.4, -6);
+      },
+      setPeakAltitude(meters) {
+        launchPeakAltitude = Math.max(2, Math.min(16, meters));
       },
       setMissionProgress(progress) {
         const morning = Math.max(0, Math.min(1, progress));
@@ -963,19 +1134,47 @@ export function createGameplayLayer(
     update(deltaSeconds: number) {
       if (!enabled) return;
       elapsed += deltaSeconds;
+      if (openingElapsed >= 0) {
+        openingElapsed += deltaSeconds;
+        camera.alpha = -Math.PI * 0.15 - openingElapsed * 0.18;
+        camera.radius = 22 - openingElapsed * 0.9;
+        camera.target = new BABYLONNS.Vector3(
+          Math.sin(openingElapsed * 0.2) * 4,
+          1.4 + openingElapsed * 0.04,
+          -6 + openingElapsed * 0.4,
+        );
+        if (openingElapsed >= 7.5) {
+          openingElapsed = -1;
+          camera.radius = cameraOffsetRadius;
+          camera.beta = 1.1;
+          camera.alpha = -Math.PI / 2;
+          camera.target.copyFrom(astronaut.root.position);
+          openingDone?.();
+          openingDone = null;
+        }
+        for (const worker of fieldCrew) {
+          const angle = elapsed * worker.speed + worker.phase;
+          const x = worker.x + Math.cos(angle) * worker.radius;
+          const z = worker.z + Math.sin(angle) * worker.radius * 0.55;
+          worker.character.root.position.x = x;
+          worker.character.root.position.z = z;
+          worker.character.root.position.y = terrain.getHeightAt(x, z);
+          worker.character.update(deltaSeconds);
+        }
+        return;
+      }
+      cupHead.rotation.y += deltaSeconds * (weather.label === "WINDY" ? 9 : 4.5);
       if (launchElapsed >= 0) {
         launchElapsed += deltaSeconds;
-        // Clear the 4.4 m launch frame, then keep climbing at an increasing
-        // rate. The vehicle never descends or resets unless the player resets
-        // the mission explicitly.
-        const poweredAscentTime = Math.min(launchElapsed, 3.5);
-        const initialAscent = 0.55 * poweredAscentTime * poweredAscentTime;
-        const coastTime = Math.max(0, launchElapsed - 3.5);
-        const continuingAscent = 3.85 * coastTime + 0.045 * coastTime * coastTime;
-        rocketRoot.position.x = rocketStart.x;
-        rocketRoot.position.z = rocketStart.z;
-        rocketRoot.position.y = rocketStart.y + initialAscent + continuingAscent;
-        if (launchElapsed > 6) launchSmoke.stop();
+        const climb = launchPeakAltitude * (1 - Math.exp(-launchElapsed / 1.8));
+        const drift = launchElapsed * 0.55;
+        rocketRoot.position.x = rocketStart.x + drift * 0.15;
+        rocketRoot.position.z = rocketStart.z - drift;
+        rocketRoot.position.y = rocketStart.y + climb;
+        if (launchElapsed > 4.5) {
+          launchSmoke.stop();
+          launchFlame.stop();
+        }
       }
 
       // Movement is camera-relative: forward/right derived from the
@@ -1051,19 +1250,48 @@ export function createGameplayLayer(
       playAvatarAnimation(walking, walking && leftShiftDown, !grounded);
       astronaut.update(deltaSeconds);
       for (const worker of fieldCrew) {
-        const angle = elapsed * worker.speed + worker.phase;
-        const x = worker.x + Math.cos(angle) * worker.radius;
-        const z = worker.z + Math.sin(angle) * worker.radius * 0.55;
-        worker.character.root.position.x = x;
-        worker.character.root.position.z = z;
-        worker.character.root.position.y = terrain.getHeightAt(x, z);
-        worker.character.root.rotation.y = -angle + Math.PI / 2;
+        const distToPlayer = Math.hypot(worker.character.root.position.x - astronaut.root.position.x, worker.character.root.position.z - astronaut.root.position.z);
+        if (distToPlayer < 4.2) {
+          const lookAngle = Math.atan2(astronaut.root.position.x - worker.character.root.position.x, astronaut.root.position.z - worker.character.root.position.z);
+          worker.character.root.rotation.y = lookAngle;
+          worker.character.setMovementState(false, false);
+        } else {
+          const angle = elapsed * worker.speed + worker.phase;
+          const x = worker.x + Math.cos(angle) * worker.radius;
+          const z = worker.z + Math.sin(angle) * worker.radius * 0.55;
+          worker.character.root.position.x = x;
+          worker.character.root.position.z = z;
+          worker.character.root.position.y = terrain.getHeightAt(x, z);
+          worker.character.root.rotation.y = -angle + Math.PI / 2;
+          worker.character.setMovementState(true, false);
+        }
         worker.character.update(deltaSeconds);
       }
 
-      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14;
-      camera.target.copyFrom(cameraTracksRocket ? rocketRoot.position : astronaut.root.position);
-      camera.target.y += cameraTracksRocket ? 1.8 : 1.2;
+      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14 && openingElapsed < 0;
+      if (cameraTracksRocket) {
+        if (activeCameraMode === "observation") {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.alpha = -Math.PI * 0.45;
+          camera.beta = 1.25;
+          camera.radius = 16;
+        } else if (activeCameraMode === "telemetry") {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.alpha = -Math.PI / 3;
+          camera.beta = 1.45;
+          camera.radius = 4.2;
+        } else {
+          camera.target.copyFrom(rocketRoot.position);
+          camera.target.y += 1.8;
+          if (launchElapsed < 2.5) {
+            camera.target.x += (Math.random() - 0.5) * 0.04;
+            camera.target.y += (Math.random() - 0.5) * 0.04;
+          }
+        }
+      } else if (openingElapsed < 0) {
+        camera.target.copyFrom(astronaut.root.position);
+        camera.target.y += 1.2;
+      }
       if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
 
       updateNearestPoi();
@@ -1077,6 +1305,8 @@ export function createGameplayLayer(
       astronaut.dispose();
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();
+      launchFlame.dispose();
+      ambientDust.dispose();
       smokeTexture.dispose();
       terrain.dispose();
       poiRoot.dispose(false, true);

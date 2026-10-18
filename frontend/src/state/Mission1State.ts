@@ -12,6 +12,7 @@ import { DEFAULT_ENGINEERING, calculateEngineering, type EngineeringProfile } fr
 import type { MissionObjectiveId } from "@/state/Mission01Objectives";
 import { MISSION_01_OBJECTIVES } from "@/state/Mission01Objectives";
 import { resolveFlight, type FlightResult } from "@/state/Mission01Launch";
+import { MISSION_01_STAGES } from "@/state/Mission01Events";
 
 /**
  * Pure gameplay state/logic for Mission 1, kept independent from the DOM so
@@ -31,6 +32,12 @@ export class Mission1State {
   engineering: EngineeringProfile = { ...DEFAULT_ENGINEERING };
   checkpoint = "Arrival";
   flightResult: FlightResult | null = null;
+  metNpcs = new Set<string>();
+  testsRun = new Set<string>();
+  checklist = new Set<string>();
+  inspectedCauses = new Set<string>();
+  diagnosis: string | null = null;
+  extraTestRequired = false;
 
   constructor(saved?: MissionSaveState) {
     this.resources = Object.fromEntries(
@@ -52,6 +59,11 @@ export class Mission1State {
         this.engineering = { ...DEFAULT_ENGINEERING, ...extra.engineering };
         this.checkpoint = extra.checkpoint;
         this.flightResult = extra.flightResult;
+        this.metNpcs = new Set(extra.metNpcs ?? []);
+        this.testsRun = new Set(extra.testsRun ?? []);
+        this.checklist = new Set(extra.checklist ?? []);
+        this.inspectedCauses = new Set(extra.inspectedCauses ?? []);
+        this.diagnosis = extra.diagnosis ?? null;
       }
     }
   }
@@ -107,8 +119,8 @@ export class Mission1State {
     const objective = MISSION_01_OBJECTIVES.find((item) => item.id === id);
     if (objective) this.checkpoint = objective.checkpoint;
     const phaseTick: Record<MissionObjectiveId, number> = {
-      lab: 2, discover: 5, prototype: 8, design: 13,
-      testing: 20, prepare: 26, flight: 32, analysis: 38,
+      lab: 2, discover: 4, "meet-team": 7, prototype: 9, design: 14,
+      testing: 20, diagnose: 23, prepare: 26, observation: 28, flight: 32, analysis: 38,
     };
     this.tick = Math.max(this.tick, phaseTick[id]);
     this.addLogEntry(`MISSION LOG — ${objective?.label ?? id}`);
@@ -133,12 +145,73 @@ export class Mission1State {
     this.addLogEntry(`ANALYSIS — ${topic} reviewed.`);
   }
 
+  meetNpc(id: string): boolean {
+    if (this.metNpcs.has(id)) return false;
+    this.metNpcs.add(id);
+    return true;
+  }
+
+  teamMet(): boolean {
+    return ["meet-propulsion", "meet-structural", "meet-data"].every((id) => this.metNpcs.has(id));
+  }
+
+  unmetNpc(): string | undefined {
+    return ["meet-propulsion", "meet-structural", "meet-data"].find((id) => !this.metNpcs.has(id));
+  }
+
+  runTest(id: string): boolean {
+    if (this.testsRun.has(id)) return false;
+    this.testsRun.add(id);
+    return true;
+  }
+
+  testsComplete(): boolean {
+    return ["system", "instrumentation", "stability"].every((id) => this.testsRun.has(id));
+  }
+
+  markChecklist(id: string): boolean {
+    if (this.checklist.has(id)) return false;
+    this.checklist.add(id);
+    return true;
+  }
+
+  checklistComplete(): boolean {
+    return ["inspect-vehicle", "check-instruments", "review-conditions", "confirm-observation", "confirm-telemetry"]
+      .every((id) => this.checklist.has(id));
+  }
+
+  pendingChecklist(): string | undefined {
+    return ["inspect-vehicle", "check-instruments", "review-conditions", "confirm-observation", "confirm-telemetry"]
+      .find((id) => !this.checklist.has(id));
+  }
+
+  expectedDiagnosis(): string {
+    if (this.engineering.structure === "light") return "Mass distribution";
+    if (this.engineering.instrumentation === "extended") return "Instrumentation";
+    if (this.engineering.structure === "reinforced") return "Structural balance";
+    return "System configuration";
+  }
+
+  currentStage(): (typeof MISSION_01_STAGES)[number] {
+    if (this.objectives.has("analysis")) return "AFTERMATH";
+    if (this.objectives.has("flight")) return "ANALYSIS";
+    if (this.objectives.has("observation")) return "LAUNCH";
+    if (this.objectives.has("prepare")) return "OBSERVATION";
+    if (this.objectives.has("diagnose")) return "LAUNCH_PREPARATION";
+    if (this.objectives.has("testing")) return "TESTING";
+    if (this.objectives.has("design")) return "TESTING";
+    if (this.objectives.has("prototype") && this.objectives.has("meet-team")) return "ENGINEERING";
+    if (this.objectives.has("discover")) return "OPEN_AIR_EXPLORATION";
+    if (this.objectives.has("lab")) return "ARRIVAL";
+    return "ARRIVAL";
+  }
+
   isFailed(): boolean {
     return RESOURCE_DEFINITIONS.some((def) => this.resources[def.key] <= 0);
   }
 
   isComplete(): boolean {
-    return this.objectives.has("analysis");
+    return MISSION_01_OBJECTIVES.every((item) => !item.required || this.objectives.has(item.id));
   }
 
   progressPercent(): number {
@@ -174,6 +247,8 @@ export class Mission1State {
         objectives: [...this.objectives], records: [...this.records],
         engineering: this.engineering, checkpoint: this.checkpoint,
         analyzed: [...this.analyzed], flightResult: this.flightResult,
+        metNpcs: [...this.metNpcs], testsRun: [...this.testsRun], checklist: [...this.checklist],
+        inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis,
       },
     };
   }

@@ -15,24 +15,21 @@ import { el } from "@/core/dom";
 import type { GameApp } from "@/core/GameApp";
 import type { GameplayHandle, GameplayMapState, NearbyPoi } from "@/babylon/gameplay/GameplayLayer";
 import { Mission1State } from "@/state/Mission1State";
-import { MISSION_01_OBJECTIVES } from "@/state/Mission01Objectives";
+import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective } from "@/state/Mission01Objectives";
 import { calculateEngineering } from "@/state/Mission01Engineering";
-import { resolveFlight } from "@/state/Mission01Launch";
+import { flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
 import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
 import type { MissionSaveState } from "@/types";
 import { t } from "@/core/i18n";
 
 const MISSION_SLUG = MISSION_SLUGS.mission1;
-const MAP_OBJECTIVE_TARGET: Record<string, string> = {
-  lab: "project-area",
-  discover: "project-area",
-  prototype: "project-area",
-  design: "engine-selection",
-  testing: "pressure-test",
-  prepare: "launch-window",
-  flight: "launch-window",
-  analysis: "telemetry-fluctuation",
+const CHECKLIST_LABELS: Record<string, string> = {
+  "inspect-vehicle": "Inspect vehicle",
+  "check-instruments": "Check instruments",
+  "review-conditions": "Review conditions",
+  "confirm-observation": "Confirm observation area",
+  "confirm-telemetry": "Confirm telemetry",
 };
 
 /** The playable Mission 1 loop: a third-person Earth test-range scene
@@ -71,6 +68,7 @@ export class Mission1Screen implements Screen {
   private mapState: GameplayMapState | null = null;
   private routeVisible = false;
   private renderedMapObjectiveId = "";
+  private lastRadioAt = 0;
   private readonly onMapKey = (event: KeyboardEvent) => {
     if (event.key.toLowerCase() === "m" && !this.isTypingTarget(event.target)) this.toggleMap();
   };
@@ -365,6 +363,7 @@ export class Mission1Screen implements Screen {
     this.mapPlayer.style.left = `${Math.max(2, Math.min(98, left))}%`;
     this.mapPlayer.style.top = `${Math.max(2, Math.min(98, top))}%`;
     this.mapPlayer.style.transform = `translate(-50%, -50%) rotate(${state.player.direction}rad)`;
+    this.maybeRadioHint(state);
     const pendingId = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id))?.id ?? "complete";
     if (pendingId !== this.renderedMapObjectiveId) this.renderMapObjective();
     else this.updateMapDistance();
@@ -375,14 +374,14 @@ export class Mission1Screen implements Screen {
     if (!objective) return;
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
     this.renderedMapObjectiveId = pending?.id ?? "complete";
-    const targetId = pending ? MAP_OBJECTIVE_TARGET[pending.id] : null;
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     objective.innerHTML = "";
     this.mapDistance = el("p", { className: "mission-map-distance" });
     objective.append(
       el("p", { className: "mission-map-kicker", text: t("CURRENT OBJECTIVE") }),
       el("strong", { className: "mission-map-current", text: t(pending?.label ?? "Mission complete") }),
-      el("p", { className: "mission-map-location", text: `${t("LOCATION")}\n${t(target?.label ?? "Project area")}` }),
+      el("p", { className: "mission-map-location", text: `${t("LOCATION")}\n${t(pending?.location ?? target?.label ?? "Project area")}` }),
       this.mapDistance,
     );
     const routeButton = el("button", { className: "btn btn-secondary mission-map-route-button", text: t(this.routeVisible ? "HIDE ROUTE" : "SHOW ROUTE"), attrs: { type: "button" } });
@@ -407,7 +406,7 @@ export class Mission1Screen implements Screen {
 
   private updateMapDistance(): void {
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
-    const targetId = pending ? MAP_OBJECTIVE_TARGET[pending.id] : null;
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     const distance = target && this.mapState
       ? Math.round(Math.hypot(target.x - this.mapState.player.x, target.z - this.mapState.player.z))
@@ -436,9 +435,67 @@ export class Mission1Screen implements Screen {
       this.interactionPrompt.classList.add("interaction-prompt--hidden");
       return;
     }
-    const action = t("E · EXAMINE OUTDOOR STATION");
+    const action = t(poi.prompt ?? "E · EXAMINE OUTDOOR STATION");
     this.interactionPrompt.textContent = `${action}: ${poi.label}`;
     this.interactionPrompt.classList.remove("interaction-prompt--hidden");
+  }
+
+  private maybeRadioHint(state: GameplayMapState): void {
+    const now = performance.now();
+    if (now - this.lastRadioAt < 28000) return;
+    this.lastRadioAt = now;
+
+    const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
+    if (!pending) return;
+
+    let speaker = "DIRECTOR";
+    let text = "";
+    if (pending.id === "lab" || pending.id === "discover") {
+      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      text = "Head to the outdoor work area. Today we see if our machine can leave the ground.";
+    } else if (pending.id === "meet-team") {
+      const unmet = this.state.unmetNpc();
+      if (unmet === "meet-propulsion") {
+        speaker = "ANDREW WELLS · PROPULSION";
+        text = "Over here by the fuel bench. We need to check these pressure lines.";
+      } else if (unmet === "meet-structural") {
+        speaker = "ELENA BROOKS · STRUCTURAL";
+        text = "I'm inspecting the frame brackets by the prototype.";
+      } else {
+        speaker = "MARA REED · DATA";
+        text = "Checking the mechanical recording drum. Come over when you can.";
+      }
+    } else if (pending.id === "prototype") {
+      speaker = "ELENA BROOKS · STRUCTURAL";
+      text = "Take a close look at the combustion chamber and propellant lines on the stand.";
+    } else if (pending.id === "design") {
+      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      text = "Configure the vehicle specifications at the open experimental bench.";
+    } else if (pending.id === "testing") {
+      speaker = "ANDREW WELLS · PROPULSION";
+      text = "Head over to the test area. Let's run the system and pressure checks.";
+    } else if (pending.id === "diagnose") {
+      speaker = "ELENA BROOKS · STRUCTURAL";
+      text = "That oscillation isn't right. Return to the vehicle and inspect the possible causes.";
+    } else if (pending.id === "prepare") {
+      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      text = "Bring the crew to the launch field. We must run through the final checklist.";
+    } else if (pending.id === "observation") {
+      speaker = "MARA REED · DATA";
+      text = "Pad cleared! Head into the observation area behind the safety barricades.";
+    } else if (pending.id === "flight") {
+      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      text = "Everyone in position. Stand by for the countdown.";
+    } else if (pending.id === "analysis") {
+      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      text = "Collect the recorded traces and meet us at the outdoor analysis station.";
+    }
+
+    if (text) {
+      this.state.addLogEntry(`RADIO — ${speaker}: “${text}”`);
+      this.renderLog();
+      this.showToast(`[RADIO — ${speaker}] ${text}`);
+    }
   }
 
   /** World interactions advance mission objectives and persist meaningful choices. */
@@ -446,23 +503,272 @@ export class Mission1Screen implements Screen {
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
 
+    // 1. Exterior closed buildings:
+    if (poiId === "main-building-exterior" || poiId === "storage-exterior" || poiId === "workshop-exterior") {
+      this.showToast(t("DOOR LOCKED · Exterior station only. All project work takes place outdoors."));
+      return;
+    }
+
+    // 2. Project Director:
+    if (poiId === "director-greeting") {
+      this.state.completeObjective("lab");
+      this.state.completeObjective("discover");
+      this.state.collectRecord("Director's experiment briefing");
+      this.renderObjectives();
+      this.showChoice(
+        "PROJECT DIRECTOR · ING. TOMÁS ELDRICH",
+        `“You're here. Good. Today is an important day.\n\nToday we're going to attempt something people have doubted for years. We are going to see whether our machine can actually fly.\n\nNot because we're going somewhere, or trying to reach space. We're trying to prove one thing: that liquid-fuel propulsion can leave the ground. Welcome to the project.”`,
+        [
+          {
+            label: "“Understood. Where do we begin?”",
+            run: () => {
+              this.state.addLogEntry("DIRECTOR — Meet the engineering team around the outdoor stations.");
+              this.showToast(t("OBJECTIVE UPDATED · Meet the team across the project area."));
+            },
+          },
+          {
+            label: "“Tell me about the vehicle on the stand.”",
+            run: () => {
+              this.state.addLogEntry("DIRECTOR — It's a small experimental motor with liquid oxygen and gasoline.");
+              this.showToast(t("DIRECTOR: Review the notes on the project desk and inspect the frame."));
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // 3. Meet Team Members:
+    if (poiId === "meet-propulsion") {
+      this.state.meetNpc("meet-propulsion");
+      if (this.state.teamMet()) this.state.completeObjective("meet-team");
+      this.renderObjectives();
+      this.showChoice(
+        "PROPULSION ENGINEER · ANDREW WELLS",
+        `“Check the readings again. We're mixing gasoline and liquid oxygen. If the feed pressure holds, the thrust chamber will produce steady lift. We can make it stronger, or lighter. A conservative injector burns steady; a high-flow injector gives more impulse but stresses the lines.”`,
+        [
+          {
+            label: "“Noted. What are our safety margins?”",
+            run: () => {
+              this.state.addLogEntry("ANDREW WELLS — Margins are tight. We purge the nitrogen lines before pressurized tests.");
+              this.showToast(t("Propulsion notes recorded. Inspect the prototype and meet the team."));
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    if (poiId === "meet-structural") {
+      this.state.meetNpc("meet-structural");
+      if (this.state.teamMet()) this.state.completeObjective("meet-team");
+      this.renderObjectives();
+      this.showChoice(
+        "STRUCTURAL ENGINEER · ELENA BROOKS",
+        `“The frame is lightweight steel tubing with brass brackets. We're placing the motor up top to pull the propellant tanks for stability. If we add too much reinforcement, mass climbs quickly. We need the right balance between structural integrity and weight.”`,
+        [
+          {
+            label: "“I'll examine the structural brackets on the prototype.”",
+            run: () => {
+              this.state.addLogEntry("ELENA BROOKS — Look at the pipe clamps and thrust ring on the stand.");
+              this.showToast(t("Structural notes recorded. Inspect the vehicle on the stand."));
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    if (poiId === "meet-data") {
+      this.state.meetNpc("meet-data");
+      if (this.state.teamMet()) this.state.completeObjective("meet-team");
+      this.renderObjectives();
+      this.showChoice(
+        "DATA TECHNICIAN · MARA REED",
+        `“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just an spectacle.”`,
+        [
+          {
+            label: "“We'll make sure the instruments are calibrated.”",
+            run: () => {
+              this.state.addLogEntry("MARA REED — The observation table will record the launch trace.");
+              this.showToast(t("Data instrumentation verified."));
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // 4. Prototype inspection / Diagnosis:
+    if (poiId === "inspect-prototype") {
+      if (this.state.objectives.has("testing") && !this.state.objectives.has("diagnose")) {
+        const expected = this.state.expectedDiagnosis();
+        this.showChoice(
+          "PROTOTYPE INSPECTION · DIAGNOSE INSTABILITY",
+          `WARNING: UNEXPECTED OSCILLATION DETECTED DURING TEST.\n\nYou examine the experimental vehicle closely. The upper combustion frame, tank connectors, and feed pipes reveal subtle vibration signatures.\n\nWhat is the primary cause of the instability?`,
+          [
+            {
+              label: "Mass distribution (top-heavy feed dynamics)",
+              run: () => this.evaluateDiagnosis("Mass distribution", expected),
+            },
+            {
+              label: "Instrumentation (recorder line interference)",
+              run: () => this.evaluateDiagnosis("Instrumentation", expected),
+            },
+            {
+              label: "Structural balance (frame bracket deflection)",
+              run: () => this.evaluateDiagnosis("Structural balance", expected),
+            },
+            {
+              label: "System configuration (pressure valve timing)",
+              run: () => this.evaluateDiagnosis("System configuration", expected),
+            },
+          ]
+        );
+        return;
+      }
+
+      this.state.completeObjective("prototype");
+      this.state.collectRecord("Prototype inspection sketch");
+      this.renderObjectives();
+      this.showChoice(
+        "EXPERIMENTAL VEHICLE · DETAILED INSPECTION",
+        `STATUS: UNTESTED PROTOTYPE\n\n• Upper motor with ceramic-lined chamber\n• Twin propellant feed tubes (gasoline & liquid oxygen)\n• Lower tank assembly with pressure bladder\n• 4.4-meter launch frame with guide cables\n\n“The historical 1926 vehicle was a radical departure from gunpowder rockets: pure liquid propellant feeding into a combustion chamber.”`,
+        [
+          {
+            label: "Log prototype observation",
+            run: () => {
+              this.showToast(t("Prototype inspected. Next: configure vehicle at the engineering bench."));
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // 5. Historical Documents & Field Notes:
+    if (poiId === "record-notes") {
+      this.state.collectRecord("Auburn Field Notes — March 1926");
+      this.renderObjectives();
+      this.showToast(t("DOCUMENT COLLECTED: Auburn Field Notes added to Mission Log."));
+      return;
+    }
+    if (poiId === "record-sketch") {
+      this.state.collectRecord("Vehicle Design Charcoal Sketch");
+      this.renderObjectives();
+      this.showToast(t("DOCUMENT COLLECTED: Prototype Sketch added to Mission Log."));
+      return;
+    }
+    if (poiId === "record-photo") {
+      this.state.collectRecord("Field Stand Photograph — 1926");
+      this.renderObjectives();
+      this.showToast(t("DOCUMENT COLLECTED: Historical Photo added to Mission Log."));
+      return;
+    }
+    if (poiId === "record-log") {
+      this.state.collectRecord("Smoked Drum Instrument Log");
+      this.renderObjectives();
+      this.showToast(t("DOCUMENT COLLECTED: Instrument Log added to Mission Log."));
+      return;
+    }
+    if (poiId === "inspect-instruments") {
+      this.state.collectRecord("Telemetry and Recording Instruments");
+      this.renderObjectives();
+      this.showChoice(
+        "INSTRUMENTATION TABLE",
+        `Mechanical drum recorder with soot-coated paper and brass stylus. Gauges for nitrogen feed pressure and combustion chamber back-pressure.\n\nCapacity: ~20 seconds of continuous trace. Data quality depends on structural vibration.`,
+        [{ label: "Calibrate stylus and return", run: () => {} }]
+      );
+      return;
+    }
+
+    // 6. Project area:
     if (poiId === "project-area") {
       this.state.completeObjective("lab");
       this.state.completeObjective("discover");
       this.state.collectRecord("The project — outdoor field notebook");
+      this.renderObjectives();
       this.showEngineeringLeadDialogue(() => {
-        this.showChoice("PROJECT AREA · FIELD NOTE", `${poi.flavorText}\n\n${MISSION_01_DIALOGUE.director[0]}\n\nThe fictional team is trying to prove controlled liquid-fuel flight, not reach space.`, [
-          { label: "Review the prototype", run: () => { this.state.completeObjective("prototype"); this.state.collectRecord("Prototype sketch"); this.showToast("Prototype inspected. The design is experimental and data is limited."); } },
-          { label: "Talk to the propulsion engineer", run: () => { this.state.addLogEntry("ING. ANDREW WELLS · PROPULSION — We can make it stronger. And heavier."); this.showToast("The engineer points toward the outdoor engineering bench."); } },
-        ]);
+        this.showChoice(
+          "PROJECT AREA · OUTDOOR FIELD DESK",
+          `${poi.flavorText}\n\n${MISSION_01_DIALOGUE.director[0]}\n\n“We are not trying to reach space today. We are asking one careful question: can liquid-fuel propulsion lift a vehicle clear of the ground?”`,
+          [
+            { label: "Review vehicle specifications", run: () => this.openEngineering() },
+            { label: "Return to field exploration", run: () => {} },
+          ]
+        );
       });
       return;
     }
-    if (poiId === "engine-selection") { this.openEngineering(); return; }
-    if (poiId === "pressure-test") { this.openTesting(); return; }
-    if (poiId === "launch-window") { this.openLaunchPreparation(); return; }
-    if (poiId === "telemetry-fluctuation") { this.openAnalysis(); return; }
+
+    // 7. Engineering Workbench:
+    if (poiId === "engine-selection") {
+      this.openEngineering();
+      return;
+    }
+
+    // 8. Test Area:
+    if (poiId === "pressure-test") {
+      this.openTesting();
+      return;
+    }
+
+    // 9. Launch Field & Checklist:
+    if (poiId === "launch-window") {
+      this.openLaunchPreparation();
+      return;
+    }
+
+    // 10. Observation Area:
+    if (poiId === "telemetry-fluctuation") {
+      this.openObservationArea();
+      return;
+    }
+
+    // 11. Analysis Station:
+    if (poiId === "analysis-station") {
+      this.openAnalysis();
+      return;
+    }
+
     this.showToast(poi.flavorText);
+  }
+
+  private evaluateDiagnosis(choice: string, expected: string): void {
+    this.state.inspectedCauses.add(choice);
+    this.state.diagnosis = choice;
+    if (choice === expected || this.state.inspectedCauses.size >= 2) {
+      this.state.completeObjective("diagnose");
+      this.renderObjectives();
+      this.showChoice(
+        "DIAGNOSIS COMPLETE · ISSUE RESOLVED",
+        `“Good eye! ${choice} was indeed introducing the oscillation into the feed line.”\n\nElena Brooks and Andrew Wells adjust the clamps and secure the damper lines. The system pressure stabilizes.\n\nNext objective: Head to the Launch Field to complete the launch checklist.`,
+        [
+          {
+            label: "Proceed to Launch Field",
+            run: () => {
+              this.showToast(t("DIAGNOSIS CONFIRMED · Stability restored. Proceed to Launch Field."));
+            },
+          },
+        ]
+      );
+    } else {
+      this.state.extraTestRequired = true;
+      this.state.resources.telemetry = Math.max(10, this.state.resources.telemetry - 5);
+      this.renderResources();
+      this.showChoice(
+        "DIAGNOSTIC UNCERTAINTY",
+        `“${choice} checked out within tolerance. The oscillation must be coming from another subsystem.”\n\nTIME +5 · Review the prototype again to isolate the root cause.`,
+        [
+          {
+            label: "Inspect prototype again",
+            run: () => {
+              this.showToast(t("Review the remaining causes on the prototype."));
+            },
+          },
+        ]
+      );
+    }
   }
 
   private showChoice(title: string, description: string, options: { label: string; run: () => void }[]): void {
@@ -527,40 +833,222 @@ export class Mission1Screen implements Screen {
   }
 
   private openTesting(): void {
-    if (!this.state.objectives.has("design")) { this.showToast("CONFIGURE THE VEHICLE AT THE OUTDOOR ENGINEERING BENCH BEFORE TESTING."); return; }
+    if (!this.state.objectives.has("design")) {
+      this.showToast("CONFIGURE THE VEHICLE AT THE OUTDOOR ENGINEERING BENCH BEFORE TESTING.");
+      return;
+    }
     const metrics = calculateEngineering(this.state.engineering);
-    const structural = metrics.stability >= 65 ? "STRUCTURAL TEST · PASS WITH MARGIN" : "STRUCTURAL TEST · LIMITED MARGIN";
-    const dataStatus = this.state.engineering.instrumentation === "extended" ? "DATA RECORDING · READY" : "DATA RECORDING · BASIC COVERAGE";
-    this.showChoice("TEST AREA · SYSTEMS REVIEW", `${structural}\n${dataStatus}\nPROPULSION SIMULATION · ABSTRACT INDICATORS NORMAL\n\nING. JOSE VEGA: “That fluctuation wasn't there before.”\nING. ELENA BROOKS: “Check the frame and the instruments.”\n\nA brief fluctuation appears on the recorder. Diagnose the issue through your design choice. Continuing is possible, but leaves a consequence in the report.`, [
-      { label: "Modify design · spend remaining budget to add margin", run: () => { this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 12); this.state.setEngineering({ structure: "reinforced", testResponse: "modify" }); this.gameplay?.setDesign("reinforced", this.state.engineering.instrumentation); this.state.collectRecord("Test sheet — structural margin revised"); this.state.completeObjective("testing"); this.showToast("ENGINEERING INSIGHT · Reinforcement improved stability; mass increased."); } },
-      { label: "Run another systems test · consume time", run: () => { this.state.engineering.testResponse = "retest"; this.state.collectRecord("Test sheet — second systems review"); this.state.completeObjective("testing"); this.showToast("RETEST COMPLETE · Data quality improved; launch preparation is delayed."); this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 10); this.collectSample({ sampleKey: "pressure-trace-1926", label: "Systems test recorder trace", type: "telemetry", quality: 0.84 }); } },
-      { label: "Accept the risk · keep current configuration", run: () => { this.state.engineering.testResponse = "accept-risk"; this.state.engineering.riskTolerance = 80; this.state.collectRecord("Test sheet — instability accepted for observation"); this.state.completeObjective("testing"); this.showToast("RISK RECORDED · The team will monitor the instability during flight."); } },
-    ]);
+    const systemDone = this.state.testsRun.has("system");
+    const instDone = this.state.testsRun.has("instrumentation");
+    const stabDone = this.state.testsRun.has("stability");
+
+    if (this.state.testsComplete()) {
+      if (!this.state.objectives.has("diagnose")) {
+        this.showToast(t("Tests complete. Inspect the prototype to resolve the detected anomaly."));
+        return;
+      }
+      this.showToast(t("All systems tested and anomaly diagnosed. Proceed to the Launch Field."));
+      return;
+    }
+
+    this.showChoice(
+      "TEST AREA · SYSTEMS REVIEW",
+      `Outdoor Test Stand & Blast Shields.\nStability rating: ${metrics.stability}% · Mass: ${metrics.mass}% · Data: ${metrics.data}%\n\nRun the static review tests before fueling the flight vehicle:`,
+      [
+        {
+          label: `${systemDone ? "✓" : "1."} System Feed & Pressure Test`,
+          run: () => {
+            this.state.runTest("system");
+            this.state.addLogEntry("TEST AREA — Nitrogen feed and propellant lines pressurized.");
+            this.showToast(t("FEED PRESSURE TEST · Static pressure verified."));
+            this.checkTestProgress();
+          },
+        },
+        {
+          label: `${instDone ? "✓" : "2."} Instrumentation & Stylus Test`,
+          run: () => {
+            this.state.runTest("instrumentation");
+            this.state.addLogEntry("TEST AREA — Smoked drum recorder paper engaged.");
+            this.showToast(t("INSTRUMENTATION TEST · Stylus responding to pulses."));
+            this.checkTestProgress();
+          },
+        },
+        {
+          label: `${stabDone ? "✓" : "3."} Structural & Vibration Check`,
+          run: () => {
+            this.state.runTest("stability");
+            this.state.addLogEntry("TEST AREA — Vibration check run against frame clamps.");
+            this.showToast(t("VIBRATION CHECK · Frame resonance recorded."));
+            this.checkTestProgress();
+          },
+        },
+      ]
+    );
+  }
+
+  private checkTestProgress(): void {
+    if (this.state.testsComplete()) {
+      this.state.completeObjective("testing");
+      this.renderObjectives();
+      this.showChoice(
+        "WARNING · UNEXPECTED INSTABILITY DETECTED",
+        `ING. ANDREW WELLS: “That wasn't there before.”\nING. ELENA BROOKS: “Then something changed during the pressurization cycle.”\nING. TOMÁS ELDRICH: “Find it.”\n\nA mechanical oscillation has appeared in the trace recorder. Inspect the prototype closely to diagnose the cause.`,
+        [
+          {
+            label: "Inspect prototype to find the cause",
+            run: () => {
+              this.showToast(t("ANOMALY RECORDED · Return to the prototype to diagnose the issue."));
+            },
+          },
+        ]
+      );
+    }
   }
 
   private openLaunchPreparation(): void {
-    if (!this.state.objectives.has("testing")) { this.showToast("COMPLETE THE SYSTEMS REVIEW BEFORE PREPARING THE LAUNCH."); return; }
+    if (!this.state.objectives.has("diagnose")) {
+      this.showToast(t("DIAGNOSE AND RESOLVE THE TEST ANOMALY BEFORE PREPARING LAUNCH."));
+      return;
+    }
     const weather = this.gameplay?.getWeather() ?? "CLOUDY";
-    this.showChoice("LAUNCH FIELD · FINAL REVIEW", `□ Inspect the vehicle\n□ Check observation instruments\n□ Confirm telemetry\n\nWEATHER · ${weather}\nTIME · ${this.state.tick < 20 ? "DAWN" : this.state.tick < 32 ? "MORNING" : "LATE MORNING"}\n\nMARA REED · DATA TECHNICIAN: “Recorder ready.”\nING. TOMÁS ELDRICH · DIRECTOR: “Are we ready?”\n\nThe historical reference flight took place on March 16, 1926, in Auburn, Massachusetts. Your character and team are fictional.`, [
-      { label: "Proceed · attempt the flight", run: () => { this.state.engineering.launchDecision = "proceed"; this.state.collectRecord("Launch checklist — conditions and instruments confirmed"); this.state.completeObjective("prepare"); this.state.completeObjective("flight"); this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry); this.state.addLogEntry("LAUNCH DECISION — Proceed. The team takes its positions."); this.collectSample({ sampleKey: "flight-observation-1926", label: "Launch day flight observation", type: "flight-record", quality: this.state.resources.telemetry / 100 }); this.renderObjectives(); void this.autosave(); this.runLaunchSequence(); } },
-      { label: "Delay · recheck instruments and accept the cost", run: () => { this.state.engineering.launchDecision = "delay"; this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 8); this.state.resources.telemetry = Math.min(100, this.state.resources.telemetry + 12); this.state.collectRecord("Launch checklist — delay and recalibration noted"); this.state.completeObjective("prepare"); this.state.completeObjective("flight"); this.state.flightResult = "delayed"; this.state.addLogEntry("LAUNCH DECISION — Delay. Additional instrument review completed; today's attempt is recorded as delayed."); this.showToast("LAUNCH DELAYED · Additional data recovered. Review the flight record at the observation station."); } },
-    ]);
+    const cl = this.state.checklist;
+
+    const items = [
+      { id: "inspect-vehicle", label: "Inspect vehicle on launch frame" },
+      { id: "check-instruments", label: "Check observation instruments" },
+      { id: "review-conditions", label: `Review weather conditions (${weather})` },
+      { id: "confirm-observation", label: "Confirm observation barricades" },
+      { id: "confirm-telemetry", label: "Confirm telemetry recorder drum" },
+    ];
+
+    const options = items.map((item) => ({
+      label: `${cl.has(item.id) ? "✓" : "□"} ${item.label}`,
+      run: () => {
+        this.state.markChecklist(item.id);
+        this.showToast(`CHECKLIST · ${item.label} confirmed.`);
+        this.openLaunchPreparation();
+      },
+    }));
+
+    if (this.state.checklistComplete()) {
+      options.push({
+        label: "PROCEED · Confirm readiness and attempt flight",
+        run: () => {
+          this.state.engineering.launchDecision = "proceed";
+          this.state.completeObjective("prepare");
+          this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry);
+          this.gameplay?.setPeakAltitude(flightPeakAltitude(this.state.flightResult));
+          this.renderObjectives();
+          void this.autosave();
+          this.showChoice(
+            "PRE-LAUNCH BRIEFING",
+            `MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`,
+            [
+              {
+                label: "Head to the Observation Area",
+                run: () => {
+                  this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch."));
+                },
+              },
+            ]
+          );
+        },
+      });
+      options.push({
+        label: "DELAY · Postpone for extra calibration",
+        run: () => {
+          this.state.engineering.launchDecision = "delay";
+          this.state.flightResult = "delayed";
+          this.state.completeObjective("prepare");
+          this.state.completeObjective("observation");
+          this.state.completeObjective("flight");
+          this.renderObjectives();
+          void this.autosave();
+          this.showToast(t("LAUNCH DELAYED · Additional instrument review completed. Proceed to Analysis Station."));
+        },
+      });
+    }
+
+    this.showChoice(
+      "LAUNCH FIELD · PRE-FLIGHT CHECKLIST",
+      `Auburn, Massachusetts · March 16, 1926.\nWeather: ${weather} · Time: ${this.state.tick < 20 ? "DAWN" : "MORNING"}\nComplete all items before clearing the launch pad:`,
+      options
+    );
+  }
+
+  private openObservationArea(): void {
+    if (!this.state.objectives.has("prepare")) {
+      this.showToast(t("COMPLETE THE LAUNCH CHECKLIST AT THE LAUNCH FIELD FIRST."));
+      return;
+    }
+    if (this.state.objectives.has("flight")) {
+      this.showToast(t("Flight attempt already completed. Head to the Analysis Station."));
+      return;
+    }
+
+    this.state.completeObjective("observation");
+    this.renderObjectives();
+    this.showChoice(
+      "OBSERVATION AREA · TAKE POSITION",
+      `The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.\n\nDIRECTOR: “Ready on your mark.”`,
+      [
+        {
+          label: "START LAUNCH COUNTDOWN (T-10)",
+          run: () => {
+            this.runLaunchSequence();
+          },
+        },
+      ]
+    );
   }
 
   private openAnalysis(): void {
-    if (!this.state.objectives.has("flight")) { this.showToast("THE FLIGHT RECORD WILL BE AVAILABLE AFTER THE LAUNCH DECISION."); return; }
+    if (!this.state.objectives.has("flight")) {
+      this.showToast(t("THE FLIGHT RECORD WILL BE AVAILABLE AFTER THE LAUNCH ATTEMPT."));
+      return;
+    }
     const result = this.state.flightResult ?? resolveFlight(this.state.engineering, this.state.resources.telemetry);
-    this.showChoice("FLIGHT ANALYSIS", `FLIGHT RESULT · ${result.toUpperCase()}\n\n${MISSION_01_DIALOGUE.historicalNote}\n\nThe historical figures are reference context; the simulated outcome is fictional. Review the evidence sets to complete the analysis.`, [
-      { label: "Analyze propulsion data", run: () => this.state.analyzeData("Propulsion data") },
-      { label: "Analyze structural data", run: () => this.state.analyzeData("Structural data") },
-      { label: "Recover flight record", run: () => { this.state.analyzeData("Flight record"); this.state.collectRecord("Launch day — flight observation"); this.state.completeObjective("analysis"); } },
-      { label: "Conclude mission · save report", run: () => {
-        const required = ["lab", "discover", "prototype", "design", "testing", "prepare", "flight", "analysis"] as const;
-        const missing = required.filter((id) => !this.state.objectives.has(id));
-        if (missing.length) { this.showToast(`MISSION INCOMPLETE · ${missing.length} objective(s) still need attention.`); return; }
-        this.state.analyzeData("Flight report"); this.state.completeObjective("analysis"); this.renderObjectives(); this.runMissionEnding();
-      } },
-    ]);
+    const label = flightResultLabel(result);
+    this.showChoice(
+      "OUTDOOR ANALYSIS STATION · FLIGHT RECORD",
+      `FLIGHT OUTCOME: ${label}\n\n${MISSION_01_DIALOGUE.historicalNote}\n\nReview the flight telemetry traces and system performance:`,
+      [
+        {
+          label: "Analyze Propulsion & Chamber Pressure",
+          run: () => {
+            this.state.analyzeData("Propulsion & Pressure Data");
+            this.showToast(t("Propulsion trace analyzed: combustion pressure curve confirmed."));
+            this.openAnalysis();
+          },
+        },
+        {
+          label: "Analyze Structural Rigidity & Frame Deflection",
+          run: () => {
+            this.state.analyzeData("Structural & Frame Data");
+            this.showToast(t("Structural trace analyzed: frame stability verified against guide cables."));
+            this.openAnalysis();
+          },
+        },
+        {
+          label: "Recover Smoked Drum Flight Record",
+          run: () => {
+            this.state.analyzeData("Smoked Drum Flight Record");
+            this.state.collectRecord("1926 Smoked Paper Flight Trace");
+            this.showToast(t("Historical record recovered and archived in mission log."));
+            this.openAnalysis();
+          },
+        },
+        {
+          label: "CONCLUDE MISSION & COMPILE REPORT",
+          run: () => {
+            this.state.completeObjective("analysis");
+            this.renderObjectives();
+            void this.autosave();
+            this.runMissionEnding();
+          },
+        },
+      ]
+    );
   }
 
   private runLaunchSequence(): void {
@@ -574,9 +1062,26 @@ export class Mission1Screen implements Screen {
     const card = el("div", { className: "modal-card mission-launch-card" });
     const heading = el("p", { className: "mission-launch-kicker", text: t("OBSERVATION AREA · RECORDING") });
     const countdown = el("h2", { className: "mission-launch-countdown", text: "T-10" });
-    const status = el("p", { className: "modal-description mission-launch-status", text: t("The team is clear of the stand. The recorder is running. Press 1 for cinematic, 2 for observation, or 3 for telemetry view.") });
+    const status = el("p", { className: "modal-description mission-launch-status", text: t("The team is clear of the stand. The recorder is running. Use buttons or keys 1/2/3 to switch camera view.") });
+
+    const cameraRow = el("div", { className: "mission-launch-camera-row" });
+    const btnCine = el("button", { className: "btn btn-secondary", text: "1 · CINEMATIC", attrs: { type: "button" } });
+    btnCine.addEventListener("click", () => this.gameplay?.setCameraMode("cinematic"));
+    const btnObs = el("button", { className: "btn btn-secondary", text: "2 · OBSERVATION", attrs: { type: "button" } });
+    btnObs.addEventListener("click", () => this.gameplay?.setCameraMode("observation"));
+    const btnTelem = el("button", { className: "btn btn-secondary", text: "3 · TELEMETRY", attrs: { type: "button" } });
+    btnTelem.addEventListener("click", () => this.gameplay?.setCameraMode("telemetry"));
+    cameraRow.append(btnCine, btnObs, btnTelem);
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "1") this.gameplay?.setCameraMode("cinematic");
+      if (e.key === "2") this.gameplay?.setCameraMode("observation");
+      if (e.key === "3") this.gameplay?.setCameraMode("telemetry");
+    };
+    window.addEventListener("keydown", onKey);
+
     const readings = el("div", { className: "mission-launch-readings" });
-    card.append(heading, countdown, status, readings);
+    card.append(heading, countdown, status, cameraRow, readings);
     this.modalRoot.append(card);
     let remaining = 10;
     const updateReadings = (altitude: number, velocity: number, signal: number) => {
@@ -605,8 +1110,6 @@ export class Mission1Screen implements Screen {
       const startedAt = performance.now();
       this.flightTimer = window.setInterval(() => {
         const seconds = Math.min(14, (performance.now() - startedAt) / 1000);
-        // These are cinematic telemetry values: continue climbing throughout
-        // the longer ascent instead of showing the previous rise-and-fall arc.
         const poweredAscentTime = Math.min(seconds, 3.5);
         const continuingAscentTime = Math.max(0, seconds - 3.5);
         const altitude = Math.round(
@@ -620,16 +1123,19 @@ export class Mission1Screen implements Screen {
         const signal = Math.max(24, Math.round(this.state.resources.telemetry - Math.max(0, seconds - 2) * 5));
         updateReadings(altitude, velocity, signal);
         if (seconds >= 14) {
+          window.removeEventListener("keydown", onKey);
           if (this.flightTimer) window.clearInterval(this.flightTimer);
           this.flightTimer = undefined;
           this.modalRoot?.classList.add("modal-overlay--hidden");
           this.modalRoot?.classList.remove("mission-launch-overlay--cinematic");
           this.paused = false;
           this.togglePanel(true);
+          this.state.completeObjective("flight");
           this.state.addLogEntry(`FLIGHT OBSERVATION — ${this.state.flightResult ?? "recorded"}. The vehicle continued climbing throughout the observation window; displayed altitude and velocity are abstract game values. Historical reference: 41 ft / 12.5 m and 184 ft / 56 m.`);
           this.renderLog();
           this.renderFlightMetrics();
-          this.showToast("The crew is quiet for a moment. ‘It flew.’ Return to the observation table to review the record.");
+          this.renderObjectives();
+          this.showToast(t("The crew is quiet for a moment. ‘It flew.’ Head to the outdoor analysis station."));
           void this.autosave();
         }
       }, 200);
@@ -651,7 +1157,7 @@ export class Mission1Screen implements Screen {
       el("h2", { className: "mission-ending-title", text: t("THE FLIGHT WAS SMALL. THE POSSIBILITY WAS NOT.") }),
       el("p", { className: "mission-ending-dialogue", text: `${t("ING. ELENA BROOKS · STRUCTURAL ENGINEER")}\n“${t(engineerLine)}”` }),
       el("p", { className: "mission-ending-dialogue", text: `${t("ING. TOMÁS ELDRICH · PROJECT DIRECTOR")}\n“${t("Of course. That's how this begins.") }”` }),
-      el("p", { className: "mission-ending-caption", text: t("The 1926 historical flight was brief. This fictional team's choices and simulated result belong to the game.") }),
+      el("p", { className: "mission-ending-caption", text: t("The 1926 historical flight was brief (41 ft high, 184 ft distance). It demonstrated that liquid-fuel propulsion could produce flight. Mission 02 unlocked.") }),
     );
     const finish = el("button", { className: "btn btn-primary btn-large", text: t("MISSION 01 COMPLETE"), attrs: { type: "button" } });
     finish.addEventListener("click", () => {

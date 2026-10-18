@@ -94,6 +94,11 @@ export interface MissionSaveState {
     checkpoint: string;
     analyzed: string[];
     flightResult: import("@/state/Mission01Launch").FlightResult | null;
+    metNpcs?: string[];
+    testsRun?: string[];
+    checklist?: string[];
+    inspectedCauses?: string[];
+    diagnosis?: string | null;
   };
 }
 
