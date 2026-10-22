@@ -10,31 +10,13 @@ export const MISSION_1_ASSET_REGISTRY = [
     id: "procedural-auburn-field",
     source: "generated-in-project",
     license: "project-generated",
-    usage: "Terrain, soil variation, paths, trees, fence and atmospheric set dressing.",
+    usage: "Open rural test field, soil variation, compact boardwalks, and restrained atmospheric effects.",
   },
   {
     id: "procedural-1926-experimental-rocket",
     source: "generated-in-project",
     license: "project-generated",
     usage: "Historically inspired, non-instructional visual prototype.",
-  },
-  {
-    id: "polyhaven-wooden-crate-02",
-    source: "https://polyhaven.com/a/wooden_crate_02",
-    license: "CC0 1.0",
-    usage: "Weathered storage crate near the field store; bundled at 1K glTF with PBR maps.",
-  },
-  {
-    id: "polyhaven-wooden-bucket-02",
-    source: "https://polyhaven.com/a/wooden_bucket_02",
-    license: "CC0 1.0",
-    usage: "Worn wood and metal field prop by the laboratory; bundled at 1K glTF.",
-  },
-  {
-    id: "polyhaven-trowel-01",
-    source: "https://polyhaven.com/a/trowel_01",
-    license: "CC0 1.0",
-    usage: "Photogrammetry hand tool in the workshop; bundled at 1K glTF.",
   },
   {
     id: "polyhaven-pbr-grounds",

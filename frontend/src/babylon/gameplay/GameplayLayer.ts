@@ -54,7 +54,7 @@ const MOVE_ACCELERATION = 11;
 const MOVE_BRAKING = 15;
 const EARTH_GRAVITY = 9.81;
 const JUMP_SPEED = 5.5;
-// Route waypoints stop outside solid table/building footprints; keep interaction
+// Route waypoints stop outside solid station and launch-frame footprints; keep interaction
 // reach large enough to use a station without walking through its collider.
 const INTERACT_RADIUS = 4;
 const PLAYER_START = { x: 0, z: 4 };
@@ -81,8 +81,6 @@ export function createGameplayLayer(
   shadowGenerator: BABYLON.ShadowGenerator,
 ): GameplayLayerController {
   const root = new BABYLONNS.TransformNode("gameplay-root", scene);
-  const downloadedProps = new BABYLONNS.TransformNode("polyhaven-props-root", scene);
-  downloadedProps.parent = root;
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
 
@@ -279,7 +277,7 @@ export function createGameplayLayer(
   ambientDust.maxSize = 0.12;
   ambientDust.minLifeTime = 3.5;
   ambientDust.maxLifeTime = 7.0;
-  ambientDust.emitRate = 16;
+  ambientDust.emitRate = 5;
   ambientDust.minEmitPower = 0.04;
   ambientDust.maxEmitPower = 0.18;
   ambientDust.direction1 = new BABYLONNS.Vector3(-0.25, 0.04, 0.15);
@@ -427,15 +425,7 @@ export function createGameplayLayer(
 
   const collisionObstacles = [
     { minX: -3.2, maxX: 3.2, minZ: ROCKET_PLATFORM_Z - 3.1, maxZ: ROCKET_PLATFORM_Z + 3.1 },
-    // The house models have intentionally varied footprints and stay solid.
-    { minX: -16.4, maxX: -5.6, minZ: -14.4, maxZ: -3.6 },
-    { minX: 6.2, maxX: 15.8, minZ: 4.2, maxZ: 13.8 },
-    { minX: 7.4, maxX: 14.6, minZ: -11.6, maxZ: -4.4 },
   ];
-  // Keep tree trunks solid for both manual movement and waypoint routing.
-  for (const [x, z] of [[-25, -18], [-22, -8], [25, -12], [24, 19], [-24, 20]]) {
-    collisionObstacles.push({ minX: x - 0.65, maxX: x + 0.65, minZ: z - 0.65, maxZ: z + 0.65 });
-  }
 
   function resolveObjectCollisions(position: BABYLON.Vector3): { x: boolean; z: boolean } {
     let blockedX = false;
@@ -459,7 +449,7 @@ export function createGameplayLayer(
     return { x: blockedX, z: blockedZ };
   }
 
-  /** Grid-based outdoor routing respects the sealed building footprints. */
+  /** Grid-based outdoor routing respects the launch frame and work-station footprints. */
   function findWalkPath(start: BABYLON.Vector3, goal: BABYLON.Vector3): BABYLON.Vector3[] {
     type PathNode = { x: number; z: number; g: number; f: number; parent?: PathNode };
     const min = -32;
@@ -525,178 +515,10 @@ export function createGameplayLayer(
 
   const woodMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-weathered-wood", "#75583f", "wood");
   const darkMetalMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-oxidized-metal", "#3d4543", "metal");
-  const plasterMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-lime-plaster", "#b9b099", "plaster");
-  const glassMat = new BABYLONNS.PBRMaterial("gameplay-old-window-glass", scene);
-  glassMat.albedoColor = BABYLONNS.Color3.FromHexString("#8eaaa8");
-  glassMat.alpha = 0.62;
-  glassMat.metallic = 0.08;
-  glassMat.roughness = 0.28;
   const paperMat = new BABYLONNS.PBRMaterial("gameplay-aged-paper", scene);
   paperMat.albedoColor = BABYLONNS.Color3.FromHexString("#cbbb96");
   paperMat.roughness = 0.98;
-  const grassMat = new BABYLONNS.StandardMaterial("gameplay-field-grass", scene);
-  grassMat.diffuseColor = BABYLONNS.Color3.FromHexString("#596545");
-  grassMat.roughness = 1;
-  const leafMat = new BABYLONNS.StandardMaterial("gameplay-leaf-canopy", scene);
-  leafMat.diffuseColor = BABYLONNS.Color3.FromHexString("#526447");
-  leafMat.specularColor = new BABYLONNS.Color3(0.015, 0.02, 0.012);
   const missionSun = scene.getLightByName("morningSun");
-
-  const buildZone = (name: string, x: number, z: number, width: number, depth: number) => {
-    const baseY = terrain.getHeightAt(x, z);
-    const building = new BABYLONNS.TransformNode(`gameplay-${name}`, scene);
-    building.position = new BABYLONNS.Vector3(x, baseY, z);
-    building.parent = root;
-    const foundation = BABYLONNS.MeshBuilder.CreateBox(`${name}-stone-foundation`, { width: width + 0.14, height: 0.3, depth: depth + 0.12 }, scene);
-    foundation.position.y = 0.16;
-    foundation.material = darkMetalMat;
-    foundation.parent = building;
-    const wallPiece = (suffix: string, x: number, y: number, z: number, w: number, h: number, d: number) => {
-      const piece = BABYLONNS.MeshBuilder.CreateBox(`${name}-wall-${suffix}`, { width: w, height: h, depth: d }, scene);
-      piece.position = new BABYLONNS.Vector3(x, y, z);
-      piece.material = plasterMat;
-      piece.parent = building;
-    };
-    for (const side of [-1, 1]) wallPiece(`side-${side}`, side * (width / 2 - 0.07), 1.1, 0, 0.14, 2.2, depth);
-    wallPiece("back", 0, 1.1, -depth / 2 + 0.07, width, 2.2, 0.14);
-    for (const side of [-1, 1]) {
-      const windowX = side * (width * 0.28);
-      const sideWidth = width / 2 - 0.45;
-      wallPiece(`front-lower-${side}`, side * (width / 4 + 0.225), 0.55, depth / 2 - 0.07, sideWidth, 1.1, 0.14);
-      wallPiece(`front-upper-${side}`, side * (width / 4 + 0.225), 1.88, depth / 2 - 0.07, sideWidth, 0.64, 0.14);
-      for (const edge of [-1, 1]) wallPiece(`window-pier-${side}-${edge}`, windowX + edge * 0.42, 1.34, depth / 2 - 0.07, 0.24, 0.46, 0.14);
-    }
-    wallPiece("door-head", 0, 1.82, depth / 2 - 0.07, 0.9, 0.76, 0.14);
-    for (const side of [-1, 1]) {
-      const roof = BABYLONNS.MeshBuilder.CreateBox(`${name}-roof-slope-${side}`, { width: width + 0.46, height: 0.17, depth: depth * 0.62 }, scene);
-      roof.position = new BABYLONNS.Vector3(0, 2.37, side * depth * 0.22);
-      roof.rotation.x = side * 0.42;
-      roof.material = darkMetalMat;
-      roof.parent = building;
-      const fascia = BABYLONNS.MeshBuilder.CreateBox(`${name}-fascia-${side}`, { width: width + 0.48, height: 0.19, depth: 0.11 }, scene);
-      fascia.position = new BABYLONNS.Vector3(0, 2.22, side * (depth / 2 + 0.06));
-      fascia.material = woodMat;
-      fascia.parent = building;
-    }
-    const door = BABYLONNS.MeshBuilder.CreateBox(`${name}-door`, { width: 0.65, height: 1.25, depth: 0.04 }, scene);
-    door.position = new BABYLONNS.Vector3(0, 0.62, depth / 2 + 0.025);
-    door.material = darkMetalMat;
-    door.parent = building;
-    for (const side of [-1, 1]) {
-      const jamb = BABYLONNS.MeshBuilder.CreateBox(`${name}-door-jamb-${side}`, { width: 0.1, height: 1.4, depth: 0.1 }, scene);
-      jamb.position = new BABYLONNS.Vector3(side * 0.39, 0.7, depth / 2 + 0.065);
-      jamb.material = woodMat;
-      jamb.parent = building;
-    }
-    const lintel = BABYLONNS.MeshBuilder.CreateBox(`${name}-door-lintel`, { width: 0.88, height: 0.1, depth: 0.1 }, scene);
-    lintel.position = new BABYLONNS.Vector3(0, 1.4, depth / 2 + 0.065);
-    lintel.material = woodMat;
-    lintel.parent = building;
-    const handle = BABYLONNS.MeshBuilder.CreateSphere(`${name}-door-handle`, { diameter: 0.07, segments: 8 }, scene);
-    handle.position = new BABYLONNS.Vector3(0.19, 0.64, depth / 2 + 0.09);
-    handle.material = markerMat;
-    handle.parent = building;
-    for (const side of [-1, 1]) {
-      const window = BABYLONNS.MeshBuilder.CreateBox(`${name}-window-${side}`, { width: 0.58, height: 0.42, depth: 0.035 }, scene);
-      window.position = new BABYLONNS.Vector3(side * (width * 0.28), 1.34, depth / 2 + 0.03);
-      window.material = glassMat;
-      window.parent = building;
-      const windowX = side * (width * 0.28);
-      for (const edge of [-1, 1]) {
-        const trimSide = BABYLONNS.MeshBuilder.CreateBox(`${name}-window-trim-side-${side}-${edge}`, { width: 0.07, height: 0.56, depth: 0.07 }, scene);
-        trimSide.position = new BABYLONNS.Vector3(windowX + edge * 0.32, 1.34, depth / 2 + 0.06);
-        trimSide.material = woodMat;
-        trimSide.parent = building;
-        const trimH = BABYLONNS.MeshBuilder.CreateBox(`${name}-window-trim-h-${side}-${edge}`, { width: 0.7, height: 0.065, depth: 0.07 }, scene);
-        trimH.position = new BABYLONNS.Vector3(windowX, 1.34 + edge * 0.25, depth / 2 + 0.06);
-        trimH.material = woodMat;
-        trimH.parent = building;
-      }
-      const mullion = BABYLONNS.MeshBuilder.CreateBox(`${name}-window-mullion-${side}`, { width: 0.035, height: 0.42, depth: 0.04 }, scene);
-      mullion.position = new BABYLONNS.Vector3(windowX, 1.34, depth / 2 + 0.095);
-      mullion.material = woodMat;
-      mullion.parent = building;
-    }
-    for (const side of [-1, 1]) {
-      const timber = BABYLONNS.MeshBuilder.CreateBox(`${name}-corner-timber-${side}`, { width: 0.14, height: 2.22, depth: 0.14 }, scene);
-      timber.position = new BABYLONNS.Vector3(side * (width / 2 - 0.1), 1.12, depth / 2 + 0.045);
-      timber.material = woodMat;
-      timber.parent = building;
-    }
-    const chimney = BABYLONNS.MeshBuilder.CreateBox(`${name}-chimney`, { width: 0.42, height: 0.82, depth: 0.42 }, scene);
-    chimney.position = new BABYLONNS.Vector3(width * 0.28, 2.55, -depth * 0.2);
-    chimney.material = darkMetalMat;
-    chimney.parent = building;
-    addBuildingSign(BABYLONNS, scene, building, name.replace(/-/g, " ").toUpperCase(), width, depth);
-    return building;
-  };
-
-  const fallbackBuildings = [
-    buildZone("laboratory", -11, -9, 10, 7.5),
-    buildZone("storage", 11, -8, 3.2, 2.6),
-    buildZone("workshop", 11, 9, 9, 7),
-  ];
-
-  async function loadEnvironmentModels(): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const treeResult = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "arboles_optimized.glb", scene);
-      const treeRoot = new BABYLONNS.TransformNode("model-tree-0", scene);
-      treeRoot.parent = root;
-      for (const mesh of treeResult.meshes) {
-        if (!mesh.parent) mesh.parent = treeRoot;
-        mesh.receiveShadows = true;
-      }
-      const treeBounds = treeRoot.getHierarchyBoundingVectors();
-      const treeWidth = Math.max(0.01, treeBounds.max.x - treeBounds.min.x);
-      treeRoot.scaling.setAll(3.2 / treeWidth);
-      treeRoot.position = new BABYLONNS.Vector3(-25, -treeBounds.min.y * treeRoot.scaling.y, -18);
-      const treePositions: Array<[number, number]> = [[-22, -8], [25, -12], [24, 19], [-24, 20]];
-      for (const [index, position] of treePositions.entries()) {
-        const clone = treeRoot.clone(`model-tree-${index}`, root);
-        if (clone) clone.position = new BABYLONNS.Vector3(position[0], treeRoot.position.y, position[1]);
-      }
-    } catch (error) {
-      console.warn("[Mission 01] Could not load environment models; using procedural buildings and vegetation.", error);
-    }
-  }
-  void loadEnvironmentModels();
-
-  async function loadBuildingModel(file: string, name: string, x: number, z: number, targetWidth: number): Promise<BABYLON.TransformNode> {
-    const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", file, scene);
-    const modelRoot = new BABYLONNS.TransformNode(`building-model-${name}`, scene);
-    modelRoot.parent = root;
-    for (const mesh of result.meshes) {
-      if (!mesh.parent) mesh.parent = modelRoot;
-      mesh.checkCollisions = false; // Player physics uses matching full-footprint AABBs.
-      mesh.receiveShadows = true;
-    }
-    result.animationGroups.forEach((animation) => animation.stop());
-    modelRoot.computeWorldMatrix(true);
-    let bounds = modelRoot.getHierarchyBoundingVectors(true);
-    const span = Math.max(0.01, bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z);
-    modelRoot.scaling.setAll(targetWidth / span);
-    modelRoot.computeWorldMatrix(true);
-    bounds = modelRoot.getHierarchyBoundingVectors(true);
-    const groundY = terrain.getHeightAt(x, z);
-    modelRoot.position.set(x - (bounds.min.x + bounds.max.x) / 2, groundY - bounds.min.y, z - (bounds.min.z + bounds.max.z) / 2);
-    return modelRoot;
-  }
-
-  async function loadRequestedBuildings(): Promise<void> {
-    const models: BABYLON.TransformNode[] = [];
-    try {
-      await import("@babylonjs/loaders/glTF");
-      models.push(await loadBuildingModel("edificio_colon_-_modelo_3d_optimized.glb", "project-house", -11, -9, 10.8));
-      models.push(await loadBuildingModel("mies_van_der_rohe_oficina_bacardi_optimized.glb", "workshop-house", 11, 9, 9.6));
-      models.push(await loadBuildingModel("mies_van_der_rohe_oficina_bacardi_optimized.glb", "storage-house", 11, -8, 7.2));
-      fallbackBuildings.forEach((building) => building.dispose(false, true));
-    } catch (error) {
-      models.forEach((model) => model.dispose(false, true));
-      console.warn("[Mission 01] Building model load failed; keeping the procedural houses.", error);
-    }
-  }
-  void loadRequestedBuildings();
 
   // Keep the 1926-scale procedural vehicle. A modern shuttle asset is historically
   // the wrong silhouette for this mission and is left unused on purpose.
@@ -740,93 +562,8 @@ export function createGameplayLayer(
     post.parent = root;
   }
 
-  const createTree = (name: string, x: number, z: number, scale: number): void => {
-    const y = terrain.getHeightAt(x, z);
-    const tree = new BABYLONNS.TransformNode(name, scene);
-    tree.position = new BABYLONNS.Vector3(x, y, z);
-    tree.parent = root;
-    const trunk = BABYLONNS.MeshBuilder.CreateCylinder(`${name}-trunk`, { height: 2.5 * scale, diameter: 0.22 * scale, tessellation: 7 }, scene);
-    trunk.position.y = 1.25 * scale;
-    trunk.material = woodMat;
-    trunk.parent = tree;
-    for (let i = 0; i < 7; i++) {
-      const side = (i % 3) - 1;
-      const crown = BABYLONNS.MeshBuilder.CreateIcoSphere(`${name}-crown-${i}`, { radius: 0.8 * scale, subdivisions: 3 }, scene);
-      crown.position = new BABYLONNS.Vector3(side * 0.48 * scale, (2.18 + (i % 2) * 0.54) * scale, (i - 3) * 0.12 * scale);
-      crown.scaling = new BABYLONNS.Vector3(0.85 + (i % 3) * 0.12, 1.08 + (i % 2) * 0.14, 0.88 + (i % 2) * 0.1);
-      crown.material = leafMat;
-      crown.parent = tree;
-    }
-    for (let i = 0; i < 4; i++) {
-      const branch = BABYLONNS.MeshBuilder.CreateCylinder(`${name}-branch-${i}`, { height: 1.05 * scale, diameterTop: 0.045 * scale, diameterBottom: 0.095 * scale, tessellation: 7 }, scene);
-      const angle = i * Math.PI / 2 + 0.35;
-      branch.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.48 * scale, 1.9 * scale, Math.sin(angle) * 0.48 * scale);
-      branch.rotation.z = Math.cos(angle) * -0.78;
-      branch.rotation.x = Math.sin(angle) * 0.78;
-      branch.material = woodMat;
-      branch.parent = tree;
-    }
-  };
-  [
-    [-24, -19, 1.3], [-19, -22, 0.95], [20, -19, 1.2], [25, -12, 1.5],
-    [-25, 18, 1.1], [21, 21, 1.35], [27, 15, 0.9],
-  ].forEach(([x, z, scale], index) => createTree(`field-tree-${index}`, x, z, scale));
-
-  const fenceRoot = new BABYLONNS.TransformNode("field-fence-root", scene);
-  for (let i = 0; i < 9; i++) {
-    const x = -20 + i * 2.3;
-    const post = BABYLONNS.MeshBuilder.CreateBox(`fence-post-${i}`, { width: 0.12, height: 1.15, depth: 0.12 }, scene);
-    post.position = new BABYLONNS.Vector3(x, terrain.getHeightAt(x, 5) + 0.57, 5);
-    post.material = woodMat;
-    post.parent = fenceRoot;
-    if (i < 8) {
-      const rail = BABYLONNS.MeshBuilder.CreateBox(`fence-rail-${i}`, { width: 2.3, height: 0.1, depth: 0.1 }, scene);
-      rail.position = new BABYLONNS.Vector3(x + 1.15, post.position.y + 0.1, 5);
-      rail.material = woodMat;
-      rail.parent = fenceRoot;
-    }
-  }
-
-  const trackMat = new BABYLONNS.StandardMaterial("dirt-road-mat", scene);
-  trackMat.diffuseColor = BABYLONNS.Color3.FromHexString("#817462");
-  trackMat.roughness = 1;
-  for (const z of [-10, -4, 2, 8]) {
-    const path = BABYLONNS.MeshBuilder.CreateGround(`field-path-${z}`, { width: 0.55, height: 14, subdivisions: 1 }, scene);
-    path.position = new BABYLONNS.Vector3(2, terrain.getHeightAt(2, z) + 0.035, z);
-    path.material = trackMat;
-    path.parent = root;
-  }
-
-  // CC0 photogrammetry props are bundled locally; there are no runtime CDN dependencies.
-  const loadProp = async (slug: string, filename: string, x: number, z: number, scale: number, yaw = 0) => {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(
-        null,
-        `/assets/polyhaven/models/${slug}/`,
-        filename,
-        scene,
-      );
-      const placement = new BABYLONNS.TransformNode(`polyhaven-${slug}-placement`, scene);
-      placement.parent = downloadedProps;
-      placement.position = new BABYLONNS.Vector3(x, terrain.getHeightAt(x, z), z);
-      placement.rotation.y = yaw;
-      placement.scaling.setAll(scale);
-      for (const mesh of result.meshes) {
-        if (!mesh.parent) mesh.parent = placement;
-        mesh.receiveShadows = true;
-        shadowGenerator.addShadowCaster(mesh, true);
-      }
-    } catch (error) {
-      console.warn(`[Mission 01] Could not load local CC0 asset ${slug}.`, error);
-    }
-  };
-  void loadProp("wooden_crate_02", "wooden_crate_02_1k.gltf", 10.2, -7.5, 0.8, 0.3);
-  void loadProp("wooden_bucket_02", "wooden_bucket_02_1k.gltf", -2.8, -3.9, 0.7, 1.1);
-  void loadProp("trowel_01", "trowel_01_1k.gltf", -9.5, 8.4, 0.78, -0.6);
-
-  // Every interactive work surface is outdoors; the closed buildings are
-  // landmarks and contain no usable interior space.
+  // The open equipment shelter is the only structure. Mission work stays at
+  // the outdoor project, engineering, test, launch, and observation stations.
   const fieldStations = [
     { name: "project-notes", x: -8, z: -1, width: 2.8 },
     { name: "engineering-bench", x: 18.5, z: 8, width: 2.8 },
@@ -1310,22 +1047,15 @@ export function createGameplayLayer(
       smokeTexture.dispose();
       terrain.dispose();
       poiRoot.dispose(false, true);
-      downloadedProps.dispose(false, true);
       rocketRoot.dispose(false, true);
-      fenceRoot.dispose(false, true);
       testStand.dispose();
       propMat.dispose();
       instrumentMat.dispose();
       woodMat.dispose(false, true);
       darkMetalMat.dispose(false, true);
-      plasterMat.dispose(false, true);
       paperMat.dispose();
       markerMat.dispose();
-      glassMat.dispose();
-      grassMat.dispose();
-      leafMat.dispose();
       sky.dispose(false, true);
-      trackMat.dispose();
       root.dispose(false, true);
     },
   };
@@ -1411,32 +1141,4 @@ function createWeatheredMaterial(
   material.roughness = style === "metal" ? 0.75 : 0.94;
   material.metallic = style === "metal" ? 0.38 : 0;
   return material;
-}
-
-function addBuildingSign(
-  BABYLONNS: BabylonNamespace,
-  scene: BABYLON.Scene,
-  parent: BABYLON.TransformNode,
-  label: string,
-  width: number,
-  depth: number,
-): void {
-  const board = BABYLONNS.MeshBuilder.CreateBox(`${label}-sign-board`, { width: Math.min(1.8, width * 0.65), height: 0.34, depth: 0.08 }, scene);
-  board.position = new BABYLONNS.Vector3(0, 1.94, depth / 2 + 0.09);
-  board.material = new BABYLONNS.StandardMaterial(`${label}-sign-wood`, scene);
-  (board.material as BABYLON.StandardMaterial).diffuseColor = BABYLONNS.Color3.FromHexString("#493b2b");
-  board.parent = parent;
-  const face = BABYLONNS.MeshBuilder.CreatePlane(`${label}-sign-face`, { width: Math.min(1.72, width * 0.63), height: 0.27 }, scene);
-  face.position = new BABYLONNS.Vector3(0, 1.94, depth / 2 + 0.137);
-  const texture = new BABYLONNS.DynamicTexture(`${label}-sign-lettering`, { width: 512, height: 96 }, scene, true);
-  const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
-  ctx.fillStyle = "#493b2b"; ctx.fillRect(0, 0, 512, 96);
-  ctx.fillStyle = "#e0cda5"; ctx.font = "bold 37px Georgia"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(label, 256, 48, 480);
-  texture.update();
-  const material = new BABYLONNS.StandardMaterial(`${label}-sign-face-material`, scene);
-  material.diffuseTexture = texture;
-  material.emissiveColor = BABYLONNS.Color3.FromHexString("#211c14");
-  face.material = material;
-  face.parent = parent;
 }

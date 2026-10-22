@@ -3,12 +3,12 @@
 Simulador educativo de exploración espacial. El jugador se autentica (Google,
 GitHub o modo Invitado), elige un nombre de usuario, y juega exclusivamente la
 **Misión 1: The Beginning**. La misión transcurre al aire libre en un campo
-experimental procedural de Auburn, Massachusetts. Los edificios son referencias
-cerradas sin interiores jugables; las actividades ocurren en mesas de proyecto,
-bancos de ingeniería, una zona de pruebas y estaciones de lanzamiento y
-observación. Incluye decisiones, recolección de registros, guardado automático,
-telemetría y un informe final. Las Misiones 2 y 3 permanecen bloqueadas y no se
-desarrollan todavía.
+experimental procedural de Auburn, Massachusetts. La escena conserva un único
+refugio abierto para el equipo de campo; no hay casas ni interiores jugables.
+Las actividades ocurren en mesas de proyecto, bancos de ingeniería, una zona
+de pruebas y estaciones de lanzamiento y observación. Incluye decisiones,
+recolección de registros, guardado automático, telemetría y un informe final.
+Las Misiones 2 y 3 permanecen bloqueadas y no se desarrollan todavía.
 
 > **Nota de alcance:** este repositorio se generó a partir de la descripción
 > detallada de requisitos del encargo (frontend TS+Vite+Babylon.js con
@@ -129,8 +129,9 @@ destino, distancia y una ruta orientativa.
 
 La Misión 1 usa geometría y texturas procedurales para mantener el prototipo
 ligero, reproducible y coherente con un campo rural de 1926: suelo con
-variación de tierra húmeda, hierba, barro, caminos, huellas, rocas, árboles,
-cercas, edificios y un vehículo experimental ensamblado por piezas. La
+variación sutil de tierra, barro y hierba, pasarelas cortas, un refugio abierto
+para el equipo y un vehículo experimental ensamblado por piezas. Se quitaron
+árboles, casas y utilería dispersa que tapaban las estaciones. La
 procedencia aprobada para futuras referencias/modelos está registrada en
 `frontend/src/config/assetRegistry.ts`. NASA mantiene el catálogo oficial
 [NASA 3D Resources](https://science.nasa.gov/3d-resources/); no se descargan
@@ -314,8 +315,8 @@ conforme a las leyes de los territorios en los que esté disponible el Proyecto.
 La misión enlaza estaciones exteriores con una ruta de objetivos guardable:
 descubrimiento del proyecto, inspección del prototipo, configuración abstracta
 del vehículo, revisión de sistemas, decisión de lanzamiento y análisis del
-vuelo. Los edificios tienen colisión completa y no existen interiores
-jugables. La estructura y la instrumentación modifican las métricas y el
+vuelo. Las actividades ocurren al aire libre junto a un refugio abierto; no
+existen edificios grandes ni interiores jugables. La estructura y la instrumentación modifican las métricas y el
 aspecto del prototipo; el lanzamiento tiene cuenta regresiva, humo, movimiento
 del vehículo y telemetría animada. El mapa presenta la distancia actual al
 siguiente objetivo. El informe distingue el resultado simulado de la referencia
@@ -330,12 +331,9 @@ exploración y lectura del jugador; no se fuerza con esperas artificiales.
 
 ### Actualización visual y procedencia
 
-El campo usa mapas PBR locales 1K de tierra agrícola, barro con huellas y
-hierba, más iluminación y reflejos HDRI de un campo rural. Los edificios tienen
-tejados inclinados, cimientos, marcos y ventanas, letreros y luz cálida
-interior; el prototipo incluye marco de lanzamiento, tuberías visibles,
-abrazaderas y materiales envejecidos. La escena incorpora tres props glTF
-CC0 de Poly Haven (caja, cubo y paleta), descargados con texturas para no
-depender de una red al jugar. La procedencia está en
-`frontend/src/config/assetRegistry.ts`; `python3 tools/download_polyhaven_assets.py`
-vuelve a descargar las mismas versiones 1K.
+El campo usa mapas PBR locales 1K de tierra agrícola, barro y hierba, con
+menos variación geométrica y pasarelas más limpias para mantener visibles las
+estaciones. Se conserva el refugio abierto de equipo, el marco de lanzamiento,
+los instrumentos y el vehículo con materiales envejecidos. La procedencia está en
+`frontend/src/config/assetRegistry.ts`. Las texturas y el HDRI se cargan
+desde archivos locales; no se descargan props al iniciar el juego.

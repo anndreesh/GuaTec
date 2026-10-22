@@ -503,9 +503,9 @@ export class Mission1Screen implements Screen {
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
 
-    // 1. Exterior closed buildings:
-    if (poiId === "main-building-exterior" || poiId === "storage-exterior" || poiId === "workshop-exterior") {
-      this.showToast(t("DOOR LOCKED · Exterior station only. All project work takes place outdoors."));
+    // 1. Field equipment shelter:
+    if (poiId === "storage-exterior") {
+      this.showToast(t("FIELD EQUIPMENT SHELTER · The crate stays under the open canopy; all mission work happens at outdoor stations."));
       return;
     }
 

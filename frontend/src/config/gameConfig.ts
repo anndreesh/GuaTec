@@ -192,7 +192,7 @@ export const MISSION_1_PHASES: MissionPhase[] = [
     title: "Arrival",
     objective: "Find the project area.",
     description:
-      "You are a fictional assistant on a rural field. Buildings are closed landmarks. Walk the outdoor paths to the work area.",
+      "You are a fictional assistant on a rural test field. The equipment shelter is open-sided; every mission activity happens outdoors.",
     fromTick: 0,
     toTick: 3,
   },
@@ -201,7 +201,7 @@ export const MISSION_1_PHASES: MissionPhase[] = [
     title: "Open-air exploration",
     objective: "Meet the team and inspect the outdoor stations.",
     description:
-      "The laboratory stays behind a locked door. Plans, instruments, and the prototype live on tables, benches, and an open platform.",
+      "Plans, instruments, and the prototype live at outdoor tables, benches, and an open launch platform.",
     fromTick: 4,
     toTick: 10,
   },
@@ -261,25 +261,11 @@ export interface MissionPointOfInterest {
 
 export const MISSION_1_POIS: MissionPointOfInterest[] = [
   {
-    id: "main-building-exterior",
-    label: "Main building — exterior",
-    flavorText: "The main door is locked. Every usable station is outdoors.",
-    prompt: "E · LOOK AT CLOSED DOOR",
-    position: { x: -11, z: -2.5 },
-  },
-  {
     id: "storage-exterior",
-    label: "Equipment storage — exterior",
-    flavorText: "Crates and tools sit under an open shed. The storage building behind it stays closed.",
-    prompt: "E · EXAMINE STORAGE SHED",
+    label: "Field equipment shelter",
+    flavorText: "A simple open shelter keeps the field crate and tools dry. All work happens at outdoor stations.",
+    prompt: "E · CHECK FIELD EQUIPMENT",
     position: { x: 14.2, z: -2.8 },
-  },
-  {
-    id: "workshop-exterior",
-    label: "Workshop — exterior",
-    flavorText: "The workshop is a navigation landmark only. No interiors are accessible.",
-    prompt: "E · LOOK AT CLOSED WORKSHOP",
-    position: { x: 4.5, z: 9 },
   },
   {
     id: "director-greeting",
@@ -291,7 +277,7 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
   {
     id: "project-area",
     label: "Project area",
-    flavorText: "Plans and a field notebook are laid on an outdoor table. The laboratory stays locked behind you.",
+    flavorText: "Plans and a field notebook are laid out on an outdoor project table.",
     prompt: "E · EXAMINE PLANS",
     position: { x: -8, z: -1 },
   },
@@ -347,7 +333,7 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
   {
     id: "record-photo",
     label: "Field photograph",
-    flavorText: "A photograph of the stand and the rural horizon. The buildings remain in the background, closed.",
+    flavorText: "A photograph of the launch frame, observation crew, and rural horizon.",
     prompt: "E · EXAMINE PHOTOGRAPH",
     position: { x: 10.4, z: -21.5 },
   },

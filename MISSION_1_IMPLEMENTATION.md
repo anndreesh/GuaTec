@@ -15,7 +15,7 @@ Toda la experiencia compila limpiamente (`0 errores de TypeScript`), genera el b
 ### A. Ciclo Completo de Jugabilidad y Narrativa (Mission 1 Loop)
 Se estructuró y programó el ciclo completo de la Misión 1 a través de 8 etapas secuenciales e interactivas:
 1. **Llegada y Exploración Inicial**:
-   - Puntos de interacción en las puertas exteriores de los edificios (taller, almacén, casa principal) que recuerdan al jugador que las puertas están cerradas y que todo el trabajo histórico se realizaba en el exterior.
+   - Un refugio abierto y pequeño guarda el equipo del campo. La escena no incluye casas ni edificios de oficina; cada actividad ocurre en una estación exterior.
 2. **Reunión con el Equipo y Briefing**:
    - Encuentro con el Director del Proyecto (briefing histórico y objetivos).
    - Interacciones con especialistas: Ingeniero de Propulsión (LOX / Gasolina), Ingeniero Estructural (soporte y bastidor liviano) y Registrador de Datos (cámara fotográfica y tambor ahumado).
@@ -42,7 +42,8 @@ Se estructuró y programó el ciclo completo de la Misión 1 a través de 8 etap
 
 ### B. Mejoras Gráficas y Ambientación 3D (Babylon.js)
 - **Caminos de Tablones de Madera (Duckboard Walkways)**:
-  - Generación procedural de pasarelas de madera sobre el terreno húmedo/lodoso de marzo de 1926, conectando el área del director, taller, banco de pruebas, trinchera de observación y plataforma de lanzamiento.
+  - Pasarelas cortas y alineadas conectan las áreas de trabajo y lanzamiento con menos repetición visual.
+  - Se quitaron todos los árboles, las casas, las piedras dispersas y los props de jardinería; se conservaron únicamente el refugio de equipo y los objetos propios del experimento.
 - **Detalles y Elementos de Escenografía Histórica**:
   - Cilindros de gas nitrógeno con manómetros y mangueras de bronce.
   - Damajuanas/garrafas de vidrio para reactivos y propelentes en canastas protectoras.
@@ -69,9 +70,9 @@ Se estructuró y programó el ciclo completo de la Misión 1 a través de 8 etap
 | :--- | :--- |
 | `frontend/src/screens/Mission1Screen.ts` | Conexión de todos los POIs del ciclo narrativo, flujo completo de diálogos y decisiones, sistema de radio contextual (`maybeRadioHint`), manejo de cámaras de lanzamiento, secuencia de diagnóstico, reporte final y desbloqueo de Misión 2. |
 | `frontend/src/babylon/gameplay/GameplayLayer.ts` | Integración de props 3D históricos (anemómetro, teodolito, cilindros, vallas), partículas ambientales y de llama de motor, lógica de orientación de NPCs hacia el jugador, controlador multi-cámara y sacudida sísmica en ignición. |
-| `frontend/src/babylon/gameplay/MarsTerrain.ts` | Creación de pasarelas de madera (duckboards) conectando las zonas de trabajo, dispersión de rocas de campo y texturizado de terreno de lodazal invernal. |
+| `frontend/src/babylon/gameplay/MarsTerrain.ts` | Reducción de los parches del suelo y las pasarelas; eliminación de piedras dispersas. |
 | `frontend/src/babylon/gameplay/AstronautCharacter.ts` | Paleta de colores personalizable en abrigos de época para diferenciar al Director y a los especialistas técnicos. |
-| `frontend/src/config/gameConfig.ts` | Definición de POIs adicionales de documentación histórica, puertas de edificios cerradas, mesa de diagnóstico, lista de verificación previa y estación meteorológica. |
+| `frontend/src/config/gameConfig.ts` | Retiro de POIs de edificios eliminados; refugio abierto, estaciones exteriores y objetivos conservados. |
 | `frontend/src/state/Mission1State.ts` | Máquina de estados ampliada: soporte para fases de diagnóstico, checklist de lanzamiento, telemetría y desbloqueo de Misión 2. |
 | `frontend/src/state/Mission01Objectives.ts` | Objetivos progresivos estructurados (Briefing -> Equipo -> Diseño -> Prueba -> Diagnóstico -> Lanzamiento -> Análisis). |
 | `frontend/src/state/Mission01Events.ts` | Eventos de transmisión radial y notificaciones contextuales para guiar al jugador sin romper la inmersión. |
@@ -101,7 +102,7 @@ Se estructuró y programó el ciclo completo de la Misión 1 a través de 8 etap
 ## 5. Reglas de Diseño y Restricciones Aplicadas
 
 1. **Regla de Solo Exteriores (No Building Interiors)**:
-   - Ningún edificio cuenta con interiores transitables. Las estructuras (taller, almacén, casa de campo) fungen estrictamente como puntos de referencia visual en el exterior con puertas cerradas y letreros contextuales. Toda la jugabilidad ocurre al aire libre.
+   - Solo queda un refugio abierto para el equipo. No hay interiores jugables y toda la misión ocurre en estaciones exteriores.
 2. **Separación entre Realidad Histórica y Ficción del Juego**:
    - La física del vuelo, la fecha (16 de marzo de 1926), el lugar (Auburn, MA) y las marcas de rendimiento (12.5 m de altura, 2.5 s de vuelo, 56 m de impacto) corresponden al vuelo de Robert H. Goddard. Los miembros del equipo del jugador actúan como soporte de ingeniería simulado.
 3. **Mantenimiento del Stack Tecnológico**:

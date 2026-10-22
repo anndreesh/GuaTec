@@ -42,7 +42,7 @@ export function createMarsTerrain(
   const groundMat = createPbrGroundMaterial(BABYLONNS, scene, "auburn-farm-soil",
     "/assets/polyhaven/textures/farm_soil/textures/farm_soil_diff_1k.jpg",
     "/assets/polyhaven/textures/farm_soil/textures/farm_soil_nor_gl_1k.jpg",
-    "/assets/polyhaven/textures/farm_soil/textures/farm_soil_arm_1k.jpg", 17);
+    "/assets/polyhaven/textures/farm_soil/textures/farm_soil_arm_1k.jpg", 9);
   ground.material = groundMat;
   ground.receiveShadows = true;
 
@@ -55,30 +55,21 @@ export function createMarsTerrain(
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_nor_gl_1k.jpg",
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_arm_1k.jpg", 1.4);
   const surfaceRoot = new BABYLONNS.TransformNode("auburn-surface-variation", scene);
-  for (let i = 0; i < 28; i++) {
-    const x = -30 + (i % 7) * 9.8;
-    const z = -26 + Math.floor(i / 7) * 14.5;
+  const surfacePatches: Array<[number, number, number, boolean]> = [
+    [-26, -22, 4.2, false], [-19, 9, 3.8, true], [23, -21, 4.4, true],
+    [27, 8, 4.1, false], [-28, 19, 3.7, true], [20, 21, 4.3, false],
+  ];
+  surfacePatches.forEach(([x, z, radius, grass], i) => {
     const patch = BABYLONNS.MeshBuilder.CreateDisc(`field-surface-patch-${i}`, {
-      radius: 1.8 + (i % 4) * 0.45,
-      tessellation: 14,
+      radius,
+      tessellation: 10,
     }, scene);
     patch.rotation.x = Math.PI / 2;
     patch.position = new BABYLONNS.Vector3(x, terrainHeight(x, z) + 0.015, z);
-    patch.scaling.y = 0.65;
-    patch.material = i % 2 === 0 ? mudMat : grassMat;
+    patch.scaling.y = 0.82;
+    patch.material = grass ? grassMat : mudMat;
     patch.parent = surfaceRoot;
-  }
-  for (let i = 0; i < 14; i++) {
-    const track = BABYLONNS.MeshBuilder.CreateBox(`field-wheel-track-${i}`, {
-      width: 0.38,
-      height: 0.025,
-      depth: 3.8,
-    }, scene);
-    const z = -24 + i * 3.6;
-    track.position = new BABYLONNS.Vector3(-12, terrainHeight(-12, z) + 0.02, z);
-    track.material = mudMat;
-    track.parent = surfaceRoot;
-  }
+  });
 
   // Wooden duckboard walkways connecting outdoor stations over muddy March soil
   const woodPlankMat = new BABYLONNS.PBRMaterial("duckboard-wood-mat", scene);
@@ -86,28 +77,27 @@ export function createMarsTerrain(
   woodPlankMat.roughness = 0.92;
   woodPlankMat.metallic = 0.02;
 
-  // Path 1: From main building/work area to launch field (z: -2 to -22)
-  for (let i = 0; i < 24; i++) {
-    const z = -2 - i * 0.95;
+  // Path 1: From the outdoor work area to the launch field (z: -2 to -22)
+  for (let i = 0; i < 12; i++) {
+    const z = -2 - i * 1.8;
     const plank = BABYLONNS.MeshBuilder.CreateBox(`duckboard-main-${i}`, {
       width: 1.15,
       height: 0.04,
-      depth: 0.28,
+      depth: 1.55,
     }, scene);
-    plank.position = new BABYLONNS.Vector3(-2.5 + Math.sin(i * 0.25) * 0.4, terrainHeight(-2.5, z) + 0.025, z);
-    plank.rotation.y = (Math.random() - 0.5) * 0.08;
+    plank.position = new BABYLONNS.Vector3(-2.5, terrainHeight(-2.5, z) + 0.025, z);
     plank.material = woodPlankMat;
     plank.parent = surfaceRoot;
     plank.receiveShadows = true;
   }
 
   // Path 2: From work area to test area (z: -1 to 8)
-  for (let i = 0; i < 12; i++) {
-    const z = 0 + i * 0.8;
+  for (let i = 0; i < 5; i++) {
+    const z = i * 1.8;
     const plank = BABYLONNS.MeshBuilder.CreateBox(`duckboard-test-${i}`, {
       width: 1.0,
       height: 0.04,
-      depth: 0.26,
+      depth: 1.55,
     }, scene);
     plank.position = new BABYLONNS.Vector3(-6 + (i % 2) * 0.05, terrainHeight(-6, z) + 0.025, z);
     plank.material = woodPlankMat;
@@ -115,36 +105,12 @@ export function createMarsTerrain(
     plank.receiveShadows = true;
   }
 
-  // Scattered field stones along the edge of paths
-  const stoneMat = new BABYLONNS.PBRMaterial("field-stone-mat", scene);
-  stoneMat.albedoColor = BABYLONNS.Color3.FromHexString("#787a74");
-  stoneMat.roughness = 0.88;
-  stoneMat.metallic = 0.05;
-
-  const stoneCoords: [number, number][] = [
-    [-3.8, -4], [-1.2, -7], [-4.1, -12], [-1.5, -17], [-7.2, 3], [-4.8, 6],
-    [5.5, -14], [8.2, -18], [-9.5, -3], [-14.2, 2], [12.4, 5], [17.1, 4]
-  ];
-  stoneCoords.forEach(([sx, sz], idx) => {
-    const stone = BABYLONNS.MeshBuilder.CreateSphere(`field-stone-${idx}`, {
-      diameter: 0.22 + (idx % 3) * 0.12,
-      segments: 5,
-    }, scene);
-    stone.position = new BABYLONNS.Vector3(sx, terrainHeight(sx, sz) + 0.08, sz);
-    stone.scaling = new BABYLONNS.Vector3(1.2, 0.6, 0.9);
-    stone.rotation.y = idx * 0.7;
-    stone.material = stoneMat;
-    stone.parent = surfaceRoot;
-    stone.receiveShadows = true;
-  });
-
   return {
     ground,
     getHeightAt: terrainHeight,
     dispose() {
       surfaceRoot.dispose(false, true);
       woodPlankMat.dispose(false, true);
-      stoneMat.dispose(false, true);
       groundMat.dispose(false, true);
       mudMat.dispose(false, true);
       grassMat.dispose(false, true);
