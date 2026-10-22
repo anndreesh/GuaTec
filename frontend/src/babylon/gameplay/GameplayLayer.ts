@@ -160,6 +160,15 @@ export function createGameplayLayer(
   markerMat.metallic = 0.12;
   markerMat.roughness = 0.82;
 
+  const rocketShellMat = new BABYLONNS.PBRMaterial("rocket-ivory-enamel", scene);
+  rocketShellMat.albedoColor = BABYLONNS.Color3.FromHexString("#d8d0b9");
+  rocketShellMat.metallic = 0.18;
+  rocketShellMat.roughness = 0.58;
+  const rocketMarkingMat = new BABYLONNS.PBRMaterial("rocket-oxide-markings", scene);
+  rocketMarkingMat.albedoColor = BABYLONNS.Color3.FromHexString("#a54e31");
+  rocketMarkingMat.metallic = 0.24;
+  rocketMarkingMat.roughness = 0.58;
+
   const poiRoot = new BABYLONNS.TransformNode("gameplay-poi-root", scene);
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
   const getMapPoints = () => [
@@ -175,20 +184,30 @@ export function createGameplayLayer(
   const shuttleModelRoot = new BABYLONNS.TransformNode("nasa-shuttle-model", scene);
   shuttleModelRoot.parent = rocketRoot;
   shuttleModelRoot.setEnabled(false);
-  const rocketBody = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-body", { height: 3.2, diameter: 0.38, tessellation: 12 }, scene);
+  const rocketBody = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-body", { height: 3.2, diameter: 0.42, tessellation: 16 }, scene);
   rocketBody.position.y = 1.6;
-  rocketBody.material = propMat;
+  rocketBody.material = rocketShellMat;
   rocketBody.parent = proceduralRocketRoot;
-  const rocketNose = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-nose", { height: 0.55, diameterTop: 0, diameterBottom: 0.38, tessellation: 12 }, scene);
+  const rocketNose = BABYLONNS.MeshBuilder.CreateCylinder("gameplay-rocket-nose", { height: 0.62, diameterTop: 0, diameterBottom: 0.42, tessellation: 16 }, scene);
   rocketNose.position.y = 3.47;
-  rocketNose.material = markerMat;
+  rocketNose.material = rocketMarkingMat;
   rocketNose.parent = proceduralRocketRoot;
+  for (const [index, y] of [0.52, 2.48].entries()) {
+    const band = BABYLONNS.MeshBuilder.CreateCylinder(`gameplay-rocket-painted-band-${index}`, {
+      height: 0.13,
+      diameter: 0.432,
+      tessellation: 16,
+    }, scene);
+    band.position.y = y;
+    band.material = rocketMarkingMat;
+    band.parent = proceduralRocketRoot;
+  }
   for (let i = 0; i < 3; i++) {
     const angle = (i * Math.PI * 2) / 3;
-    const fin = BABYLONNS.MeshBuilder.CreateBox(`gameplay-rocket-fin-${i}`, { width: 0.08, height: 0.55, depth: 0.5 }, scene);
-    fin.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.25, 0.52, Math.sin(angle) * 0.25);
+    const fin = BABYLONNS.MeshBuilder.CreateBox(`gameplay-rocket-fin-${i}`, { width: 0.09, height: 0.58, depth: 0.54 }, scene);
+    fin.position = new BABYLONNS.Vector3(Math.cos(angle) * 0.27, 0.5, Math.sin(angle) * 0.27);
     fin.rotation.y = -angle;
-    fin.material = markerMat;
+    fin.material = rocketMarkingMat;
     fin.parent = proceduralRocketRoot;
   }
   const rocketRing = BABYLONNS.MeshBuilder.CreateTorus("gameplay-rocket-coupling", { diameter: 0.42, thickness: 0.045, tessellation: 12 }, scene);
@@ -1055,6 +1074,8 @@ export function createGameplayLayer(
       darkMetalMat.dispose(false, true);
       paperMat.dispose();
       markerMat.dispose();
+      rocketShellMat.dispose();
+      rocketMarkingMat.dispose();
       sky.dispose(false, true);
       root.dispose(false, true);
     },
