@@ -153,9 +153,9 @@ function createProceduralSoilMaterial(
       const grass = Math.max(0, broad - 0.69) * 0.36;
       const variation = (broad - 0.5) * 26 + (medium - 0.5) * 19 + (fine - 0.5) * 11 + (grain - 0.5) * 13;
       const index = (y * size + x) * 4;
-      pixels.data[index] = Math.max(0, Math.min(255, 83 + variation - damp * 28 - grass * 13));
-      pixels.data[index + 1] = Math.max(0, Math.min(255, 67 + variation * 0.88 - damp * 17 + grass * 5));
-      pixels.data[index + 2] = Math.max(0, Math.min(255, 49 + variation * 0.72 - damp * 9 - grass * 4));
+      pixels.data[index] = Math.max(0, Math.min(255, 111 + variation - damp * 28 - grass * 13));
+      pixels.data[index + 1] = Math.max(0, Math.min(255, 87 + variation * 0.88 - damp * 17 + grass * 5));
+      pixels.data[index + 2] = Math.max(0, Math.min(255, 63 + variation * 0.72 - damp * 9 - grass * 4));
       pixels.data[index + 3] = 255;
     }
   }

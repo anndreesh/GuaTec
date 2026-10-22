@@ -10,7 +10,7 @@ export const MISSION_1_ASSET_REGISTRY = [
     id: "procedural-auburn-field",
     source: "generated-in-project",
     license: "project-generated",
-    usage: "Open rural test field, soil variation, compact boardwalks, and restrained atmospheric effects.",
+    usage: "Open test field with generated rolling relief, deterministic soil color noise, short boardwalks, and restrained atmospheric effects.",
   },
   {
     id: "procedural-1926-experimental-rocket",
@@ -22,13 +22,7 @@ export const MISSION_1_ASSET_REGISTRY = [
     id: "polyhaven-pbr-grounds",
     source: "https://polyhaven.com/",
     license: "CC0 1.0",
-    usage: "Farm Soil, Muddy Tracks and Grass Ground 1K albedo, normal and ARM maps for the outdoor terrain.",
-  },
-  {
-    id: "polyhaven-suburban-field-01-hdri",
-    source: "https://polyhaven.com/a/suburban_field_01",
-    license: "CC0 1.0",
-    usage: "Bundled 1K HDR panorama for image-based outdoor lighting and reflections.",
+    usage: "Farm Soil normal and ARM maps, plus Muddy Tracks and Grass Ground albedo, normal and ARM maps for terrain details.",
   },
   {
     id: "nasa-3d-reference-catalogue",

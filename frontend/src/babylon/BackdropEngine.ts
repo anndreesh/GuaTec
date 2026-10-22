@@ -1,6 +1,6 @@
 import { MISSION_1_POIS, THEME } from "@/config/gameConfig";
 import { createGameplayLayer, type GameplayHandle } from "@/babylon/gameplay/GameplayLayer";
-import type { HDRCubeTexture, Node } from "@babylonjs/core";
+import type { Node } from "@babylonjs/core";
 
 export type BackdropMode = "starfield" | "mars-orbit" | "mars-surface" | "mission1-gameplay";
 
@@ -76,7 +76,6 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
   // WASD + follow camera) is built lazily the first time it's needed so the
   // ambient-only modes (splash/mission-select/report) stay cheap.
   let gameplayLayer: ReturnType<typeof createGameplayLayer> | null = null;
-  let fieldEnvironment: HDRCubeTexture | null = null;
   function ensureGameplayLayer(): ReturnType<typeof createGameplayLayer> {
     if (!gameplayLayer) {
       gameplayLayer = createGameplayLayer(BABYLON, scene, camera, canvas, MISSION_1_POIS, shadowGenerator);
@@ -111,6 +110,12 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
         scene.imageProcessingConfiguration.toneMappingEnabled = false;
         scene.imageProcessingConfiguration.exposure = 1;
         scene.imageProcessingConfiguration.contrast = 1;
+        ambient.intensity = 0.42;
+        ambient.diffuse = BABYLON.Color3.White();
+        ambient.groundColor = BABYLON.Color3.FromHexString("#282334");
+        sun.intensity = 1.35;
+        sun.diffuse = BABYLON.Color3.White();
+        sun.specular = BABYLON.Color3.White();
       }
 
       switch (mode) {
@@ -132,23 +137,24 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           starfield.setEnabled(true);
           break;
         case "mission1-gameplay":
-          // The bundled shuttle and its launch frame cast an oversized
-          // shadow at dawn. Keep this small test range evenly lit and readable.
-          scene.shadowsEnabled = false;
+          // A cool moon and dim sky fill the field while directional light
+          // gives the rocket, launch frame, and rolling soil readable shadows.
+          scene.shadowsEnabled = true;
           planet.setEnabled(false);
           starfield.setEnabled(false);
-          if (!fieldEnvironment) {
-            fieldEnvironment = new BABYLON.HDRCubeTexture(
-              "/assets/polyhaven/hdri/suburban_field_01_1k.hdr", scene, 256, false, true, false, true,
-            );
-            fieldEnvironment.isBlocking = false;
-            fieldEnvironment.rotationY = Math.PI * 0.82;
-          }
-          scene.environmentTexture = fieldEnvironment;
-          scene.environmentIntensity = 0.62;
+          scene.environmentTexture = null;
+          scene.environmentIntensity = 0.34;
+          ambient.intensity = 0.48;
+          ambient.diffuse = BABYLON.Color3.FromHexString("#a8bce9");
+          ambient.groundColor = BABYLON.Color3.FromHexString("#1c1a2a");
+          sun.direction = new BABYLON.Vector3(-0.18, -0.9, 0.32).normalize();
+          sun.position = new BABYLON.Vector3(18, 24, -20);
+          sun.intensity = 0.58;
+          sun.diffuse = BABYLON.Color3.FromHexString("#bed0f4");
+          sun.specular = BABYLON.Color3.FromHexString("#c9d8ff");
           scene.imageProcessingConfiguration.toneMappingEnabled = true;
-          scene.imageProcessingConfiguration.exposure = 1.04;
-          scene.imageProcessingConfiguration.contrast = 1.12;
+          scene.imageProcessingConfiguration.exposure = 0.98;
+          scene.imageProcessingConfiguration.contrast = 1.13;
           ensureGameplayLayer().enable();
           scene.meshes.forEach((mesh) => {
             let node: Node | null = mesh;
@@ -175,7 +181,6 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
     dispose() {
       window.removeEventListener("resize", onResize);
       gameplayLayer?.dispose();
-      fieldEnvironment?.dispose();
       engine.dispose();
     },
   };
