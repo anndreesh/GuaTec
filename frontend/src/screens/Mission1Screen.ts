@@ -513,6 +513,7 @@ export class Mission1Screen implements Screen {
     if (poiId === "director-greeting") {
       this.state.completeObjective("lab");
       this.state.completeObjective("discover");
+      if (this.state.teamMet()) this.state.completeObjective("meet-team");
       this.state.collectRecord("Director's experiment briefing");
       this.renderObjectives();
       this.showChoice(
@@ -623,8 +624,17 @@ export class Mission1Screen implements Screen {
               label: "System configuration (pressure valve timing)",
               run: () => this.evaluateDiagnosis("System configuration", expected),
             },
+            {
+              label: "Accept the unresolved risk and proceed",
+              run: () => this.acceptDiagnosticRisk(),
+            },
           ]
         );
+        return;
+      }
+
+      if (!this.state.objectives.has("meet-team")) {
+        this.showToast(t("MEET THE ENGINEERING TEAM BEFORE INSPECTING THE PROTOTYPE."));
         return;
       }
 
@@ -736,8 +746,8 @@ export class Mission1Screen implements Screen {
 
   private evaluateDiagnosis(choice: string, expected: string): void {
     this.state.inspectedCauses.add(choice);
-    this.state.diagnosis = choice;
-    if (choice === expected || this.state.inspectedCauses.size >= 2) {
+    if (choice === expected) {
+      this.state.diagnosis = choice;
       this.state.completeObjective("diagnose");
       this.renderObjectives();
       this.showChoice(
@@ -753,22 +763,33 @@ export class Mission1Screen implements Screen {
         ]
       );
     } else {
-      this.state.extraTestRequired = true;
+      this.state.diagnosis = null;
       this.state.resources.telemetry = Math.max(10, this.state.resources.telemetry - 5);
       this.renderResources();
       this.showChoice(
         "DIAGNOSTIC UNCERTAINTY",
-        `“${choice} checked out within tolerance. The oscillation must be coming from another subsystem.”\n\nTIME +5 · Review the prototype again to isolate the root cause.`,
+        `“${choice} checked out within tolerance. The oscillation must be coming from another subsystem.”\n\nThe recorder lost some signal while the crew repeated the check. You can inspect another cause or formally accept the unresolved risk.`,
         [
           {
             label: "Inspect prototype again",
-            run: () => {
-              this.showToast(t("Review the remaining causes on the prototype."));
-            },
+            run: () => this.handleInteract("inspect-prototype"),
           },
+          { label: "Accept the unresolved risk and proceed", run: () => this.acceptDiagnosticRisk() },
         ]
       );
     }
+  }
+
+  private acceptDiagnosticRisk(): void {
+    this.state.riskAccepted = true;
+    this.state.engineering.testResponse = "accept-risk";
+    this.state.completeObjective("diagnose");
+    this.renderObjectives();
+    this.showChoice(
+      "RISK ACCEPTED · EXPERIMENTAL RESULT MAY VARY",
+      "The crew records the unresolved oscillation and agrees to proceed. The stability margin is reduced; any deviation or data loss will appear in the flight report.",
+      [{ label: "Proceed to the launch field", run: () => this.showToast(t("Risk recorded. Complete the launch checklist at the Launch Field.")) }],
+    );
   }
 
   private showChoice(title: string, description: string, options: { label: string; run: () => void }[]): void {
@@ -955,16 +976,15 @@ export class Mission1Screen implements Screen {
         },
       });
       options.push({
-        label: "DELAY · Postpone for extra calibration",
+        label: "DELAY · Recheck conditions before clearing the pad",
         run: () => {
           this.state.engineering.launchDecision = "delay";
-          this.state.flightResult = "delayed";
-          this.state.completeObjective("prepare");
-          this.state.completeObjective("observation");
-          this.state.completeObjective("flight");
+          this.state.flightResult = null;
+          this.state.checklist.clear();
           this.renderObjectives();
           void this.autosave();
-          this.showToast(t("LAUNCH DELAYED · Additional instrument review completed. Proceed to Analysis Station."));
+          this.showToast(t("LAUNCH DELAYED · The flight has not started. Recheck the launch conditions before proceeding."));
+          this.openLaunchPreparation();
         },
       });
     }
@@ -1009,6 +1029,8 @@ export class Mission1Screen implements Screen {
     }
     const result = this.state.flightResult ?? resolveFlight(this.state.engineering, this.state.resources.telemetry);
     const label = flightResultLabel(result);
+    const analysisTopics = ["Propulsion & Pressure Data", "Structural & Frame Data", "Smoked Drum Flight Record"];
+    const analysisCompleteCount = analysisTopics.filter((topic) => this.state.analyzed.has(topic)).length;
     this.showChoice(
       "OUTDOOR ANALYSIS STATION · FLIGHT RECORD",
       `FLIGHT OUTCOME: ${label}\n\n${MISSION_01_DIALOGUE.historicalNote}\n\nReview the flight telemetry traces and system performance:`,
@@ -1039,9 +1061,13 @@ export class Mission1Screen implements Screen {
           },
         },
         {
-          label: "CONCLUDE MISSION & COMPILE REPORT",
+          label: `COMPILE FINAL REPORT · ${analysisCompleteCount}/3 records reviewed`,
           run: () => {
-            this.state.completeObjective("analysis");
+            if (!this.state.completeObjective("analysis")) {
+              this.showToast(t("Review the propulsion trace, structural trace, and smoked drum record before compiling the report."));
+              this.openAnalysis();
+              return;
+            }
             this.renderObjectives();
             void this.autosave();
             this.runMissionEnding();

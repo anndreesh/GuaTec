@@ -37,6 +37,7 @@ export class Mission1State {
   checklist = new Set<string>();
   inspectedCauses = new Set<string>();
   diagnosis: string | null = null;
+  riskAccepted = false;
   extraTestRequired = false;
 
   constructor(saved?: MissionSaveState) {
@@ -44,26 +45,30 @@ export class Mission1State {
       RESOURCE_DEFINITIONS.map((def) => [def.key, def.initial]),
     ) as Record<ResourceKey, number>;
 
-    if (saved && saved.tick !== undefined) {
-      this.tick = saved.tick;
-      this.resources = { ...this.resources, ...saved.resources };
+    if (saved && Number.isFinite(saved.tick)) {
+      this.tick = clamp(Math.floor(saved.tick), 0, MISSION_1_TOTAL_TICKS);
+      for (const definition of RESOURCE_DEFINITIONS) {
+        const value = saved.resources?.[definition.key];
+        if (Number.isFinite(value)) this.resources[definition.key] = clamp(value, 0, definition.max);
+      }
       this.resolvedDecisionIds = new Set(saved.resolvedDecisionIds ?? []);
       this.log = saved.log ?? [];
       this.decisionsMade = saved.decisionsMade ?? this.resolvedDecisionIds.size;
       this.samplesCollected = saved.samplesCollected ?? [];
       const extra = saved.mission01;
       if (extra) {
-        this.objectives = new Set(extra.objectives as MissionObjectiveId[]);
-        this.records = new Set(extra.records);
-        this.analyzed = new Set(extra.analyzed);
-        this.engineering = { ...DEFAULT_ENGINEERING, ...extra.engineering };
-        this.checkpoint = extra.checkpoint;
+        this.records = new Set(Array.isArray(extra.records) ? extra.records : []);
+        this.analyzed = new Set(Array.isArray(extra.analyzed) ? extra.analyzed : []);
+        this.engineering = restoreEngineering(extra.engineering);
         this.flightResult = extra.flightResult;
-        this.metNpcs = new Set(extra.metNpcs ?? []);
-        this.testsRun = new Set(extra.testsRun ?? []);
-        this.checklist = new Set(extra.checklist ?? []);
-        this.inspectedCauses = new Set(extra.inspectedCauses ?? []);
+        this.metNpcs = new Set(stringArray(extra.metNpcs));
+        this.testsRun = new Set(stringArray(extra.testsRun));
+        this.checklist = new Set(stringArray(extra.checklist));
+        this.inspectedCauses = new Set(stringArray(extra.inspectedCauses));
         this.diagnosis = extra.diagnosis ?? null;
+        this.riskAccepted = extra.riskAccepted ?? false;
+        this.objectives = this.validateSavedObjectives(Array.isArray(extra.objectives) ? extra.objectives as MissionObjectiveId[] : []);
+        this.checkpoint = this.checkpointForObjectives();
       }
     }
   }
@@ -113,8 +118,21 @@ export class Mission1State {
     if (!this.log.includes(text)) this.log.push(text);
   }
 
-  completeObjective(id: MissionObjectiveId): void {
-    if (this.objectives.has(id)) return;
+  completeObjective(id: MissionObjectiveId): boolean {
+    if (this.objectives.has(id)) return true;
+    const index = MISSION_01_OBJECTIVES.findIndex((item) => item.id === id);
+    if (index < 0 || MISSION_01_OBJECTIVES.slice(0, index).some((item) => item.required && !this.objectives.has(item.id))) {
+      return false;
+    }
+    if (id === "meet-team" && !this.teamMet()) return false;
+    if (id === "prototype" && !this.objectives.has("meet-team")) return false;
+    if (id === "testing" && !this.testsComplete()) return false;
+    if (id === "diagnose" && !this.diagnosis && !this.riskAccepted) return false;
+    if (id === "prepare" && (!this.checklistComplete() || this.engineering.launchDecision !== "proceed")) return false;
+    if (id === "observation" && this.engineering.launchDecision !== "proceed") return false;
+    if (id === "flight" && (!this.flightResult || this.engineering.launchDecision !== "proceed")) return false;
+    if (id === "analysis" && (!this.analyzed.has("Propulsion & Pressure Data") ||
+      !this.analyzed.has("Structural & Frame Data") || !this.analyzed.has("Smoked Drum Flight Record"))) return false;
     this.objectives.add(id);
     const objective = MISSION_01_OBJECTIVES.find((item) => item.id === id);
     if (objective) this.checkpoint = objective.checkpoint;
@@ -124,6 +142,7 @@ export class Mission1State {
     };
     this.tick = Math.max(this.tick, phaseTick[id]);
     this.addLogEntry(`MISSION LOG — ${objective?.label ?? id}`);
+    return true;
   }
 
   collectRecord(id: string): boolean {
@@ -248,7 +267,7 @@ export class Mission1State {
         engineering: this.engineering, checkpoint: this.checkpoint,
         analyzed: [...this.analyzed], flightResult: this.flightResult,
         metNpcs: [...this.metNpcs], testsRun: [...this.testsRun], checklist: [...this.checklist],
-        inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis,
+        inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis, riskAccepted: this.riskAccepted,
       },
     };
   }
@@ -286,8 +305,60 @@ export class Mission1State {
       historicalRecords: [...this.records],
     };
   }
+
+  private validateSavedObjectives(saved: MissionObjectiveId[]): Set<MissionObjectiveId> {
+    const valid = new Set<MissionObjectiveId>();
+    for (const item of MISSION_01_OBJECTIVES) {
+      if (!item.required || !saved.includes(item.id)) continue;
+      const index = MISSION_01_OBJECTIVES.indexOf(item);
+      if (MISSION_01_OBJECTIVES.slice(0, index).some((prior) => prior.required && !valid.has(prior.id))) break;
+      if (item.id === "meet-team" && !this.teamMet()) break;
+      if (item.id === "prototype" && !valid.has("meet-team")) break;
+      if (item.id === "testing" && !this.testsComplete()) break;
+      if (item.id === "diagnose" && !this.diagnosis && !this.riskAccepted) break;
+      if (item.id === "prepare" && (!this.checklistComplete() || this.engineering.launchDecision !== "proceed")) break;
+      if (item.id === "observation" && this.engineering.launchDecision !== "proceed") break;
+      if (item.id === "flight" && (!this.flightResult || this.engineering.launchDecision !== "proceed")) break;
+      if (item.id === "analysis" && (!this.analyzed.has("Propulsion & Pressure Data") ||
+        !this.analyzed.has("Structural & Frame Data") || !this.analyzed.has("Smoked Drum Flight Record"))) break;
+      valid.add(item.id);
+    }
+    return valid;
+  }
+
+  private checkpointForObjectives(): string {
+    let checkpoint = "Arrival";
+    for (const item of MISSION_01_OBJECTIVES) {
+      if (this.objectives.has(item.id)) checkpoint = item.checkpoint;
+      else break;
+    }
+    return checkpoint;
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function restoreEngineering(saved?: Partial<EngineeringProfile>): EngineeringProfile {
+  const structure = saved?.structure;
+  const instrumentation = saved?.instrumentation;
+  const testResponse = saved?.testResponse;
+  const launchDecision = saved?.launchDecision;
+  return {
+    structure: structure === "light" || structure === "balanced" || structure === "reinforced"
+      ? structure : DEFAULT_ENGINEERING.structure,
+    instrumentation: instrumentation === "basic" || instrumentation === "extended"
+      ? instrumentation : DEFAULT_ENGINEERING.instrumentation,
+    budget: Number.isFinite(saved?.budget) ? clamp(saved!.budget!, 0, 100) : DEFAULT_ENGINEERING.budget,
+    testResponse: testResponse === "modify" || testResponse === "retest" || testResponse === "accept-risk"
+      ? testResponse : null,
+    launchDecision: launchDecision === "proceed" || launchDecision === "delay" ? launchDecision : null,
+    riskTolerance: Number.isFinite(saved?.riskTolerance)
+      ? clamp(saved!.riskTolerance!, 0, 100) : DEFAULT_ENGINEERING.riskTolerance,
+  };
 }

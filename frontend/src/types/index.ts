@@ -99,6 +99,7 @@ export interface MissionSaveState {
     checklist?: string[];
     inspectedCauses?: string[];
     diagnosis?: string | null;
+    riskAccepted?: boolean;
   };
 }
 
