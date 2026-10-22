@@ -177,7 +177,7 @@ export function createGameplayLayer(
   ];
 
   const rocketRoot = new BABYLONNS.TransformNode("gameplay-liquid-rocket", scene);
-  rocketRoot.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, 0), ROCKET_PLATFORM_Z);
+  rocketRoot.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, ROCKET_PLATFORM_Z), ROCKET_PLATFORM_Z);
   rocketRoot.parent = root;
   const proceduralRocketRoot = new BABYLONNS.TransformNode("procedural-rocket-fallback", scene);
   proceduralRocketRoot.parent = rocketRoot;
@@ -330,7 +330,7 @@ export function createGameplayLayer(
     bolt.parent = proceduralRocketRoot;
   }
   const testStand = BABYLONNS.MeshBuilder.CreateBox("gameplay-test-stand", { width: 2.4, height: 0.15, depth: 2.4 }, scene);
-  testStand.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, 0) + 0.07, ROCKET_PLATFORM_Z);
+  testStand.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, ROCKET_PLATFORM_Z) + 0.07, ROCKET_PLATFORM_Z);
   testStand.material = markerMat;
   testStand.parent = root;
 
@@ -425,7 +425,7 @@ export function createGameplayLayer(
   theodoliteScope.parent = theodoliteRoot;
 
   const frameRoot = new BABYLONNS.TransformNode("1926-launch-frame", scene);
-  frameRoot.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, 0), ROCKET_PLATFORM_Z);
+  frameRoot.position = new BABYLONNS.Vector3(0, terrain.getHeightAt(0, ROCKET_PLATFORM_Z), ROCKET_PLATFORM_Z);
   frameRoot.parent = root;
   for (const x of [-0.55, 0.55]) {
     for (const z of [-0.55, 0.55]) {
