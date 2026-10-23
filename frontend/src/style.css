@@ -835,6 +835,8 @@ body {
 }
 
 .mission-objective--done { color: #b7d2b9; }
+.mission-objective--current { color: #f0bd80; font-weight: 700; }
+.mission-objective--locked { color: rgba(186, 192, 199, 0.55); }
 
 @media (max-width: 640px) {
   .mission-objective-list { grid-template-columns: 1fr; }

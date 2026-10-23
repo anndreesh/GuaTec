@@ -15,7 +15,7 @@ import { el } from "@/core/dom";
 import type { GameApp } from "@/core/GameApp";
 import type { GameplayHandle, GameplayMapState, NearbyPoi } from "@/babylon/gameplay/GameplayLayer";
 import { Mission1State } from "@/state/Mission1State";
-import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective } from "@/state/Mission01Objectives";
+import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective, type MissionObjectiveId } from "@/state/Mission01Objectives";
 import { calculateEngineering } from "@/state/Mission01Engineering";
 import { flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
 import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
@@ -503,6 +503,27 @@ export class Mission1Screen implements Screen {
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
 
+    // Story locations stay explorable, but their mission actions only unlock
+    // after the required checkpoint has been completed.
+    const requiredObjectives: Partial<Record<string, MissionObjectiveId>> = {
+      "director-greeting": "lab",
+      "meet-propulsion": "discover",
+      "meet-structural": "discover",
+      "meet-data": "discover",
+      "inspect-prototype": "meet-team",
+      "engine-selection": "prototype",
+      "pressure-test": "design",
+      "launch-window": "diagnose",
+      "telemetry-fluctuation": "prepare",
+      "analysis-station": "flight",
+    };
+    const requiredId = requiredObjectives[poiId];
+    const required = requiredId ? MISSION_01_OBJECTIVES.find((objective) => objective.id === requiredId) : null;
+    if (required && !this.state.objectives.has(required.id)) {
+      this.showToast(`CHECKPOINT LOCKED · Complete first: ${t(required.label)}.`);
+      return;
+    }
+
     // 1. Field equipment shelter:
     if (poiId === "storage-exterior") {
       this.showToast(t("FIELD EQUIPMENT SHELTER · The crate stays under the open canopy; all mission work happens at outdoor stations."));
@@ -511,9 +532,7 @@ export class Mission1Screen implements Screen {
 
     // 2. Project Director:
     if (poiId === "director-greeting") {
-      this.state.completeObjective("lab");
       this.state.completeObjective("discover");
-      if (this.state.teamMet()) this.state.completeObjective("meet-team");
       this.state.collectRecord("Director's experiment briefing");
       this.renderObjectives();
       this.showChoice(
@@ -695,19 +714,13 @@ export class Mission1Screen implements Screen {
     // 6. Project area:
     if (poiId === "project-area") {
       this.state.completeObjective("lab");
-      this.state.completeObjective("discover");
       this.state.collectRecord("The project — outdoor field notebook");
       this.renderObjectives();
-      this.showEngineeringLeadDialogue(() => {
-        this.showChoice(
-          "PROJECT AREA · OUTDOOR FIELD DESK",
-          `${poi.flavorText}\n\n${MISSION_01_DIALOGUE.director[0]}\n\n“We are not trying to reach space today. We are asking one careful question: can liquid-fuel propulsion lift a vehicle clear of the ground?”`,
-          [
-            { label: "Review vehicle specifications", run: () => this.openEngineering() },
-            { label: "Return to field exploration", run: () => {} },
-          ]
-        );
-      });
+      this.showChoice(
+        "PROJECT AREA · OUTDOOR FIELD DESK",
+        `${poi.flavorText}\n\nThe field notes point you to the project director for the briefing.`,
+        [{ label: "Continue to the project director", run: () => this.showToast(t("NEXT CHECKPOINT · Speak with the project director.")) }],
+      );
       return;
     }
 
@@ -830,6 +843,7 @@ export class Mission1Screen implements Screen {
 
   private openEngineering(): void {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
+    if (this.state.objectives.has("testing")) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
     const stats = calculateEngineering(this.state.engineering);
     this.showChoice("ENGINEERING · ABSTRACT DESIGN", `Structure: ${this.state.engineering.structure.toUpperCase()} · Instrumentation: ${this.state.engineering.instrumentation.toUpperCase()}\n\nMass ${stats.mass}% · Stability ${stats.stability}% · Data ${stats.data}% · Reliability ${stats.reliability}% · Budget use ${stats.cost}%\n\nThese are game values, not construction instructions. Choose a trade-off; a heavy reinforced structure improves margin but uses more budget.`, [
       { label: "LIGHT structure · lower mass, lower margin", run: () => this.chooseDesign("light") },
@@ -1442,9 +1456,13 @@ export class Mission1Screen implements Screen {
     this.objectivePanel.innerHTML = "";
     this.objectivePanel.append(el("h3", { className: "phase-title", text: t("MISSION OBJECTIVES") }));
     const list = el("ul", { className: "mission-objective-list" });
+    const activeId = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id))?.id;
     for (const objective of MISSION_01_OBJECTIVES) {
       const done = this.state.objectives.has(objective.id);
-      list.append(el("li", { className: done ? "mission-objective--done" : "", text: `${done ? "✓" : "□"} ${t(objective.label)}` }));
+      const active = objective.id === activeId;
+      const className = done ? "mission-objective--done" : active ? "mission-objective--current" : "mission-objective--locked";
+      const marker = done ? "✓" : active ? "▶" : "🔒";
+      list.append(el("li", { className, text: `${marker} ${t(objective.label)}` }));
     }
     this.objectivePanel.append(list, el("p", { className: "phase-description", text: `${t("Checkpoint")}: ${t(this.state.checkpoint)} · ${t("Historical records")}: ${this.state.records.size}` }));
     this.renderMapObjective();
