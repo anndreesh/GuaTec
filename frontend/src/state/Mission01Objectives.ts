@@ -6,10 +6,10 @@ export const MISSION_01_OBJECTIVES = [
   { id: "prototype", label: "Understand the prototype", location: "Prototype Area", required: true, checkpoint: "Project discovery" },
   { id: "design", label: "Prepare the vehicle", location: "Engineering Bench", required: true, checkpoint: "Engineering" },
   { id: "testing", label: "Complete testing", location: "Test Area", required: true, checkpoint: "Testing" },
-  { id: "diagnose", label: "Investigate the instability", location: "Prototype Area", required: true, checkpoint: "Testing" },
+  { id: "diagnose", label: "Find the source of the problem", location: "Prototype Area", required: true, checkpoint: "Testing" },
   { id: "prepare", label: "Prepare the launch", location: "Launch Field", required: true, checkpoint: "Launch preparation" },
   { id: "observation", label: "Go to the observation area", location: "Observation Area", required: true, checkpoint: "Launch" },
-  { id: "flight", label: "Attempt flight", location: "Observation Area", required: true, checkpoint: "Launch" },
+  { id: "flight", label: "Attempt the flight", location: "Observation Area", required: true, checkpoint: "Launch" },
   { id: "analysis", label: "Analyze the results", location: "Analysis Station", required: true, checkpoint: "Analysis" },
 ] as const;
 
