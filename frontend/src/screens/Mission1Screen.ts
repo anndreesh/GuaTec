@@ -45,6 +45,8 @@ export class Mission1Screen implements Screen {
   private flightTimer: number | undefined;
   private paused = false;
   private ended = false;
+  private restarting = false;
+  private readonly pendingAutosaves = new Set<Promise<void>>();
 
   private resourceBars = new Map<string, HTMLElement>();
   private logPanel: HTMLElement | null = null;
@@ -207,12 +209,18 @@ export class Mission1Screen implements Screen {
   }
 
   private async restartMission(): Promise<void> {
+    this.restarting = true;
+    this.stopTimers();
     this.showToast(t("Restarting mission…"));
     try {
+      // Drain writes that started before the restart so an old snapshot cannot
+      // race the API reset and restore the progress we are clearing.
+      await Promise.allSettled([...this.pendingAutosaves]);
       await progressApi.replay(MISSION_SLUG);
-      this.stopTimers();
       await this.app.showMission1();
     } catch (error) {
+      this.restarting = false;
+      this.autosaveTimer = window.setInterval(() => void this.autosave(), AUTOSAVE_INTERVAL_MS);
       console.error("[Mission1Screen] mission restart failed", error);
       this.showToast(t("Could not restart the mission. Check the connection and try again."));
     }
@@ -1470,8 +1478,19 @@ export class Mission1Screen implements Screen {
     this.gameplay?.setMissionProgress(this.state.progressPercent() / 100);
   }
 
-  private async autosave(): Promise<void> {
-    if (this.ended) return;
+  private autosave(): Promise<void> {
+    if (this.ended || this.restarting) return Promise.resolve();
+    const pending = this.persistCurrentState();
+    this.pendingAutosaves.add(pending);
+    void pending.then(
+      () => this.pendingAutosaves.delete(pending),
+      () => this.pendingAutosaves.delete(pending),
+    );
+    return pending;
+  }
+
+  private async persistCurrentState(): Promise<void> {
+    if (this.ended || this.restarting) return;
     try {
       await progressApi.autosave(MISSION_SLUG, this.state.toSaveState(), this.state.persistenceProgressPercent());
       await inventoryApi.sync(
