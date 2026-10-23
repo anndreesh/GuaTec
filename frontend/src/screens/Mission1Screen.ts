@@ -636,7 +636,7 @@ export class Mission1Screen implements Screen {
       this.renderObjectives();
       this.showChoice(
         "DATA TECHNICIAN · MARA REED",
-        `“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just an spectacle.”`,
+        `“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just a spectacle.”`,
         [
           {
             label: "“We'll make sure the instruments are calibrated.”",
