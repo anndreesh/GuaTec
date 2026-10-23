@@ -725,7 +725,7 @@ export function createGameplayLayer(
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
   const cameraOffsetRadius = 7;
   camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 48;
+  camera.upperRadiusLimit = 56;
   // Keep the orbit on the upper side of the horizon so the camera can never
   // pass below the ground when the player or camera target moves.
   camera.lowerBetaLimit = 0.35;
@@ -823,7 +823,7 @@ export function createGameplayLayer(
         launchFlame.stop();
         camera.alpha = Math.PI / 2;
         camera.beta = 1.48;
-        camera.radius = 40;
+        camera.radius = 48;
         camera.target.copyFrom(astronaut.root.position);
         camera.target.y += 2.8;
         camera.target.z -= 3.2;
@@ -923,7 +923,7 @@ export function createGameplayLayer(
       camera.inputs.clear();
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
-      camera.radius = 40;
+      camera.radius = 48;
       camera.alpha = Math.PI / 2;
       camera.beta = 1.48;
       camera.target = astronaut.root.position.clone();
@@ -958,7 +958,7 @@ export function createGameplayLayer(
         );
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
-          camera.radius = 40;
+          camera.radius = 48;
           camera.beta = 1.48;
           camera.alpha = Math.PI / 2;
           camera.target.copyFrom(astronaut.root.position);
@@ -1259,7 +1259,7 @@ function createAuburnStars(
   const skyRadius = 82;
   directions.forEach((direction, index) => {
     const focalStar = index % 7 === 0;
-    const size = focalStar ? 0.5 : 0.2 + random() * 0.12;
+    const size = focalStar ? 0.58 : 0.3 + random() * 0.15;
     const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index}`, {
       diameter: size,
       segments: 8,
