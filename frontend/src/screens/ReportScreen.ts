@@ -64,7 +64,7 @@ export class ReportScreen implements Screen {
         const design = report.engineeringConfiguration;
         panel.append(
           el("h3", { className: "report-subtitle", text: t("Configuración de ingeniería") }),
-          el("p", { text: `${t("Structure")}: ${design.structure} · ${t("Instrumentation")}: ${design.instrumentation}` }),
+          el("p", { text: `${t("Structure")}: ${design.structure} · ${t("Instrumentation")}: ${design.instrumentation} · ${t("Priority")}: ${design.priority ?? "stability"}` }),
           el("p", { text: `${t("Testing decision")}: ${design.testResponse ?? t("Not recorded")} · ${t("Launch decision")}: ${design.launchDecision ?? t("Not recorded")}` }),
         );
       }

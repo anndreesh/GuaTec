@@ -16,7 +16,7 @@ import type { GameApp } from "@/core/GameApp";
 import type { GameplayHandle, GameplayMapState, NearbyPoi } from "@/babylon/gameplay/GameplayLayer";
 import { Mission1State } from "@/state/Mission1State";
 import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective, type MissionObjectiveId } from "@/state/Mission01Objectives";
-import { calculateEngineering } from "@/state/Mission01Engineering";
+import { DESIGN_BUDGET, calculateEngineering, type EngineeringProfile } from "@/state/Mission01Engineering";
 import { LAUNCH_DELAY_BUDGET_COST, flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
 import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
@@ -863,27 +863,43 @@ export class Mission1Screen implements Screen {
   private openEngineering(): void {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
     if (this.state.objectives.has("testing")) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
-    const stats = calculateEngineering(this.state.engineering);
-    this.showChoice("ENGINEERING · ABSTRACT DESIGN", `Structure: ${this.state.engineering.structure.toUpperCase()} · Instrumentation: ${this.state.engineering.instrumentation.toUpperCase()}\n\nMass ${stats.mass}% · Stability ${stats.stability}% · Data ${stats.data}% · Reliability ${stats.reliability}% · Budget use ${stats.cost}%\n\nThese are game values, not construction instructions. Choose a trade-off; a heavy reinforced structure improves margin but uses more budget.`, [
+    const profile = this.state.engineering;
+    const stats = calculateEngineering(profile);
+    this.showChoice("ENGINEERING · ABSTRACT DESIGN", `Structure: ${profile.structure.toUpperCase()} · Instrumentation: ${profile.instrumentation.toUpperCase()} · Priority: ${profile.priority.toUpperCase()}\n\nMass ${stats.mass}% · Stability ${stats.stability}% · Data ${stats.data}% · Reliability ${stats.reliability}% · Budget use ${stats.cost}%\n\nThese are game values, not construction instructions. Choose a trade-off; a heavy reinforced structure improves margin but uses more budget.`, [
       { label: "LIGHT structure · lower mass, lower margin", run: () => this.chooseDesign("light") },
       { label: "BALANCED structure · moderate trade-off", run: () => this.chooseDesign("balanced") },
       { label: "REINFORCED structure · more stability, higher mass", run: () => this.chooseDesign("reinforced") },
-      { label: "Extended instrumentation · more data, uses budget", run: () => {
-        if (this.state.engineering.instrumentation !== "extended") this.state.engineering.budget = Math.max(0, this.state.engineering.budget - 18);
-        this.state.setEngineering({ instrumentation: "extended" }); this.state.completeObjective("design");
-        this.gameplay?.setDesign(this.state.engineering.structure, "extended");
-        this.showToast("INSTRUMENTATION INSTALLED · Data capacity increased; budget margin reduced.");
-      } },
+      { label: "Instrumentation and priority · data, cost and stability", run: () => this.openInstrumentationMenu() },
+    ]);
+  }
+
+  private openInstrumentationMenu(): void {
+    const profile = this.state.engineering;
+    this.showChoice("ENGINEERING · INSTRUMENTATION AND PRIORITY", `Instrumentation: ${profile.instrumentation.toUpperCase()} · Priority: ${profile.priority.toUpperCase()}\n\nInstrumentation sets how much data the flight records, at a cost. Priority decides which trade-off the team protects when they conflict.`, [
+      { label: "BASIC instrumentation · lowest cost, limited data", run: () => this.applyEngineeringChoice({ instrumentation: "basic" }) },
+      { label: "BALANCED instrumentation · moderate data and cost", run: () => this.applyEngineeringChoice({ instrumentation: "balanced" }) },
+      { label: "ADVANCED instrumentation · most data, highest cost", run: () => this.applyEngineeringChoice({ instrumentation: "advanced" }) },
+      { label: "PRIORITY COST · cheaper build, less stability", run: () => this.applyEngineeringChoice({ priority: "cost" }) },
+      { label: "PRIORITY STABILITY · steadier vehicle, more cost", run: () => this.applyEngineeringChoice({ priority: "stability" }) },
+      { label: "PRIORITY DATA · better recovery, slightly less stable", run: () => this.applyEngineeringChoice({ priority: "data" }) },
+      { label: "Back to structure", run: () => this.openEngineering() },
     ]);
   }
 
   private chooseDesign(structure: "light" | "balanced" | "reinforced"): void {
-    this.state.setEngineering({ structure });
-    this.gameplay?.setDesign(structure, this.state.engineering.instrumentation);
-    this.state.engineering.budget = Math.max(0, 80 - calculateEngineering(this.state.engineering).cost);
-    this.state.completeObjective("design");
     const line = structure === "light" ? MISSION_01_DIALOGUE.engineerLight : structure === "reinforced" ? MISSION_01_DIALOGUE.engineerHeavy : MISSION_01_DIALOGUE.engineerBalanced;
-    this.showToast(`${t("DESIGN LOCKED")} · ${t(line)}`);
+    this.applyEngineeringChoice({ structure }, `${t("DESIGN LOCKED")} · ${t(line)}`);
+  }
+
+  /** Applies one engineering choice, recalculates the budget and refreshes the 3D model. */
+  private applyEngineeringChoice(patch: Partial<EngineeringProfile>, message?: string): void {
+    this.state.setEngineering(patch);
+    const profile = this.state.engineering;
+    this.gameplay?.setDesign(profile.structure, profile.instrumentation);
+    profile.budget = Math.max(0, DESIGN_BUDGET - calculateEngineering(profile).cost);
+    this.state.completeObjective("design");
+    this.renderObjectives();
+    this.showToast(message ?? t("CONFIGURATION SAVED · Budget recalculated from the new trade-offs."));
   }
 
   private openTesting(): void {

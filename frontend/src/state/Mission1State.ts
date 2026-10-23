@@ -8,7 +8,13 @@ import {
   type ResourceKey,
 } from "@/config/gameConfig";
 import type { MissionReport, MissionSaveState } from "@/types";
-import { DEFAULT_ENGINEERING, calculateEngineering, type EngineeringProfile } from "@/state/Mission01Engineering";
+import {
+  DEFAULT_ENGINEERING,
+  calculateEngineering,
+  type EngineeringProfile,
+  type InstrumentationChoice,
+  type ProjectPriority,
+} from "@/state/Mission01Engineering";
 import type { MissionObjectiveId } from "@/state/Mission01Objectives";
 import { MISSION_01_OBJECTIVES } from "@/state/Mission01Objectives";
 import { resolveFlight, type FlightResult } from "@/state/Mission01Launch";
@@ -206,7 +212,7 @@ export class Mission1State {
 
   expectedDiagnosis(): string {
     if (this.engineering.structure === "light") return "Mass distribution";
-    if (this.engineering.instrumentation === "extended") return "Instrumentation";
+    if (this.engineering.instrumentation === "advanced") return "Instrumentation";
     if (this.engineering.structure === "reinforced") return "Structural balance";
     return "System configuration";
   }
@@ -344,16 +350,30 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
+const INSTRUMENTATION_CHOICES: readonly InstrumentationChoice[] = ["basic", "balanced", "advanced"];
+const PRIORITY_CHOICES: readonly ProjectPriority[] = ["cost", "stability", "data"];
+
+function restoreInstrumentation(value: unknown): InstrumentationChoice {
+  // Saves from before the three-level model stored "extended"; it maps to the advanced level.
+  if (value === "extended") return "advanced";
+  return INSTRUMENTATION_CHOICES.find((choice) => choice === value) ?? DEFAULT_ENGINEERING.instrumentation;
+}
+
+function restorePriority(value: unknown): ProjectPriority {
+  return PRIORITY_CHOICES.find((choice) => choice === value) ?? DEFAULT_ENGINEERING.priority;
+}
+
 function restoreEngineering(saved?: Partial<EngineeringProfile>): EngineeringProfile {
   const structure = saved?.structure;
   const instrumentation = saved?.instrumentation;
+  const priority = saved?.priority;
   const testResponse = saved?.testResponse;
   const launchDecision = saved?.launchDecision;
   return {
     structure: structure === "light" || structure === "balanced" || structure === "reinforced"
       ? structure : DEFAULT_ENGINEERING.structure,
-    instrumentation: instrumentation === "basic" || instrumentation === "extended"
-      ? instrumentation : DEFAULT_ENGINEERING.instrumentation,
+    instrumentation: restoreInstrumentation(instrumentation),
+    priority: restorePriority(priority),
     budget: Number.isFinite(saved?.budget) ? clamp(saved!.budget!, 0, 100) : DEFAULT_ENGINEERING.budget,
     testResponse: testResponse === "modify" || testResponse === "retest" || testResponse === "accept-risk"
       ? testResponse : null,

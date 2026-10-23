@@ -24,7 +24,7 @@ export interface GameplayHandle {
   onInteract(cb: (poiId: string) => void): void;
   reset(): void;
   navigateTo(poiId: string): void;
-  setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "extended"): void;
+  setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "balanced" | "advanced"): void;
   playLaunch(): void;
   playOpeningCinematic(onDone?: () => void): void;
   setPeakAltitude(meters: number): void;
@@ -834,7 +834,7 @@ export function createGameplayLayer(
         rocketRoot.scaling.y = structure === "light" ? 0.92 : structure === "reinforced" ? 1.12 : 1;
         rocketRoot.scaling.x = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
         rocketRoot.scaling.z = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
-        instruments.setEnabled(instrumentation === "extended");
+        instruments.setEnabled(instrumentation !== "basic");
         frameRoot.setEnabled(structure !== "light");
         frameRoot.scaling.setAll(structure === "reinforced" ? 1.12 : 1);
       },
