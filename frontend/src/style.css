@@ -1459,3 +1459,257 @@ button.mission-map-location:focus-visible {
   margin: .2rem 0;
   font-size: .85rem;
 }
+
+/* ==========================================================
+   Mission 1 — visual polish layer (overrides; loaded last)
+   Changes looks only: class names and markup are unchanged.
+   ========================================================== */
+
+:root {
+  --mission-glass: linear-gradient(160deg, rgba(16, 24, 44, 0.94), rgba(6, 9, 20, 0.92));
+  --mission-edge: rgba(255, 178, 150, 0.28);
+  --mission-glow: 0 18px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --mission-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes mission-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes mission-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Dialogue and choice windows */
+.modal-overlay {
+  background: radial-gradient(ellipse at center, rgba(12, 16, 30, 0.55), rgba(2, 4, 10, 0.88));
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: mission-fade 0.25s var(--mission-ease);
+  padding: 16px;
+}
+
+.modal-card {
+  position: relative;
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 18px;
+  padding: 28px 30px 24px;
+  max-width: 560px;
+  box-shadow: var(--mission-glow);
+  animation: mission-rise 0.35s var(--mission-ease);
+}
+
+.modal-card::before {
+  content: "";
+  position: absolute;
+  left: 30px;
+  top: 0;
+  width: 56px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.modal-title {
+  margin: 4px 0 12px;
+  font-size: 1.12rem;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+
+.modal-description {
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #c9d1ea;
+  white-space: pre-line;
+}
+
+.modal-options {
+  gap: 8px;
+}
+
+.modal-options .btn {
+  justify-content: flex-start;
+  text-align: left;
+  padding: 11px 16px;
+  border-radius: 10px;
+  transition: transform 0.15s var(--mission-ease), border-color 0.15s, background 0.15s;
+}
+
+.modal-options .btn:hover:not(:disabled) {
+  transform: translateX(4px);
+  border-color: var(--accent);
+}
+
+/* Opening sequence */
+.mission-opening-card {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 122, 69, 0.14), transparent 60%),
+    var(--mission-glass);
+}
+
+.mission-opening-date {
+  letter-spacing: 0.3em;
+  color: var(--text-muted);
+}
+
+.mission-opening-subtitle {
+  margin: 0 0 14px;
+  font-style: italic;
+  color: #ffd29c;
+}
+
+.mission1-screen .btn-primary {
+  box-shadow: 0 6px 18px rgba(255, 122, 69, 0.28);
+  transition: transform 0.15s var(--mission-ease), box-shadow 0.15s;
+}
+
+.mission1-screen .btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(255, 122, 69, 0.38);
+}
+
+/* Objectives and phase panels */
+.mission-objectives,
+.phase-panel {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 14px;
+  box-shadow: var(--mission-glow);
+}
+
+.mission-objective-list li {
+  padding: 3px 0;
+}
+
+.mission-objective--current {
+  color: #ffd29c;
+  text-shadow: 0 0 12px rgba(255, 150, 90, 0.35);
+}
+
+.phase-pill {
+  transition: transform 0.2s var(--mission-ease);
+}
+
+.phase-pill--current {
+  box-shadow: 0 0 0 4px rgba(255, 122, 69, 0.18);
+}
+
+/* Interaction prompt and toasts */
+.interaction-prompt {
+  background: linear-gradient(180deg, rgba(20, 28, 50, 0.95), rgba(6, 9, 20, 0.92));
+  border: 1px solid var(--mission-edge);
+  padding: 9px 20px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: mission-rise 0.25s var(--mission-ease);
+}
+
+.gameplay-toast {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  color: #dfe5f7;
+  border-radius: 12px;
+  padding: 11px 18px;
+  line-height: 1.45;
+  box-shadow: var(--mission-glow);
+  animation: mission-rise 0.3s var(--mission-ease);
+}
+
+/* Map */
+.mission-map-card {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 18px;
+  box-shadow: var(--mission-glow);
+  animation: mission-rise 0.3s var(--mission-ease);
+}
+
+.mission-map-grid {
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 45%, rgba(120, 140, 110, 0.18), rgba(10, 14, 22, 0.92));
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Launch and flight */
+.mission-launch-card {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 18px;
+  box-shadow: var(--mission-glow);
+}
+
+.mission-launch-countdown {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 22px rgba(255, 122, 69, 0.45);
+}
+
+.mission-launch-reading strong,
+.flight-metric-row strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-metrics {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 14px;
+  box-shadow: var(--mission-glow);
+}
+
+/* Ending */
+.mission-ending-card {
+  background: var(--mission-glass);
+  border: 1px solid var(--mission-edge);
+  border-radius: 18px;
+  box-shadow: var(--mission-glow);
+}
+
+.mission-ending-title {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #ffd29c, #ff7a45);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Phones: keep a 16px side gutter and avoid horizontal scroll */
+@media (max-width: 640px) {
+  .modal-card {
+    width: calc(100% - 32px);
+    padding: 22px 20px 20px;
+  }
+
+  .modal-title {
+    font-size: 1.02rem;
+  }
+
+  .gameplay-toast {
+    max-width: calc(100% - 32px);
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-card,
+  .gameplay-toast,
+  .interaction-prompt,
+  .mission-map-card,
+  .mission-opening-card {
+    animation: none;
+  }
+
+  .modal-options .btn,
+  .mission1-screen .btn-primary,
+  .phase-pill {
+    transition: none;
+  }
+}
