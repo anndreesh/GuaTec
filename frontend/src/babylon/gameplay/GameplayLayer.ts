@@ -822,9 +822,11 @@ export function createGameplayLayer(
         launchSmoke.stop();
         launchFlame.stop();
         camera.alpha = Math.PI / 2;
-        camera.beta = 1.15;
+        camera.beta = 1.48;
         camera.radius = 40;
         camera.target.copyFrom(astronaut.root.position);
+        camera.target.y += 2.8;
+        camera.target.z -= 3.2;
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
       },
@@ -923,8 +925,10 @@ export function createGameplayLayer(
       camera.attachControl(canvas, true);
       camera.radius = 40;
       camera.alpha = Math.PI / 2;
-      camera.beta = 1.15;
+      camera.beta = 1.48;
       camera.target = astronaut.root.position.clone();
+      camera.target.y += 2.8;
+      camera.target.z -= 3.2;
     },
     disable() {
       if (!enabled) return;
@@ -955,9 +959,11 @@ export function createGameplayLayer(
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
           camera.radius = 40;
-          camera.beta = 1.15;
+          camera.beta = 1.48;
           camera.alpha = Math.PI / 2;
           camera.target.copyFrom(astronaut.root.position);
+          camera.target.y += 2.8;
+          camera.target.z -= 3.2;
           openingDone?.();
           openingDone = null;
         }
@@ -1099,7 +1105,8 @@ export function createGameplayLayer(
         }
       } else if (openingElapsed < 0) {
         camera.target.copyFrom(astronaut.root.position);
-        camera.target.y += 1.2;
+        camera.target.y += 2.8;
+        camera.target.z -= 3.2;
       }
       if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
 
