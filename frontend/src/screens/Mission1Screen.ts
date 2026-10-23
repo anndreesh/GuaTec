@@ -70,6 +70,7 @@ export class Mission1Screen implements Screen {
   private mapState: GameplayMapState | null = null;
   private routeVisible = false;
   private renderedMapObjectiveId = "";
+  private mapSignature = "";
   private lastRadioAt = 0;
   private launchDayAnnounced = false;
   private readonly onMapKey = (event: KeyboardEvent) => {
@@ -327,6 +328,7 @@ export class Mission1Screen implements Screen {
       el("p", { text: `▲ ${t("You · facing direction")}` }),
       el("p", { text: `1–9 ${t("Locations (numbered)")}` }),
       el("p", { text: `┄ ${t("Route to the current objective (SHOW ROUTE)")}` }),
+      el("p", { text: `◌ ${t("Unexplored area · not visited yet")}` }),
     );
     card.append(header, map, this.mapLocations, legend, details);
     this.mapOverlay.append(card);
@@ -343,20 +345,29 @@ export class Mission1Screen implements Screen {
   private updateMissionMap(state: GameplayMapState): void {
     this.mapState = state;
     if (!this.mapPlayer) return;
-    if (this.mapGrid && this.mapGrid.querySelectorAll(".mission-map-point").length !== state.points.length) {
+    const signature = state.points.map((point) => `${point.id}:${point.discovered === false ? 0 : 1}`).join("|");
+    if (this.mapGrid && signature !== this.mapSignature) {
+      this.mapSignature = signature;
       this.mapGrid.querySelectorAll(".mission-map-point").forEach((point) => point.remove());
       if (this.mapLocations) this.mapLocations.innerHTML = "";
       this.mapLocations?.append(el("h3", { className: "mission-map-locations-title", text: t("ALL LOCATIONS") }));
       for (const [index, point] of state.points.entries()) {
-        const label = t(point.label);
+        const discovered = point.discovered !== false;
+        const label = discovered ? t(point.label) : t("Unexplored area");
         const number = String(index + 1);
-        const marker = el("span", { className: "mission-map-point", text: number, attrs: { title: `${number} · ${label}`, "aria-label": `${number}. ${label}` } });
+        const marker = el("span", {
+          className: discovered ? "mission-map-point" : "mission-map-point mission-map-point--unexplored",
+          text: number,
+          attrs: { title: `${number} · ${label}`, "aria-label": `${number}. ${label}` },
+        });
         marker.dataset.x = String(point.x);
         marker.dataset.z = String(point.z);
         marker.dataset.label = label;
         this.mapGrid.append(marker);
         if (point.navigable === false) {
-          this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--landmark", text: `${number} · ${label}` }));
+          this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--landmark", text: `${number} · ${t(point.label)}` }));
+        } else if (!discovered) {
+          this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--unexplored", text: `${number} · ${t("Unexplored area")}` }));
         } else {
           const locationButton = el("button", { className: "mission-map-location", text: `${number} · ${label}`, attrs: { type: "button" } });
           locationButton.addEventListener("click", () => {

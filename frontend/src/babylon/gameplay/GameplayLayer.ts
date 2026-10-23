@@ -11,7 +11,7 @@ export interface NearbyPoi {
 
 export interface GameplayMapState {
   player: { x: number; z: number; direction: number };
-  points: Array<{ id: string; label: string; x: number; z: number; navigable?: boolean }>;
+  points: Array<{ id: string; label: string; x: number; z: number; navigable?: boolean; discovered?: boolean }>;
 }
 
 export type AuburnWeather = "CLEAR" | "CLOUDY" | "LIGHT MIST" | "WINDY";
@@ -57,6 +57,8 @@ const JUMP_SPEED = 5.5;
 // Route waypoints stop outside solid station and launch-frame footprints; keep interaction
 // reach large enough to use a station without walking through its collider.
 const INTERACT_RADIUS = 4;
+/** Distance at which a location is marked as discovered on the mission map. */
+const DISCOVERY_RADIUS = 18;
 const PLAYER_START = { x: 0, z: 4 };
 const FIELD_HALF_SIZE = 33.5;
 const ROCKET_PLATFORM_Z = -14;
@@ -172,9 +174,14 @@ export function createGameplayLayer(
 
   const poiRoot = new BABYLONNS.TransformNode("gameplay-poi-root", scene);
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
+  // Locations become "discovered" once the player has been near them (see updateNearestPoi).
+  const discoveredPoiIds = new Set<string>();
   const getMapPoints = () => [
-    ...poiMeshes.map(({ poi, position }) => ({ id: poi.id, label: poi.label, x: position.x, z: position.z, navigable: true })),
-    { id: "prototype-platform", label: "Plataforma del prototipo", x: 0, z: ROCKET_PLATFORM_Z, navigable: false },
+    ...poiMeshes.map(({ poi, position }) => ({
+      id: poi.id, label: poi.label, x: position.x, z: position.z, navigable: true,
+      discovered: discoveredPoiIds.has(poi.id),
+    })),
+    { id: "prototype-platform", label: "Plataforma del prototipo", x: 0, z: ROCKET_PLATFORM_Z, navigable: false, discovered: true },
   ];
 
   const rocketRoot = new BABYLONNS.TransformNode("gameplay-liquid-rocket", scene);
@@ -778,6 +785,7 @@ export function createGameplayLayer(
       const dx = entry.position.x - astronaut.root.position.x;
       const dz = entry.position.z - astronaut.root.position.z;
       const distSq = dx * dx + dz * dz;
+      if (distSq <= DISCOVERY_RADIUS * DISCOVERY_RADIUS) discoveredPoiIds.add(entry.poi.id);
       if (distSq <= INTERACT_RADIUS * INTERACT_RADIUS && (!closest || distSq < closest.distSq)) {
         closest = { poi: entry.poi, position: entry.position, distSq };
       }
@@ -806,6 +814,7 @@ export function createGameplayLayer(
         interactCallback = cb;
       },
       reset() {
+        discoveredPoiIds.clear();
         astronaut.root.position.set(PLAYER_START.x, terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z), PLAYER_START.z);
         astronaut.root.rotation.set(0, 0, 0);
         velocity.set(0, 0, 0);

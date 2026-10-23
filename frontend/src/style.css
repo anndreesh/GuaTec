@@ -1442,3 +1442,20 @@ button.mission-map-location:focus-visible {
     -webkit-user-select: none;
   }
 }
+
+/* Locations the player has not reached yet (MISSION_01_DESIGN_SPEC §6). */
+.mission-map-point--unexplored {
+  opacity: .45;
+  border-style: dashed;
+}
+
+.mission-map-location--unexplored {
+  opacity: .6;
+  font-style: italic;
+  cursor: default;
+}
+
+.mission-map-legend p {
+  margin: .2rem 0;
+  font-size: .85rem;
+}

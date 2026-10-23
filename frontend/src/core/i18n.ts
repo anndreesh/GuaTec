@@ -239,6 +239,8 @@ const spanishFromEnglish: Record<string, string> = {
   "Back to structure": "Volver a la estructura",
   "CONFIGURATION SAVED · Budget recalculated from the new trade-offs.": "CONFIGURACIÓN GUARDADA · Presupuesto recalculado con los nuevos compromisos.",
   "Priority": "Prioridad",
+  "Unexplored area": "Zona sin explorar",
+  "Unexplored area · not visited yet": "Zona sin explorar · aún no visitada",
   "MAP LEGEND": "LEYENDA DEL MAPA",
   "You · facing direction": "Tú · dirección en la que miras",
   "Locations (numbered)": "Localizaciones (numeradas)",
