@@ -22,6 +22,7 @@ import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
 import type { MissionSaveState } from "@/types";
 import { t } from "@/core/i18n";
+import { missionAudio } from "@/core/MissionAudio";
 
 const MISSION_SLUG = MISSION_SLUGS.mission1;
 const CHECKLIST_LABELS: Record<string, string> = {
@@ -1071,6 +1072,8 @@ export class Mission1Screen implements Screen {
   }
 
   private openObservationArea(): void {
+    // Phase G: the exterior ambience is emphasised at the observation area.
+    missionAudio.setWindLevel(0.2);
     if (!this.state.objectives.has("prepare")) {
       this.showToast(t("COMPLETE THE LAUNCH CHECKLIST AT THE LAUNCH FIELD FIRST."));
       return;
@@ -1197,6 +1200,7 @@ export class Mission1Screen implements Screen {
       remaining -= 1;
       if (remaining > 0) {
         countdown.textContent = `T-${remaining}`;
+        missionAudio.beep(remaining <= 3 ? 1100 : 880);
         if (remaining <= 3) status.textContent = t("The small crew watches the stand and the mechanical recorder.");
         return;
       }
@@ -1206,6 +1210,8 @@ export class Mission1Screen implements Screen {
       countdown.classList.add("mission-launch-ignition");
       this.modalRoot?.classList.add("mission-launch-overlay--cinematic");
       status.textContent = t("The vehicle leaves the frame. Record the flight, then review the result.");
+      missionAudio.ignition();
+      missionAudio.setWindLevel(0.25);
       this.gameplay?.playLaunch();
       const startedAt = performance.now();
       this.flightTimer = window.setInterval(() => {
@@ -1333,6 +1339,7 @@ export class Mission1Screen implements Screen {
     const start = el("button", { className: "btn btn-primary btn-large", text: t("ENTER THE FIELD"), attrs: { type: "button" } });
     start.classList.add("mission-opening-start", "mission-opening-start--hidden");
     start.addEventListener("click", () => {
+      missionAudio.startWind();
       overlay.remove();
       this.showTutorialOverlay(container);
     });
@@ -1617,6 +1624,7 @@ export class Mission1Screen implements Screen {
 
   unmount(): void {
     this.stopTimers();
+    missionAudio.stopWind();
     window.removeEventListener("keydown", this.onPanelToggleKey);
     window.removeEventListener("keydown", this.onMapKey);
     this.restorePanelButton = null;
