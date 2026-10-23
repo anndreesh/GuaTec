@@ -1246,7 +1246,7 @@ function createAuburnStars(
   const minimumDot = Math.cos(13 * Math.PI / 180);
   for (let attempt = 0; directions.length < 22 && attempt < 2000; attempt++) {
     const azimuth = random() * Math.PI * 2;
-    const elevation = (25 + random() * 47) * Math.PI / 180;
+    const elevation = (10 + random() * 58) * Math.PI / 180;
     const direction = new BABYLONNS.Vector3(
       Math.sin(azimuth) * Math.cos(elevation),
       Math.sin(elevation),
