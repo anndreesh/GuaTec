@@ -583,16 +583,19 @@ export function createGameplayLayer(
         // Center the lower body over the support plate. The fins and upper
         // hardware can be asymmetric, so centering the full model makes its
         // "belly" visibly miss the stand.
-        const lowerBodyBoxes = modelMeshes
+        const lowerBodyCentersX = modelMeshes
           .map((mesh) => mesh.getBoundingInfo().boundingBox)
-          .filter((box) => box.minimumWorld.y <= scaledBounds.minY + 0.9);
-        const baseMinX = lowerBodyBoxes.length
-          ? Math.min(...lowerBodyBoxes.map((box) => box.minimumWorld.x))
-          : scaledBounds.minX;
-        const baseMaxX = lowerBodyBoxes.length
-          ? Math.max(...lowerBodyBoxes.map((box) => box.maximumWorld.x))
-          : scaledBounds.maxX;
-        shuttleModelRoot.position.x += -(baseMinX + baseMaxX) / 2;
+          .filter((box) => {
+            const widthX = box.maximumWorld.x - box.minimumWorld.x;
+            const widthZ = box.maximumWorld.z - box.minimumWorld.z;
+            return box.minimumWorld.y <= scaledBounds.minY + 1.1 && widthX <= 2.2 && widthZ <= 2.2;
+          })
+          .map((box) => (box.minimumWorld.x + box.maximumWorld.x) / 2)
+          .sort((a, b) => a - b);
+        const baseAxisX = lowerBodyCentersX.length
+          ? lowerBodyCentersX[Math.floor(lowerBodyCentersX.length / 2)]!
+          : (scaledBounds.minX + scaledBounds.maxX) / 2;
+        shuttleModelRoot.position.x += frameRoot.position.x - baseAxisX;
         shuttleModelRoot.position.y += groundY + 0.12 - scaledBounds.minY;
         shuttleModelRoot.position.z += ROCKET_PLATFORM_Z - (scaledBounds.minZ + scaledBounds.maxZ) / 2;
       }
