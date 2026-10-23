@@ -552,7 +552,10 @@ export class Mission1Screen implements Screen {
             label: "“Understood. Where do we begin?”",
             run: () => {
               this.state.addLogEntry("DIRECTOR — Meet the engineering team around the outdoor stations.");
-              this.showToast(t("OBJECTIVE UPDATED · Meet the team across the project area."));
+              // The engineering lead's radio briefing was defined but never shown; it plays here.
+              this.showEngineeringLeadDialogue(() => {
+                this.showToast(t("OBJECTIVE UPDATED · Meet the team across the project area."));
+              });
             },
           },
           {
