@@ -1055,7 +1055,7 @@ export class Mission1Screen implements Screen {
     const analysisCompleteCount = analysisTopics.filter((topic) => this.state.analyzed.has(topic)).length;
     this.showChoice(
       "OUTDOOR ANALYSIS STATION · FLIGHT RECORD",
-      `FLIGHT OUTCOME: ${label}\n\n${MISSION_01_DIALOGUE.historicalNote}\n\nReview the flight telemetry traces and system performance:`,
+      `FLIGHT OUTCOME: ${label}\n\n${t(MISSION_01_DIALOGUE.historicalNote)}\n\nReview the flight telemetry traces and system performance:`,
       [
         {
           label: "Analyze Propulsion & Chamber Pressure",
