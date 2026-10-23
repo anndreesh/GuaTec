@@ -662,8 +662,10 @@ export function createGameplayLayer(
   const cameraOffsetRadius = 7;
   camera.lowerRadiusLimit = 4;
   camera.upperRadiusLimit = 12;
-  camera.lowerBetaLimit = 0.02;
-  camera.upperBetaLimit = Math.PI - 0.02;
+  // Keep the orbit on the upper side of the horizon so the camera can never
+  // pass below the ground when the player or camera target moves.
+  camera.lowerBetaLimit = 0.35;
+  camera.upperBetaLimit = 1.5;
 
   // --- Input state ---
   const keysDown = new Set<string>();
@@ -1131,7 +1133,7 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   ctx.restore();
 
   // Seeded stars keep the generated night sky stable between sessions.
-  for (let i = 0; i < 3400; i++) {
+  for (let i = 0; i < 1050; i++) {
     const x = random() * 2048;
     const y = 24 + random() * 480;
     const radius = 0.48 + random() ** 3 * 1.65;
