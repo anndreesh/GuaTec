@@ -167,7 +167,7 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
               }
               node = node.parent;
             }
-            if (belongsToGameplay && !castsSceneBlockingShadow && mesh.name !== "auburn-sky-dome") {
+            if (belongsToGameplay && !castsSceneBlockingShadow && mesh.name !== "auburn-sky-dome" && !mesh.name.startsWith("auburn-star-")) {
               shadowGenerator.addShadowCaster(mesh, true);
               mesh.receiveShadows = true;
             }

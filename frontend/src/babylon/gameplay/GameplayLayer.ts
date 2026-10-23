@@ -83,6 +83,7 @@ export function createGameplayLayer(
   const root = new BABYLONNS.TransformNode("gameplay-root", scene);
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
+  const starUpdate = createAuburnStars(BABYLONNS, scene, root, camera);
 
   const terrain = createMarsTerrain(BABYLONNS, scene);
   terrain.ground.parent = root;
@@ -181,6 +182,9 @@ export function createGameplayLayer(
   rocketRoot.parent = root;
   const proceduralRocketRoot = new BABYLONNS.TransformNode("procedural-rocket-fallback", scene);
   proceduralRocketRoot.parent = rocketRoot;
+  // Keep a clearly visible generated rocket in the scene even if the external
+  // GLB fails to load or its model data is incomplete.
+  proceduralRocketRoot.scaling.set(1.18, 1.3, 1.18);
   const shuttleModelRoot = new BABYLONNS.TransformNode("nasa-shuttle-model", scene);
   shuttleModelRoot.parent = rocketRoot;
   shuttleModelRoot.setEnabled(false);
@@ -557,21 +561,29 @@ export function createGameplayLayer(
       shuttleModelRoot.position.y = 0;
       shuttleModelRoot.computeWorldMatrix(true);
       result.meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
-      const bounds = result.meshes
-        .filter((mesh) => mesh !== importedRoot)
-        .filter((mesh) => mesh.getBoundingInfo)
-        .map((mesh) => mesh.getBoundingInfo().boundingBox);
-      if (bounds.length) {
-        const minY = Math.min(...bounds.map((box) => box.minimumWorld.y));
-        const maxY = Math.max(...bounds.map((box) => box.maximumWorld.y));
-        const originalHeight = Math.max(0.1, maxY - minY);
-        shuttleModelRoot.scaling.setAll(4.6 / originalHeight);
+      const modelMeshes = result.meshes.filter((mesh) => mesh.getTotalVertices() > 0);
+      const worldBounds = () => {
         shuttleModelRoot.computeWorldMatrix(true);
-        result.meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
-        const scaledMinY = Math.min(...bounds.map((box) => box.minimumWorld.y));
-        shuttleModelRoot.position.y += terrain.getHeightAt(0, ROCKET_PLATFORM_Z) - scaledMinY + 0.12;
+        modelMeshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+        const boxes = modelMeshes.map((mesh) => mesh.getBoundingInfo().boundingBox);
+        return {
+          minX: Math.min(...boxes.map((box) => box.minimumWorld.x)),
+          maxX: Math.max(...boxes.map((box) => box.maximumWorld.x)),
+          minY: Math.min(...boxes.map((box) => box.minimumWorld.y)),
+          maxY: Math.max(...boxes.map((box) => box.maximumWorld.y)),
+          minZ: Math.min(...boxes.map((box) => box.minimumWorld.z)),
+          maxZ: Math.max(...boxes.map((box) => box.maximumWorld.z)),
+        };
+      };
+      const initialBounds = worldBounds();
+      if (modelMeshes.length && initialBounds.maxY > initialBounds.minY) {
+        shuttleModelRoot.scaling.setAll(4.6 / (initialBounds.maxY - initialBounds.minY));
+        const scaledBounds = worldBounds();
+        const groundY = terrain.getHeightAt(0, ROCKET_PLATFORM_Z);
+        shuttleModelRoot.position.x += -(scaledBounds.minX + scaledBounds.maxX) / 2;
+        shuttleModelRoot.position.y += groundY + 0.12 - scaledBounds.minY;
+        shuttleModelRoot.position.z += ROCKET_PLATFORM_Z - (scaledBounds.minZ + scaledBounds.maxZ) / 2;
       }
-      proceduralRocketRoot.setEnabled(false);
       shuttleModelRoot.setEnabled(true);
     } catch (error) {
       console.warn("Could not load the mission rocket model; using the generated rocket instead.", error);
@@ -1103,6 +1115,7 @@ export function createGameplayLayer(
       rocketShellMat.dispose();
       rocketMarkingMat.dispose();
       sky.dispose(false, true);
+      scene.onBeforeRenderObservable.remove(starUpdate);
       root.dispose(false, true);
     },
   };
@@ -1169,32 +1182,7 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   }
   ctx.restore();
 
-  // Seeded stars keep the generated night sky stable between sessions.
-  for (let i = 0; i < 280; i++) {
-    const x = random() * 2048;
-    const y = 24 + random() * 480;
-    const radius = 0.48 + random() ** 3 * 1.65;
-    const bandY = 320 + Math.sin(x * 0.00307) * 108;
-    const inGalaxy = Math.abs(y - bandY) < 105;
-    const alpha = (0.56 + random() * 0.38) * (inGalaxy ? 0.78 : 1);
-    const warm = random() > 0.84;
-    ctx.fillStyle = warm ? `rgba(255, 222, 184, ${alpha})` : `rgba(211, 226, 255, ${alpha})`;
-    if (radius > 1.45) {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 4.5);
-      glow.addColorStop(0, warm ? "rgba(255, 226, 191, 0.7)" : "rgba(208, 224, 255, 0.65)");
-      glow.addColorStop(1, "rgba(180, 200, 255, 0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(x, y, radius * 4.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // The Babylon sky sphere maps the dynamic texture upside down; invert on
-  // upload so the star field and Milky Way stay in the upper sky hemisphere.
-  texture.update(true);
+  texture.update();
   const material = new BABYLONNS.StandardMaterial("auburn-sky-material", scene);
   material.diffuseTexture = texture;
   material.emissiveTexture = texture;
@@ -1204,6 +1192,57 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   sky.material = material;
   sky.isPickable = false;
   return sky;
+}
+
+function createAuburnStars(
+  BABYLONNS: BabylonNamespace,
+  scene: BABYLON.Scene,
+  root: BABYLON.TransformNode,
+  camera: BABYLON.ArcRotateCamera,
+): BABYLON.Observer<BABYLON.Scene> {
+  const material = new BABYLONNS.StandardMaterial("auburn-world-star-material", scene);
+  material.diffuseColor = BABYLONNS.Color3.Black();
+  material.emissiveColor = BABYLONNS.Color3.FromHexString("#dce8ff");
+  material.specularColor = BABYLONNS.Color3.Black();
+  material.disableLighting = true;
+  material.backFaceCulling = false;
+  let seed = 19260316;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const stars: Array<{ mesh: BABYLON.Mesh; horizontal: number; vertical: number; distance: number }> = [];
+  // Geometry avoids texture UV inversion. Keep stars in the upper part of the
+  // live camera view so they remain visible from the ground-level orbit.
+  for (let i = 0; i < 70; i++) {
+    const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${i}`, {
+      diameter: random() > 0.92 ? 0.36 : 0.14 + random() * 0.12,
+      segments: 6,
+    }, scene);
+    star.parent = root;
+    star.material = material;
+    star.isPickable = false;
+    star.receiveShadows = false;
+    stars.push({
+      mesh: star,
+      horizontal: (random() - 0.5) * 54,
+      vertical: 10 + random() * 18,
+      distance: 58 + (i % 7) * 2,
+    });
+  }
+  return scene.onBeforeRenderObservable.add(() => {
+    const forward = camera.getDirection(BABYLONNS.Axis.Z);
+    const up = camera.getDirection(BABYLONNS.Axis.Y);
+    const right = camera.getDirection(BABYLONNS.Axis.X);
+    const origin = camera.globalPosition;
+    stars.forEach(({ mesh, horizontal, vertical, distance }) => {
+      mesh.position.set(
+        origin.x + forward.x * distance + up.x * vertical + right.x * horizontal,
+        origin.y + forward.y * distance + up.y * vertical + right.y * horizontal,
+        origin.z + forward.z * distance + up.z * vertical + right.z * horizontal,
+      );
+    });
+  });
 }
 
 function createWeatheredMaterial(
