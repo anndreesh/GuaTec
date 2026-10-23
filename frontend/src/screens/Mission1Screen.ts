@@ -321,7 +321,14 @@ export class Mission1Screen implements Screen {
     map.append(this.mapRoute, this.mapPlayer, el("span", { className: "mission-map-caption", text: t("NORTH ↑ · PROJECT YARD · LAUNCH FIELD") }));
     this.mapLocations = el("nav", { className: "mission-map-locations", attrs: { "aria-label": t("ALL LOCATIONS") } });
     const details = el("aside", { className: "mission-map-objective" });
-    card.append(header, map, this.mapLocations, details);
+    const legend = el("div", { className: "mission-map-legend", attrs: { "aria-label": t("MAP LEGEND") } });
+    legend.append(
+      el("h3", { className: "mission-map-locations-title", text: t("MAP LEGEND") }),
+      el("p", { text: `▲ ${t("You · facing direction")}` }),
+      el("p", { text: `1–9 ${t("Locations (numbered)")}` }),
+      el("p", { text: `┄ ${t("Route to the current objective (SHOW ROUTE)")}` }),
+    );
+    card.append(header, map, this.mapLocations, legend, details);
     this.mapOverlay.append(card);
     container.append(this.mapOverlay);
   }
