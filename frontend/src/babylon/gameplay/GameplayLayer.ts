@@ -1245,7 +1245,10 @@ function createAuburnStars(
   const directions: BABYLON.Vector3[] = [];
   const minimumDot = Math.cos(13 * Math.PI / 180);
   for (let attempt = 0; directions.length < 22 && attempt < 2000; attempt++) {
-    const azimuth = random() * Math.PI * 2;
+    // Keep the seeded scatter across the fixed forward sky above the range,
+    // where it is visible from the starting position; these world angles do
+    // not change when the player or camera moves.
+    const azimuth = Math.PI + (random() - 0.5) * Math.PI * 0.9;
     const elevation = (10 + random() * 58) * Math.PI / 180;
     const direction = new BABYLONNS.Vector3(
       Math.sin(azimuth) * Math.cos(elevation),
