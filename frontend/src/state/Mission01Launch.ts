@@ -3,6 +3,9 @@ import { calculateEngineering } from "@/state/Mission01Engineering";
 
 export type FlightResult = "stable-flight" | "deviation" | "incomplete-data" | "underperformance" | "delayed";
 
+/** Budget points spent each time the launch is delayed to recheck conditions. */
+export const LAUNCH_DELAY_BUDGET_COST = 6;
+
 /** Abstract game outcome only; this is not a real vehicle performance model. */
 export function resolveFlight(profile: EngineeringProfile, recoveredData: number): FlightResult {
   if (profile.launchDecision === "delay") return "delayed";

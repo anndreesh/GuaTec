@@ -17,7 +17,7 @@ import type { GameplayHandle, GameplayMapState, NearbyPoi } from "@/babylon/game
 import { Mission1State } from "@/state/Mission1State";
 import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective, type MissionObjectiveId } from "@/state/Mission01Objectives";
 import { calculateEngineering } from "@/state/Mission01Engineering";
-import { flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
+import { LAUNCH_DELAY_BUDGET_COST, flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
 import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
 import type { MissionSaveState } from "@/types";
@@ -1003,6 +1003,10 @@ export class Mission1Screen implements Screen {
           this.state.engineering.launchDecision = "delay";
           this.state.flightResult = null;
           this.state.checklist.clear();
+          // Delaying costs budget and time (MISSION_01_DESIGN_SPEC, phase F.7).
+          this.state.engineering.budget = Math.max(0, this.state.engineering.budget - LAUNCH_DELAY_BUDGET_COST);
+          this.state.advanceTick();
+          this.state.addLogEntry(`[T${this.state.tick}] Launch delayed: budget −${LAUNCH_DELAY_BUDGET_COST}, one time step lost.`);
           this.renderObjectives();
           void this.autosave();
           this.showToast(t("LAUNCH DELAYED · The flight has not started. Recheck the launch conditions before proceeding."));
