@@ -725,7 +725,7 @@ export function createGameplayLayer(
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
   const cameraOffsetRadius = 7;
   camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 26;
+  camera.upperRadiusLimit = 34;
   // Keep the orbit on the upper side of the horizon so the camera can never
   // pass below the ground when the player or camera target moves.
   camera.lowerBetaLimit = 0.35;
@@ -822,8 +822,8 @@ export function createGameplayLayer(
         launchSmoke.stop();
         launchFlame.stop();
         camera.alpha = Math.PI / 2;
-        camera.beta = 1.1;
-        camera.radius = 20;
+        camera.beta = 1.4;
+        camera.radius = 26;
         camera.target.copyFrom(astronaut.root.position);
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
@@ -921,9 +921,9 @@ export function createGameplayLayer(
       camera.inputs.clear();
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
-      camera.radius = 20;
+      camera.radius = 26;
       camera.alpha = Math.PI / 2;
-      camera.beta = 1.1;
+      camera.beta = 1.4;
       camera.target = astronaut.root.position.clone();
     },
     disable() {
@@ -954,8 +954,8 @@ export function createGameplayLayer(
         );
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
-          camera.radius = 20;
-          camera.beta = 1.1;
+          camera.radius = 26;
+          camera.beta = 1.4;
           camera.alpha = Math.PI / 2;
           camera.target.copyFrom(astronaut.root.position);
           openingDone?.();
@@ -1141,7 +1141,9 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
     segments: 48,
     sideOrientation: BABYLONNS.Mesh.BACKSIDE,
   }, scene);
-  sky.infiniteDistance = true;
+  // Keep the sky dome fixed in the mission world. The star meshes sit just
+  // inside this shell, so moving an infinite-distance dome would hide them.
+  sky.infiniteDistance = false;
   const texture = new BABYLONNS.DynamicTexture("auburn-procedural-starry-sky", { width: 2048, height: 1024 }, scene, false);
   const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
   const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
