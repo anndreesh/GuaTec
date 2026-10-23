@@ -710,7 +710,7 @@ export function createGameplayLayer(
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
   const cameraOffsetRadius = 7;
   camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 12;
+  camera.upperRadiusLimit = 26;
   // Keep the orbit on the upper side of the horizon so the camera can never
   // pass below the ground when the player or camera target moves.
   camera.lowerBetaLimit = 0.35;
@@ -806,9 +806,9 @@ export function createGameplayLayer(
         openingElapsed = -1;
         launchSmoke.stop();
         launchFlame.stop();
-        camera.alpha = -Math.PI / 2;
+        camera.alpha = Math.PI / 2;
         camera.beta = 1.1;
-        camera.radius = cameraOffsetRadius;
+        camera.radius = 20;
         camera.target.copyFrom(astronaut.root.position);
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
@@ -856,9 +856,9 @@ export function createGameplayLayer(
         openingElapsed = 0;
         openingDone = onDone ?? null;
         camera.radius = 22;
-        camera.beta = 0.85;
-        camera.alpha = -Math.PI * 0.15;
-        camera.target = new BABYLONNS.Vector3(0, 1.4, -6);
+        camera.beta = 1.02;
+        camera.alpha = Math.PI * 0.46;
+        camera.target = new BABYLONNS.Vector3(0, 1.4, -5);
       },
       setPeakAltitude(meters) {
         launchPeakAltitude = Math.max(2, Math.min(16, meters));
@@ -906,8 +906,8 @@ export function createGameplayLayer(
       camera.inputs.clear();
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
-      camera.radius = cameraOffsetRadius;
-      camera.alpha = -Math.PI / 2;
+      camera.radius = 20;
+      camera.alpha = Math.PI / 2;
       camera.beta = 1.1;
       camera.target = astronaut.root.position.clone();
     },
@@ -939,9 +939,9 @@ export function createGameplayLayer(
         );
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
-          camera.radius = cameraOffsetRadius;
+          camera.radius = 20;
           camera.beta = 1.1;
-          camera.alpha = -Math.PI / 2;
+          camera.alpha = Math.PI / 2;
           camera.target.copyFrom(astronaut.root.position);
           openingDone?.();
           openingDone = null;
@@ -1226,8 +1226,8 @@ function createAuburnStars(
     stars.push({
       mesh: star,
       horizontal: (random() - 0.5) * 54,
-      vertical: 10 + random() * 18,
-      distance: 58 + (i % 7) * 2,
+      vertical: 32 + random() * 14,
+      distance: 74 + (i % 7) * 2,
     });
   }
   return scene.onBeforeRenderObservable.add(() => {
