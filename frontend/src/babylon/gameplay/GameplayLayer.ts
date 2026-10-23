@@ -88,10 +88,10 @@ export function createGameplayLayer(
   terrain.ground.parent = root;
   scene.fogMode = BABYLONNS.Scene.FOGMODE_EXP2;
   const weatherOptions: Array<{ label: AuburnWeather; fogDensity: number }> = [
-    { label: "CLEAR", fogDensity: 0.0012 },
-    { label: "CLOUDY", fogDensity: 0.0016 },
-    { label: "LIGHT MIST", fogDensity: 0.002 },
-    { label: "WINDY", fogDensity: 0.0014 },
+    { label: "CLEAR", fogDensity: 0.0022 },
+    { label: "CLOUDY", fogDensity: 0.0028 },
+    { label: "LIGHT MIST", fogDensity: 0.0032 },
+    { label: "WINDY", fogDensity: 0.0025 },
   ];
   const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)]!;
   scene.fogDensity = weather.fogDensity;
@@ -537,9 +537,36 @@ export function createGameplayLayer(
   const paperMat = new BABYLONNS.PBRMaterial("gameplay-aged-paper", scene);
   paperMat.albedoColor = BABYLONNS.Color3.FromHexString("#cbbb96");
   paperMat.roughness = 0.98;
-  // Keep the 1926-scale procedural vehicle. A modern shuttle asset is historically
-  // the wrong silhouette for this mission and is left unused on purpose.
-  shuttleModelRoot.setEnabled(false);
+  // Restore the mission's existing 3D rocket asset; keep the generated vehicle
+  // visible until the model finishes loading so a missing asset has a fallback.
+  void (async () => {
+    try {
+      await import("@babylonjs/loaders/glTF");
+      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(
+        null,
+        "/assets/models/",
+        "space_shuttle_nasa_optimized.glb",
+        scene,
+      );
+      const modelMeshes = result.meshes.filter((mesh) => mesh.name !== "__root__");
+      modelMeshes.forEach((mesh) => { mesh.parent = shuttleModelRoot; });
+      shuttleModelRoot.scaling.setAll(0.1);
+      shuttleModelRoot.position.y = 1.45;
+      shuttleModelRoot.computeWorldMatrix(true);
+      modelMeshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+      const bounds = modelMeshes
+        .filter((mesh) => mesh.getBoundingInfo)
+        .map((mesh) => mesh.getBoundingInfo().boundingBox);
+      if (bounds.length) {
+        const minY = Math.min(...bounds.map((box) => box.minimumWorld.y));
+        shuttleModelRoot.position.y += terrain.getHeightAt(0, ROCKET_PLATFORM_Z) - minY + 0.12;
+      }
+      proceduralRocketRoot.setEnabled(false);
+      shuttleModelRoot.setEnabled(true);
+    } catch (error) {
+      console.warn("Could not load the mission rocket model; using the generated rocket instead.", error);
+    }
+  })();
   proceduralRocketRoot.setEnabled(true);
 
   const observationDeck = BABYLONNS.MeshBuilder.CreateBox("observation-deck", {
@@ -1155,7 +1182,9 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
   }
-  texture.update();
+  // The Babylon sky sphere maps the dynamic texture upside down; invert on
+  // upload so the star field and Milky Way stay in the upper sky hemisphere.
+  texture.update(true);
   const material = new BABYLONNS.StandardMaterial("auburn-sky-material", scene);
   material.diffuseTexture = texture;
   material.emissiveTexture = texture;

@@ -23,8 +23,10 @@ export function createMarsTerrain(
   scene: BABYLON.Scene,
   options: { size?: number; subdivisions?: number } = {},
 ): MarsTerrain {
-  const size = options.size ?? 70;
-  const subdivisions = options.subdivisions ?? 48;
+  // A wide, fogged field reaches beyond the camera's visible horizon while
+  // the gameplay movement bounds remain intentionally local to the mission.
+  const size = options.size ?? 1600;
+  const subdivisions = options.subdivisions ?? 512;
 
   const ground = BABYLONNS.MeshBuilder.CreateGround("mars-ground", { width: size, height: size, subdivisions }, scene);
   const positions = ground.getVerticesData(BABYLONNS.VertexBuffer.PositionKind);
@@ -163,6 +165,8 @@ function createProceduralSoilMaterial(
   albedo.update(false);
   albedo.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
   albedo.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  albedo.uScale = 64;
+  albedo.vScale = 64;
   albedo.anisotropicFilteringLevel = 8;
 
   const material = new BABYLONNS.PBRMaterial("auburn-generated-soil", scene);
@@ -172,8 +176,8 @@ function createProceduralSoilMaterial(
   for (const texture of [normal, arm]) {
     texture.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
     texture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
-    texture.uScale = 9;
-    texture.vScale = 9;
+    texture.uScale = 128;
+    texture.vScale = 128;
     texture.anisotropicFilteringLevel = 8;
   }
   material.bumpTexture = normal;
