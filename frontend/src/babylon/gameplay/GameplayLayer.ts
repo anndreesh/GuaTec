@@ -548,18 +548,28 @@ export function createGameplayLayer(
         "space_shuttle_nasa_optimized.glb",
         scene,
       );
-      const modelMeshes = result.meshes.filter((mesh) => mesh.name !== "__root__");
-      modelMeshes.forEach((mesh) => { mesh.parent = shuttleModelRoot; });
-      shuttleModelRoot.scaling.setAll(0.1);
-      shuttleModelRoot.position.y = 1.45;
+      const importedRoot = result.meshes.find((mesh) => mesh.name === "__root__") ?? result.meshes[0];
+      if (importedRoot) importedRoot.parent = shuttleModelRoot;
+      // The GLB is modeled lengthwise along Z. Rotate it upright, then scale
+      // its measured height to a plausible 4.6 m experimental rocket.
+      shuttleModelRoot.rotation.x = Math.PI / 2;
+      shuttleModelRoot.scaling.setAll(1);
+      shuttleModelRoot.position.y = 0;
       shuttleModelRoot.computeWorldMatrix(true);
-      modelMeshes.forEach((mesh) => mesh.computeWorldMatrix(true));
-      const bounds = modelMeshes
+      result.meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+      const bounds = result.meshes
+        .filter((mesh) => mesh !== importedRoot)
         .filter((mesh) => mesh.getBoundingInfo)
         .map((mesh) => mesh.getBoundingInfo().boundingBox);
       if (bounds.length) {
         const minY = Math.min(...bounds.map((box) => box.minimumWorld.y));
-        shuttleModelRoot.position.y += terrain.getHeightAt(0, ROCKET_PLATFORM_Z) - minY + 0.12;
+        const maxY = Math.max(...bounds.map((box) => box.maximumWorld.y));
+        const originalHeight = Math.max(0.1, maxY - minY);
+        shuttleModelRoot.scaling.setAll(4.6 / originalHeight);
+        shuttleModelRoot.computeWorldMatrix(true);
+        result.meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+        const scaledMinY = Math.min(...bounds.map((box) => box.minimumWorld.y));
+        shuttleModelRoot.position.y += terrain.getHeightAt(0, ROCKET_PLATFORM_Z) - scaledMinY + 0.12;
       }
       proceduralRocketRoot.setEnabled(false);
       shuttleModelRoot.setEnabled(true);
@@ -1160,7 +1170,7 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   ctx.restore();
 
   // Seeded stars keep the generated night sky stable between sessions.
-  for (let i = 0; i < 1050; i++) {
+  for (let i = 0; i < 280; i++) {
     const x = random() * 2048;
     const y = 24 + random() * 480;
     const radius = 0.48 + random() ** 3 * 1.65;
