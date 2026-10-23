@@ -184,7 +184,7 @@ export function createGameplayLayer(
   proceduralRocketRoot.parent = rocketRoot;
   // Keep a clearly visible generated rocket in the scene even if the external
   // GLB fails to load or its model data is incomplete.
-  proceduralRocketRoot.scaling.set(1.3, 1.5, 1.3);
+  proceduralRocketRoot.scaling.set(1.5, 1.8, 1.5);
   const shuttleModelRoot = new BABYLONNS.TransformNode("nasa-shuttle-model", scene);
   shuttleModelRoot.parent = rocketRoot;
   shuttleModelRoot.setEnabled(false);
@@ -577,7 +577,7 @@ export function createGameplayLayer(
       };
       const initialBounds = worldBounds();
       if (modelMeshes.length && initialBounds.maxY > initialBounds.minY) {
-        shuttleModelRoot.scaling.setAll(5.8 / (initialBounds.maxY - initialBounds.minY));
+        shuttleModelRoot.scaling.setAll(7.2 / (initialBounds.maxY - initialBounds.minY));
         const scaledBounds = worldBounds();
         const groundY = terrain.getHeightAt(0, ROCKET_PLATFORM_Z);
         // Center the lower body over the support plate. The fins and upper
