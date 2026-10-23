@@ -71,6 +71,7 @@ export class Mission1Screen implements Screen {
   private routeVisible = false;
   private renderedMapObjectiveId = "";
   private lastRadioAt = 0;
+  private launchDayAnnounced = false;
   private readonly onMapKey = (event: KeyboardEvent) => {
     if (event.key.toLowerCase() === "m" && !this.isTypingTarget(event.target)) this.toggleMap();
   };
@@ -951,6 +952,16 @@ export class Mission1Screen implements Screen {
   private openLaunchPreparation(): void {
     if (!this.state.objectives.has("diagnose")) {
       this.showToast(t("DIAGNOSE AND RESOLVE THE TEST ANOMALY BEFORE PREPARING LAUNCH."));
+      return;
+    }
+    if (!this.launchDayAnnounced) {
+      // Narrative transition to launch day (MISSION_01_DESIGN_SPEC, phase F.1).
+      this.launchDayAnnounced = true;
+      this.showChoice(
+        "MARCH 16, 1926 — LAUNCH DAY",
+        "The morning light is flat and pale over the Auburn field. The vehicle stands on the launch frame, and the team is waiting for your call.",
+        [{ label: "Begin launch preparation", run: () => this.openLaunchPreparation() }],
+      );
       return;
     }
     const weather = this.gameplay?.getWeather() ?? "CLOUDY";
