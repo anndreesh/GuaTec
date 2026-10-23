@@ -83,7 +83,7 @@ export function createGameplayLayer(
   const root = new BABYLONNS.TransformNode("gameplay-root", scene);
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
-  const starUpdate = createAuburnStars(BABYLONNS, scene, root, camera);
+  createAuburnStars(BABYLONNS, scene, root);
 
   const terrain = createMarsTerrain(BABYLONNS, scene);
   terrain.ground.parent = root;
@@ -184,7 +184,7 @@ export function createGameplayLayer(
   proceduralRocketRoot.parent = rocketRoot;
   // Keep a clearly visible generated rocket in the scene even if the external
   // GLB fails to load or its model data is incomplete.
-  proceduralRocketRoot.scaling.set(1.18, 1.3, 1.18);
+  proceduralRocketRoot.scaling.set(1.3, 1.5, 1.3);
   const shuttleModelRoot = new BABYLONNS.TransformNode("nasa-shuttle-model", scene);
   shuttleModelRoot.parent = rocketRoot;
   shuttleModelRoot.setEnabled(false);
@@ -577,10 +577,22 @@ export function createGameplayLayer(
       };
       const initialBounds = worldBounds();
       if (modelMeshes.length && initialBounds.maxY > initialBounds.minY) {
-        shuttleModelRoot.scaling.setAll(4.6 / (initialBounds.maxY - initialBounds.minY));
+        shuttleModelRoot.scaling.setAll(5.8 / (initialBounds.maxY - initialBounds.minY));
         const scaledBounds = worldBounds();
         const groundY = terrain.getHeightAt(0, ROCKET_PLATFORM_Z);
-        shuttleModelRoot.position.x += -(scaledBounds.minX + scaledBounds.maxX) / 2;
+        // Center the lower body over the support plate. The fins and upper
+        // hardware can be asymmetric, so centering the full model makes its
+        // "belly" visibly miss the stand.
+        const lowerBodyBoxes = modelMeshes
+          .map((mesh) => mesh.getBoundingInfo().boundingBox)
+          .filter((box) => box.minimumWorld.y <= scaledBounds.minY + 0.9);
+        const baseMinX = lowerBodyBoxes.length
+          ? Math.min(...lowerBodyBoxes.map((box) => box.minimumWorld.x))
+          : scaledBounds.minX;
+        const baseMaxX = lowerBodyBoxes.length
+          ? Math.max(...lowerBodyBoxes.map((box) => box.maximumWorld.x))
+          : scaledBounds.maxX;
+        shuttleModelRoot.position.x += -(baseMinX + baseMaxX) / 2;
         shuttleModelRoot.position.y += groundY + 0.12 - scaledBounds.minY;
         shuttleModelRoot.position.z += ROCKET_PLATFORM_Z - (scaledBounds.minZ + scaledBounds.maxZ) / 2;
       }
@@ -1115,7 +1127,6 @@ export function createGameplayLayer(
       rocketShellMat.dispose();
       rocketMarkingMat.dispose();
       sky.dispose(false, true);
-      scene.onBeforeRenderObservable.remove(starUpdate);
       root.dispose(false, true);
     },
   };
@@ -1198,51 +1209,55 @@ function createAuburnStars(
   BABYLONNS: BabylonNamespace,
   scene: BABYLON.Scene,
   root: BABYLON.TransformNode,
-  camera: BABYLON.ArcRotateCamera,
-): BABYLON.Observer<BABYLON.Scene> {
-  const material = new BABYLONNS.StandardMaterial("auburn-world-star-material", scene);
-  material.diffuseColor = BABYLONNS.Color3.Black();
-  material.emissiveColor = BABYLONNS.Color3.FromHexString("#dce8ff");
-  material.specularColor = BABYLONNS.Color3.Black();
-  material.disableLighting = true;
-  material.backFaceCulling = false;
-  let seed = 19260316;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
+): void {
+  const makeMaterial = (name: string, color: string): BABYLON.StandardMaterial => {
+    const material = new BABYLONNS.StandardMaterial(name, scene);
+    material.diffuseColor = BABYLONNS.Color3.Black();
+    material.emissiveColor = BABYLONNS.Color3.FromHexString(color);
+    material.specularColor = BABYLONNS.Color3.Black();
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    return material;
   };
-  const stars: Array<{ mesh: BABYLON.Mesh; horizontal: number; vertical: number; distance: number }> = [];
-  // Geometry avoids texture UV inversion. Keep stars in the upper part of the
-  // live camera view so they remain visible from the ground-level orbit.
-  for (let i = 0; i < 70; i++) {
-    const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${i}`, {
-      diameter: random() > 0.92 ? 0.36 : 0.14 + random() * 0.12,
-      segments: 6,
-    }, scene);
-    star.parent = root;
-    star.material = material;
-    star.isPickable = false;
-    star.receiveShadows = false;
-    stars.push({
-      mesh: star,
-      horizontal: (random() - 0.5) * 54,
-      vertical: 32 + random() * 14,
-      distance: 74 + (i % 7) * 2,
-    });
-  }
-  return scene.onBeforeRenderObservable.add(() => {
-    const forward = camera.getDirection(BABYLONNS.Axis.Z);
-    const up = camera.getDirection(BABYLONNS.Axis.Y);
-    const right = camera.getDirection(BABYLONNS.Axis.X);
-    const origin = camera.globalPosition;
-    stars.forEach(({ mesh, horizontal, vertical, distance }) => {
-      mesh.position.set(
-        origin.x + forward.x * distance + up.x * vertical + right.x * horizontal,
-        origin.y + forward.y * distance + up.y * vertical + right.y * horizontal,
-        origin.z + forward.z * distance + up.z * vertical + right.z * horizontal,
+  const softIvory = makeMaterial("auburn-star-soft-ivory", "#c7d5ee");
+  const coolWhite = makeMaterial("auburn-star-cool-white", "#edf2ff");
+  const warmAccent = makeMaterial("auburn-star-warm-accent", "#e6bd91");
+  // Fixed celestial chart: six quiet, four-point constellations span the
+  // horizon. They are anchored to the world, not the camera, and leave broad
+  // areas of dark sky empty so the scene reads as composed rather than noisy.
+  const constellations = [
+    { azimuth: -150, elevation: 47, accent: warmAccent },
+    { azimuth: -90, elevation: 39, accent: softIvory },
+    { azimuth: -30, elevation: 52, accent: coolWhite },
+    { azimuth: 30, elevation: 42, accent: softIvory },
+    { azimuth: 90, elevation: 49, accent: warmAccent },
+    { azimuth: 150, elevation: 37, accent: coolWhite },
+  ];
+  const chart = [
+    [-7, -3, 0.2], [-2, 2, 0.42], [3, -1, 0.18], [8, 4, 0.24],
+  ] as const;
+  const skyRadius = 82;
+  let index = 0;
+  for (const constellation of constellations) {
+    for (const [azimuthOffset, elevationOffset, size] of chart) {
+      const azimuth = (constellation.azimuth + azimuthOffset) * Math.PI / 180;
+      const elevation = (constellation.elevation + elevationOffset) * Math.PI / 180;
+      const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index++}`, {
+        diameter: size,
+        segments: 8,
+      }, scene);
+      star.position.set(
+        Math.sin(azimuth) * Math.cos(elevation) * skyRadius,
+        Math.sin(elevation) * skyRadius,
+        Math.cos(azimuth) * Math.cos(elevation) * skyRadius,
       );
-    });
-  });
+      star.parent = root;
+      star.material = size > 0.3 ? constellation.accent : softIvory;
+      star.isPickable = false;
+      star.receiveShadows = false;
+      star.alwaysSelectAsActiveMesh = true;
+    }
+  }
 }
 
 function createWeatheredMaterial(
