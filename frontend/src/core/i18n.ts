@@ -226,6 +226,7 @@ const spanishFromEnglish: Record<string, string> = {
   "MARCH 16, 1926 — LAUNCH DAY": "16 DE MARZO DE 1926 — DÍA DEL LANZAMIENTO",
   "The morning light is flat and pale over the Auburn field. The vehicle stands on the launch frame, and the team is waiting for your call.": "La luz de la mañana es plana y pálida sobre el campo de Auburn. El vehículo está sobre el bastidor de lanzamiento y el equipo espera tu decisión.",
   "Begin launch preparation": "Iniciar preparación del lanzamiento",
+  "“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”": "“Revisa las lecturas otra vez. Estamos quemando gasolina con oxígeno líquido. Si el sistema de alimentación se mantiene estable, la cámara de empuje da un impulso constante. Cada cambio hace el vehículo más resistente, más ligero o más arriesgado. Tenemos que decidir dónde queda el riesgo.”",
   "MAP LEGEND": "LEYENDA DEL MAPA",
   "You · facing direction": "Tú · dirección en la que miras",
   "Locations (numbered)": "Localizaciones (numeradas)",

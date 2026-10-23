@@ -584,12 +584,12 @@ export class Mission1Screen implements Screen {
       this.renderObjectives();
       this.showChoice(
         "PROPULSION ENGINEER · ANDREW WELLS",
-        `“Check the readings again. We're mixing gasoline and liquid oxygen. If the feed pressure holds, the thrust chamber will produce steady lift. We can make it stronger, or lighter. A conservative injector burns steady; a high-flow injector gives more impulse but stresses the lines.”`,
+        `“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”`,
         [
           {
             label: "“Noted. What are our safety margins?”",
             run: () => {
-              this.state.addLogEntry("ANDREW WELLS — Margins are tight. We purge the nitrogen lines before pressurized tests.");
+              this.state.addLogEntry("ANDREW WELLS — Margins are tight. We check every line and gauge before any pressurized test.");
               this.showToast(t("Propulsion notes recorded. Inspect the prototype and meet the team."));
             },
           },
