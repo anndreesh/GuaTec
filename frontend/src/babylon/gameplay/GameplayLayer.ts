@@ -725,7 +725,7 @@ export function createGameplayLayer(
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
   const cameraOffsetRadius = 7;
   camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 34;
+  camera.upperRadiusLimit = 48;
   // Keep the orbit on the upper side of the horizon so the camera can never
   // pass below the ground when the player or camera target moves.
   camera.lowerBetaLimit = 0.35;
@@ -822,8 +822,8 @@ export function createGameplayLayer(
         launchSmoke.stop();
         launchFlame.stop();
         camera.alpha = Math.PI / 2;
-        camera.beta = 1.4;
-        camera.radius = 26;
+        camera.beta = 1.15;
+        camera.radius = 40;
         camera.target.copyFrom(astronaut.root.position);
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
@@ -921,9 +921,9 @@ export function createGameplayLayer(
       camera.inputs.clear();
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
-      camera.radius = 26;
+      camera.radius = 40;
       camera.alpha = Math.PI / 2;
-      camera.beta = 1.4;
+      camera.beta = 1.15;
       camera.target = astronaut.root.position.clone();
     },
     disable() {
@@ -954,8 +954,8 @@ export function createGameplayLayer(
         );
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
-          camera.radius = 26;
-          camera.beta = 1.4;
+          camera.radius = 40;
+          camera.beta = 1.15;
           camera.alpha = Math.PI / 2;
           camera.target.copyFrom(astronaut.root.position);
           openingDone?.();
@@ -1237,7 +1237,7 @@ function createAuburnStars(
   };
   const directions: BABYLON.Vector3[] = [];
   const minimumDot = Math.cos(13 * Math.PI / 180);
-  for (let attempt = 0; directions.length < 32 && attempt < 2000; attempt++) {
+  for (let attempt = 0; directions.length < 22 && attempt < 2000; attempt++) {
     const azimuth = random() * Math.PI * 2;
     const elevation = (25 + random() * 47) * Math.PI / 180;
     const direction = new BABYLONNS.Vector3(
@@ -1251,8 +1251,8 @@ function createAuburnStars(
   }
   const skyRadius = 82;
   directions.forEach((direction, index) => {
-    const focalStar = index % 8 === 0;
-    const size = focalStar ? 0.48 : 0.14 + random() * 0.1;
+    const focalStar = index % 7 === 0;
+    const size = focalStar ? 0.5 : 0.2 + random() * 0.12;
     const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index}`, {
       diameter: size,
       segments: 8,
