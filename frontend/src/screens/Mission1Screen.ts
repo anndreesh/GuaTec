@@ -871,8 +871,8 @@ export class Mission1Screen implements Screen {
     this.gameplay?.setDesign(structure, this.state.engineering.instrumentation);
     this.state.engineering.budget = Math.max(0, 80 - calculateEngineering(this.state.engineering).cost);
     this.state.completeObjective("design");
-    const line = structure === "light" ? MISSION_01_DIALOGUE.engineerLight : structure === "reinforced" ? MISSION_01_DIALOGUE.engineerHeavy : "The design leaves room for both structure and useful measurements.";
-    this.showToast(`DESIGN LOCKED · ${line}`);
+    const line = structure === "light" ? MISSION_01_DIALOGUE.engineerLight : structure === "reinforced" ? MISSION_01_DIALOGUE.engineerHeavy : MISSION_01_DIALOGUE.engineerBalanced;
+    this.showToast(`${t("DESIGN LOCKED")} · ${t(line)}`);
   }
 
   private openTesting(): void {

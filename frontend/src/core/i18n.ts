@@ -220,6 +220,11 @@ const englishExtra: Record<string, string> = {
 };
 
 const spanishFromEnglish: Record<string, string> = {
+  "DESIGN LOCKED": "DISEÑO BLOQUEADO",
+  "It's light. Let's hope we've given it enough stability.": "Es ligero. Esperemos que tenga suficiente estabilidad.",
+  "Better. But heavier.": "Mejor. Pero más pesado.",
+  "This leaves room for both structure and useful measurements.": "Esto deja margen para la estructura y para mediciones útiles.",
+  "The historic 1926 flight was extremely short. Its importance was not its distance. It demonstrated that liquid-fuel propulsion could produce flight.": "El vuelo histórico de 1926 fue muy corto. Su importancia no estuvo en la distancia. Demostró que la propulsión de combustible líquido podía producir vuelo.",
   "Misión 1: The Beginning": "Misión 1: El comienzo",
   "↻ Restart mission": "↻ Reiniciar misión", "Restart mission": "Reiniciar misión",
   "NARRATIVE PROGRESS": "PROGRESO NARRATIVO", "MISSION OBJECTIVES": "OBJETIVOS DE LA MISIÓN",
