@@ -1271,6 +1271,7 @@ export class Mission1Screen implements Screen {
       el("p", { className: "splash-badge", text: t("AUBURN, MASSACHUSETTS") }),
       el("p", { className: "mission-opening-date", text: t("MARCH 1926") }),
       el("h3", { className: "modal-title", text: t("THE BEGINNING") }),
+      el("p", { className: "mission-opening-subtitle", text: t("One small launch can change everything") }),
       el("p", {
         className: "modal-description",
         text: t("A small experimental team is preparing a liquid-fuel rocket. Your work begins before the launch: explore the field, learn what the team knows, and help turn an uncertain experiment into evidence."),

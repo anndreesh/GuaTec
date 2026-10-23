@@ -220,6 +220,7 @@ const englishExtra: Record<string, string> = {
 };
 
 const spanishFromEnglish: Record<string, string> = {
+  "One small launch can change everything": "Un pequeño lanzamiento puede cambiarlo todo",
   "DESIGN LOCKED": "DISEÑO BLOQUEADO",
   "It's light. Let's hope we've given it enough stability.": "Es ligero. Esperemos que tenga suficiente estabilidad.",
   "Better. But heavier.": "Mejor. Pero más pesado.",
