@@ -1225,42 +1225,45 @@ function createAuburnStars(
   const softIvory = makeMaterial("auburn-star-soft-ivory", "#c7d5ee");
   const coolWhite = makeMaterial("auburn-star-cool-white", "#edf2ff");
   const warmAccent = makeMaterial("auburn-star-warm-accent", "#e6bd91");
-  // Fixed celestial chart: six quiet, four-point constellations span the
-  // horizon. They are anchored to the world, not the camera, and leave broad
-  // areas of dark sky empty so the scene reads as composed rather than noisy.
-  const constellations = [
-    { azimuth: -150, elevation: 47, accent: warmAccent },
-    { azimuth: -90, elevation: 39, accent: softIvory },
-    { azimuth: -30, elevation: 52, accent: coolWhite },
-    { azimuth: 30, elevation: 42, accent: softIvory },
-    { azimuth: 90, elevation: 49, accent: warmAccent },
-    { azimuth: 150, elevation: 37, accent: coolWhite },
-  ];
-  const chart = [
-    [-7, -3, 0.2], [-2, 2, 0.42], [3, -1, 0.18], [8, 4, 0.24],
-  ] as const;
-  const skyRadius = 82;
-  let index = 0;
-  for (const constellation of constellations) {
-    for (const [azimuthOffset, elevationOffset, size] of chart) {
-      const azimuth = (constellation.azimuth + azimuthOffset) * Math.PI / 180;
-      const elevation = (constellation.elevation + elevationOffset) * Math.PI / 180;
-      const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index++}`, {
-        diameter: size,
-        segments: 8,
-      }, scene);
-      star.position.set(
-        Math.sin(azimuth) * Math.cos(elevation) * skyRadius,
-        Math.sin(elevation) * skyRadius,
-        Math.cos(azimuth) * Math.cos(elevation) * skyRadius,
-      );
-      star.parent = root;
-      star.material = size > 0.3 ? constellation.accent : softIvory;
-      star.isPickable = false;
-      star.receiveShadows = false;
-      star.alwaysSelectAsActiveMesh = true;
+  // Seeded random points create a natural sky while staying stable between
+  // frames and reloads. A minimum angular gap keeps them from forming noisy
+  // clumps; the world-space positions never depend on camera direction.
+  let seed = 19260316;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const directions: BABYLON.Vector3[] = [];
+  const minimumDot = Math.cos(13 * Math.PI / 180);
+  for (let attempt = 0; directions.length < 32 && attempt < 2000; attempt++) {
+    const azimuth = random() * Math.PI * 2;
+    const elevation = (25 + random() * 47) * Math.PI / 180;
+    const direction = new BABYLONNS.Vector3(
+      Math.sin(azimuth) * Math.cos(elevation),
+      Math.sin(elevation),
+      Math.cos(azimuth) * Math.cos(elevation),
+    );
+    if (directions.every((other) => BABYLONNS.Vector3.Dot(other, direction) < minimumDot)) {
+      directions.push(direction);
     }
   }
+  const skyRadius = 82;
+  directions.forEach((direction, index) => {
+    const focalStar = index % 8 === 0;
+    const size = focalStar ? 0.48 : 0.14 + random() * 0.1;
+    const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index}`, {
+      diameter: size,
+      segments: 8,
+    }, scene);
+    star.position.copyFrom(direction.scale(skyRadius));
+    star.parent = root;
+    star.material = focalStar
+      ? [coolWhite, warmAccent][Math.floor(random() * 2)]!
+      : softIvory;
+    star.isPickable = false;
+    star.receiveShadows = false;
+    star.alwaysSelectAsActiveMesh = true;
+  });
 }
 
 function createWeatheredMaterial(
