@@ -1017,30 +1017,30 @@ export function createGameplayLayer(
         }
       }
 
-      // Movement is camera-relative: forward/right derived from the
-      // camera's horizontal orbit angle so WASD always feels intuitive
-      // regardless of where the player has orbited the view.
+      // Movement remains camera-relative, with the signs reversed to match
+      // the conventional third-person WASD/touch layout requested for this
+      // camera orientation.
       const forward = new BABYLONNS.Vector3(Math.cos(camera.alpha), 0, Math.sin(camera.alpha));
       const right = new BABYLONNS.Vector3(forward.z, 0, -forward.x);
       let moveX = 0;
       let moveZ = 0;
-      moveX += right.x * touchMoveX - forward.x * touchMoveY;
-      moveZ += right.z * touchMoveX - forward.z * touchMoveY;
+      moveX -= right.x * touchMoveX - forward.x * touchMoveY;
+      moveZ -= right.z * touchMoveX - forward.z * touchMoveY;
       if (keysDown.has("w") || keysDown.has("arrowup")) {
-        moveX -= forward.x;
-        moveZ -= forward.z;
-      }
-      if (keysDown.has("s") || keysDown.has("arrowdown")) {
         moveX += forward.x;
         moveZ += forward.z;
       }
-      if (keysDown.has("a") || keysDown.has("arrowleft")) {
-        moveX -= right.x;
-        moveZ -= right.z;
+      if (keysDown.has("s") || keysDown.has("arrowdown")) {
+        moveX -= forward.x;
+        moveZ -= forward.z;
       }
-      if (keysDown.has("d") || keysDown.has("arrowright")) {
+      if (keysDown.has("a") || keysDown.has("arrowleft")) {
         moveX += right.x;
         moveZ += right.z;
+      }
+      if (keysDown.has("d") || keysDown.has("arrowright")) {
+        moveX -= right.x;
+        moveZ -= right.z;
       }
 
       let movementStrength = Math.min(1, Math.hypot(moveX, moveZ));
