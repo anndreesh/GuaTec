@@ -8,11 +8,11 @@ export interface MarsTerrain {
   dispose(): void;
 }
 
-/** Low, smooth rolls keep the field readable and agree with player movement. */
+/** Gentle uneven ground keeps the field readable while giving it a walked-in rural profile. */
 function terrainHeight(x: number, z: number): number {
-  return Math.sin(x * 0.13) * Math.cos(z * 0.11) * 0.12
-    + Math.sin(x * 0.075 + z * 0.16) * 0.075
-    + Math.cos((x - z) * 0.24) * 0.035;
+  return Math.sin(x * 0.13) * Math.cos(z * 0.11) * 0.17
+    + Math.sin(x * 0.075 + z * 0.16) * 0.11
+    + Math.cos((x - z) * 0.24) * 0.045;
 }
 
 /**
@@ -55,6 +55,7 @@ export function createMarsTerrain(
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_nor_gl_1k.jpg",
     "/assets/polyhaven/textures/grass_ground/textures/grass_ground_arm_1k.jpg", 1.4);
   const surfaceRoot = new BABYLONNS.TransformNode("auburn-surface-variation", scene);
+  surfaceRoot.parent = ground;
   const surfacePatches: Array<[number, number, number, boolean]> = [
     [-26, -22, 4.2, false], [-19, 9, 3.8, true], [23, -21, 4.4, true],
     [27, 8, 4.1, false], [-28, 19, 3.7, true], [20, 21, 4.3, false],
@@ -62,14 +63,68 @@ export function createMarsTerrain(
   surfacePatches.forEach(([x, z, radius, grass], i) => {
     const patch = BABYLONNS.MeshBuilder.CreateDisc(`field-surface-patch-${i}`, {
       radius,
-      tessellation: 10,
+      tessellation: 24,
     }, scene);
+    // Deform the circular edge into irregular worn turf and shallow muddy scuffs.
+    const patchPositions = patch.getVerticesData(BABYLONNS.VertexBuffer.PositionKind);
+    if (patchPositions) {
+      for (let v = 0; v < patchPositions.length; v += 3) {
+        const px = patchPositions[v]!;
+        const pz = patchPositions[v + 1]!;
+        const angle = Math.atan2(pz, px);
+        const radial = 1 + Math.sin(angle * 3 + i * 1.7) * 0.075 + Math.cos(angle * 5 - i) * 0.045;
+        patchPositions[v] = px * radial;
+        patchPositions[v + 1] = pz * radial;
+      }
+      patch.updateVerticesData(BABYLONNS.VertexBuffer.PositionKind, patchPositions);
+      patch.createNormals(false);
+    }
     patch.rotation.x = Math.PI / 2;
     patch.position = new BABYLONNS.Vector3(x, terrainHeight(x, z) + 0.015, z);
-    patch.scaling.y = 0.82;
+    patch.scaling.y = 0.78 + (i % 3) * 0.07;
     patch.material = grass ? grassMat : mudMat;
     patch.parent = surfaceRoot;
   });
+
+  // Sparse tufts show the dry field edge without burying walkways or work areas.
+  // Seeded placement keeps the composition stable between scene loads.
+  const grassRandom = (seed: number): number => {
+    const value = Math.sin(seed * 91.713 + 17.131) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const grassBlade = BABYLONNS.MeshBuilder.CreateBox("dry-grass-blade-prototype", {
+    width: 0.035, height: 0.3, depth: 0.035,
+  }, scene);
+  grassBlade.position.set(-1000, -5, -1000);
+  grassBlade.material = grassMat;
+  grassBlade.parent = surfaceRoot;
+  for (let tuftIndex = 0; tuftIndex < 44; tuftIndex++) {
+    const x = -30 + grassRandom(tuftIndex + 1) * 60;
+    const z = -29 + grassRandom(tuftIndex + 101) * 56;
+    const nearLaunch = Math.hypot(x, z + 14) < 7.5;
+    const nearWorkTables = (x > 15 && z > 4 && z < 12)
+      || (x < -3 && x > -11 && z > -3 && z < 12)
+      || (x > 6 && x < 14 && z < -19 && z > -28)
+      || (x > 12 && z < 0 && z > -6);
+    const onMainWalkway = Math.abs(x + 2.5) < 1.15 && z < -1 && z > -24;
+    const onTestWalkway = Math.abs(x + 6) < 1.05 && z > -1 && z < 9;
+    if (nearLaunch || nearWorkTables || onMainWalkway || onTestWalkway) continue;
+    const baseY = terrainHeight(x, z);
+    const blades = 2 + Math.floor(grassRandom(tuftIndex + 205) * 2);
+    for (let bladeIndex = 0; bladeIndex < blades; bladeIndex++) {
+      const height = 0.16 + grassRandom(tuftIndex * 7 + bladeIndex + 307) * 0.2;
+      const blade = grassBlade.createInstance(`dry-grass-tuft-${tuftIndex}-${bladeIndex}`);
+      blade.position = new BABYLONNS.Vector3(
+        x + (grassRandom(tuftIndex * 11 + bladeIndex + 401) - 0.5) * 0.18,
+        baseY + height * 0.5,
+        z + (grassRandom(tuftIndex * 13 + bladeIndex + 503) - 0.5) * 0.18,
+      );
+      blade.scaling.y = height / 0.3;
+      blade.rotation.z = (grassRandom(tuftIndex * 17 + bladeIndex + 607) - 0.5) * 0.5;
+      blade.rotation.y = grassRandom(tuftIndex * 19 + bladeIndex + 709) * Math.PI;
+      blade.parent = surfaceRoot;
+    }
+  }
 
   // Wooden duckboard walkways connecting outdoor stations over muddy March soil
   const woodPlankMat = new BABYLONNS.PBRMaterial("duckboard-wood-mat", scene);
