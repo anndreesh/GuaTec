@@ -1354,6 +1354,14 @@ Object.assign(frenchTranslations, {
 });
 
 Object.assign(spanishFromEnglish, {
+  "The field notes point you to the project director for the briefing.": "Las notas de campo te indican que busques al director del proyecto para la sesión informativa.",
+  "Continue to the project director": "Ir con el director del proyecto",
+  "Director's experiment briefing": "Sesión informativa del director sobre el experimento",
+  "Prototype inspection sketch": "Boceto de inspección del prototipo",
+  "1926 Smoked Paper Flight Trace": "Traza de vuelo de 1926 en papel ahumado",
+  "Test area": "Zona de pruebas",
+  "Launch field": "Campo de lanzamiento",
+  "Observation area": "Área de observación",
   "MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”": "MARA REED: “Grabación lista.”\nANDREW WELLS: “Sistema de alimentación presurizado y listo.”\nING. TOMÁS ELDRICH: “Muy bien. Veamos qué sucede. Despejen la plataforma y tomen posición en el área de observación.”",
   "Review the flight telemetry traces and system performance:": "Revisa las trazas de telemetría y el rendimiento de los sistemas:",
   "Analyze Propulsion & Chamber Pressure": "Analizar propulsión y presión de cámara",
@@ -1373,6 +1381,14 @@ Object.assign(spanishFromEnglish, {
 });
 
 Object.assign(translations, {
+  "The field notes point you to the project director for the briefing.": "The field notes point you to the project director for the briefing.",
+  "Continue to the project director": "Continue to the project director",
+  "Director's experiment briefing": "Director's experiment briefing",
+  "Prototype inspection sketch": "Prototype inspection sketch",
+  "1926 Smoked Paper Flight Trace": "1926 Smoked Paper Flight Trace",
+  "Test area": "Test area",
+  "Launch field": "Launch field",
+  "Observation area": "Observation area",
   "Review the flight telemetry traces and system performance:": "Review the flight telemetry traces and system performance:",
   "Analyze Propulsion & Chamber Pressure": "Analyze Propulsion & Chamber Pressure",
   "Analyze Structural Rigidity & Frame Deflection": "Analyze Structural Rigidity & Frame Deflection",
@@ -1388,6 +1404,14 @@ Object.assign(translations, {
 });
 
 Object.assign(frenchTranslations, {
+  "The field notes point you to the project director for the briefing.": "Les notes de terrain vous invitent à retrouver le directeur du projet pour la séance d’information.",
+  "Continue to the project director": "Rejoindre le directeur du projet",
+  "Director's experiment briefing": "Briefing du directeur sur l’expérience",
+  "Prototype inspection sketch": "Croquis d’inspection du prototype",
+  "1926 Smoked Paper Flight Trace": "Trace de vol de 1926 sur papier fumé",
+  "Test area": "Zone d’essai",
+  "Launch field": "Terrain de lancement",
+  "Observation area": "Zone d’observation",
   "MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”": "MARA REED : « Enregistreur prêt. »\nANDREW WELLS : « Le circuit d’alimentation est sous pression et prêt. »\nING. TOMÁS ELDRICH : « Très bien. Voyons ce qui se passe. Libérez la plateforme et prenez place dans la zone d’observation. »",
   "Review the flight telemetry traces and system performance:": "Examinez les courbes de télémétrie et les performances des systèmes :",
   "Analyze Propulsion & Chamber Pressure": "Analyser la propulsion et la pression de la chambre",
