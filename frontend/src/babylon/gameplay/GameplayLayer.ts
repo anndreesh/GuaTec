@@ -1017,17 +1017,17 @@ export function createGameplayLayer(
         }
       }
 
-      // Movement remains camera-relative, with the signs reversed to match
-      // the conventional third-person WASD/touch layout requested for this
-      // camera orientation.
-      const forward = new BABYLONNS.Vector3(Math.cos(camera.alpha), 0, Math.sin(camera.alpha));
-      const right = new BABYLONNS.Vector3(forward.z, 0, -forward.x);
+      // ArcRotateCamera's alpha vector points from the target toward the
+      // camera. The astronaut's forward direction is the opposite vector.
+      const cameraDirection = new BABYLONNS.Vector3(Math.cos(camera.alpha), 0, Math.sin(camera.alpha));
+      const forward = cameraDirection.scale(-1);
+      const right = new BABYLONNS.Vector3(cameraDirection.z, 0, -cameraDirection.x);
       let moveX = 0;
       let moveZ = 0;
       moveX -= right.x * touchMoveX - forward.x * touchMoveY;
       moveZ -= right.z * touchMoveX - forward.z * touchMoveY;
       if (keysDown.has("w") || keysDown.has("arrowup")) {
-        // W / ↑ moves toward the camera-facing forward direction.
+        // W / ↑ moves forward, away from the camera behind the astronaut.
         moveX += forward.x;
         moveZ += forward.z;
       }
