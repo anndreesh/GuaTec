@@ -38,7 +38,7 @@ export class ReportScreen implements Screen {
     } else {
       panel.append(
         el("div", { className: `outcome-badge outcome-badge--${report.outcome}`, text: t(OUTCOME_LABEL[report.outcome]) }),
-        el("p", { className: "report-summary", text: report.summary }),
+        el("p", { className: "report-summary", text: t(report.summary) }),
         el("h3", { className: "report-subtitle", text: t("Recursos finales") }),
       );
 
@@ -47,7 +47,7 @@ export class ReportScreen implements Screen {
         resourceList.append(
           el("div", {
             className: "report-resource-item",
-            text: `${def.label}: ${Math.round(report.finalResources[def.key] ?? 0)} ${def.unit}`,
+            text: `${t(def.label)}: ${Math.round(report.finalResources[def.key] ?? 0)} ${def.unit}`,
           }),
         );
       }
@@ -56,7 +56,7 @@ export class ReportScreen implements Screen {
       if (report.flightResult) {
         panel.append(
           el("h3", { className: "report-subtitle", text: t("Resultado del vuelo") }),
-          el("p", { text: `${t("Resultado")}: ${report.flightResult.replace(/-/g, " ").toUpperCase()}` }),
+          el("p", { text: `${t("Resultado")}: ${t(report.flightResult.replace(/-/g, " "))}` }),
           el("p", { text: `${t("Recovered data")}: ${Math.round(report.dataRecovered ?? 0)}%` }),
         );
       }
@@ -64,14 +64,14 @@ export class ReportScreen implements Screen {
         const design = report.engineeringConfiguration;
         panel.append(
           el("h3", { className: "report-subtitle", text: t("Configuración de ingeniería") }),
-          el("p", { text: `${t("Structure")}: ${design.structure} · ${t("Instrumentation")}: ${design.instrumentation} · ${t("Priority")}: ${design.priority ?? "stability"}` }),
-          el("p", { text: `${t("Testing decision")}: ${design.testResponse ?? t("Not recorded")} · ${t("Launch decision")}: ${design.launchDecision ?? t("Not recorded")}` }),
+          el("p", { text: `${t("Structure")}: ${t(design.structure)} · ${t("Instrumentation")}: ${t(design.instrumentation)} · ${t("Priority")}: ${t(design.priority ?? "stability")}` }),
+          el("p", { text: `${t("Testing decision")}: ${t(design.testResponse ?? "Not recorded")} · ${t("Launch decision")}: ${t(design.launchDecision ?? "Not recorded")}` }),
         );
       }
       if (report.historicalRecords?.length) {
         panel.append(el("h3", { className: "report-subtitle", text: t("Mission log · historical records") }));
         const records = el("ul", { className: "mission-objective-list" });
-        report.historicalRecords.forEach((record) => records.append(el("li", { text: record })));
+        report.historicalRecords.forEach((record) => records.append(el("li", { text: t(record) })));
         panel.append(records);
       }
       panel.append(
@@ -83,7 +83,7 @@ export class ReportScreen implements Screen {
         el("h3", { className: "report-subtitle", text: t("Estadísticas") }),
         el("p", { text: `${t("Ciclos de preparación completados")}: ${report.ticksSurvived}` }),
         el("p", { text: `${t("Decisiones tomadas")}: ${report.decisionsMade}` }),
-        el("p", { text: `Muestras recolectadas: ${report.samplesCollected}` }),
+        el("p", { text: `${t("Muestras recolectadas")}: ${report.samplesCollected}` }),
       );
     }
 
@@ -101,7 +101,7 @@ export class ReportScreen implements Screen {
         sampleList.append(
           el("div", {
             className: "sample-item",
-            text: `${sample.label} (${sample.type}, calidad ${(sample.quality * 100).toFixed(0)}%)`,
+            text: `${t(sample.label)} (${t(sample.type)}, ${t("calidad")} ${(sample.quality * 100).toFixed(0)}%)`,
           }),
         );
       }
