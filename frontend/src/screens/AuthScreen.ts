@@ -67,7 +67,7 @@ export class AuthScreen implements Screen {
           confirmation.hidden = false;
           confirmation.required = true;
         }
-        if (submit) submit.textContent = "Crear cuenta con este correo";
+        if (submit) submit.textContent = t("Crear cuenta con este correo");
         panel.querySelector(".auth-divider")?.setAttribute("hidden", "true");
         panel.querySelector("#provider-list")?.setAttribute("hidden", "true");
         AuthStore.clearPendingOAuthEmail();
@@ -151,7 +151,7 @@ export class AuthScreen implements Screen {
     });
     const toggle = el("button", {
       className: "btn btn-ghost auth-toggle",
-      text: "Crear una cuenta",
+      text: t("Crear una cuenta"),
       attrs: { type: "button" },
     });
 
@@ -191,7 +191,7 @@ export class AuthScreen implements Screen {
   ): Promise<void> {
     error.textContent = "";
     if (this.isRegistering && credentials.password !== confirmation) {
-      error.textContent = "Las contraseñas no coinciden.";
+      error.textContent = t("Las contraseñas no coinciden.");
       return;
     }
 
