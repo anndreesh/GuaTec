@@ -3,6 +3,7 @@ import type { MissionPointOfInterest } from "@/config/gameConfig";
 import { createAstronautCharacter, type BabylonNamespace } from "@/babylon/gameplay/AstronautCharacter";
 import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 import { createLaunchSupport } from "./LaunchSupport";
+import { createWorkshopAssets, type WorkshopAsset } from "./WorkshopAssets";
 
 export interface NearbyPoi {
   id: string;
@@ -232,6 +233,22 @@ export function createGameplayLayer(
   gaugeFaceMat.roughness = 0.94;
   gaugeFaceMat.metallic = 0;
 
+  const chartTexture = new BABYLONNS.DynamicTexture("pressure-recorder-ruled-chart", { width: 1024, height: 512 }, scene, false);
+  const chartContext = chartTexture.getContext() as unknown as CanvasRenderingContext2D;
+  chartContext.fillStyle = "#e4d5b8"; chartContext.fillRect(0, 0, 1024, 512);
+  chartContext.strokeStyle = "#b69d7b"; chartContext.lineWidth = 1;
+  for (let x = 0; x < 1024; x += 24) { chartContext.beginPath(); chartContext.moveTo(x, 0); chartContext.lineTo(x, 512); chartContext.stroke(); }
+  for (let y = 0; y < 512; y += 24) { chartContext.beginPath(); chartContext.moveTo(0, y); chartContext.lineTo(1024, y); chartContext.stroke(); }
+  chartContext.strokeStyle = "#3e5660"; chartContext.lineWidth = 3; chartContext.beginPath();
+  for (let x = 0; x < 1024; x += 3) {
+    const y = 275 - Math.sin(x * 0.018) * 14 - Math.sin(x * 0.19) * 4 - (x > 340 && x < 680 ? Math.sin((x - 340) * Math.PI / 340) * 130 : 0);
+    if (x === 0) chartContext.moveTo(x, y); else chartContext.lineTo(x, y);
+  }
+  chartContext.stroke(); chartTexture.update(false);
+  const chartMat = new BABYLONNS.PBRMaterial("cream-pressure-trace-paper", scene);
+  chartMat.albedoTexture = chartTexture; chartMat.roughness = 1;
+
+  const gaugeNeedles: BABYLON.Mesh[] = [];
   const addGauge = (name: string, position: BABYLON.Vector3, radius: number, parent: BABYLON.TransformNode): void => {
     const body = BABYLONNS.MeshBuilder.CreateCylinder(`${name}-cast-case`, { height: radius * 0.38, diameter: radius * 2.16, tessellation: 32 }, scene);
     body.position = position.clone();
@@ -240,10 +257,12 @@ export function createGameplayLayer(
     body.parent = parent;
     const bezel = BABYLONNS.MeshBuilder.CreateTorus(`${name}-brass-bezel`, { diameter: radius * 2.04, thickness: radius * 0.12, tessellation: 40 }, scene);
     bezel.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.2);
+    bezel.rotation.x = Math.PI / 2;
     bezel.material = brassMat;
     bezel.parent = parent;
-    const face = BABYLONNS.MeshBuilder.CreatePlane(`${name}-printed-face`, { size: radius * 1.84 }, scene);
+    const face = BABYLONNS.MeshBuilder.CreateDisc(`${name}-printed-face`, { radius: radius * 0.92, tessellation: 48 }, scene);
     face.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.21);
+    face.rotation.y = Math.PI;
     face.material = gaugeFaceMat;
     face.parent = parent;
     const needle = BABYLONNS.MeshBuilder.CreateBox(`${name}-needle`, { width: radius * 0.045, height: radius * 0.92, depth: radius * 0.025 }, scene);
@@ -251,6 +270,7 @@ export function createGameplayLayer(
     needle.rotation.z = -0.43;
     needle.material = markerMat;
     needle.parent = parent;
+    gaugeNeedles.push(needle);
     const pivot = BABYLONNS.MeshBuilder.CreateSphere(`${name}-needle-pivot`, { diameter: radius * 0.16, segments: 12 }, scene);
     pivot.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.25);
     pivot.material = brassMat;
@@ -606,6 +626,7 @@ export function createGameplayLayer(
     return path;
   }
 
+  const workshopAssets = createWorkshopAssets(BABYLONNS, scene, shadowGenerator);
   const woodMat = createWeatheredMaterial(BABYLONNS, scene, "gameplay-weathered-wood", "#75583f", "wood");
   const paperMat = new BABYLONNS.PBRMaterial("gameplay-aged-paper", scene);
   paperMat.albedoColor = BABYLONNS.Color3.FromHexString("#cbbb96");
@@ -706,65 +727,55 @@ export function createGameplayLayer(
     }
   })();
 
-  // Open equipment shelter: a simple rural timber shed storing the field kit.
-  const shed = new BABYLONNS.TransformNode("open-equipment-shelter", scene);
-  shed.position = new BABYLONNS.Vector3(14.2, terrain.getHeightAt(14.2, -2.8), -2.8);
+  // A framed service shed: roof rests on rafters, siding meets the sill and
+  // the open front leaves room to walk up to real storage furniture.
+  const shed = new BABYLONNS.TransformNode("field-service-shed", scene);
+  shed.position.set(14.2, terrain.getHeightAt(14.2, -2.8), -2.8);
   shed.parent = root;
-  collisionObstacles.push({ minX: 12.25, maxX: 16.15, minZ: -4.15, maxZ: -1.45 });
-  for (const x of [-1.55, 1.55]) for (const z of [-0.95, 0.95]) {
-    const post = BABYLONNS.MeshBuilder.CreateBox(`shelter-post-${x}-${z}`, { width: 0.13, height: 2.05, depth: 0.13 }, scene);
-    post.position = new BABYLONNS.Vector3(x, 1.02, z);
-    post.material = darkMetalMat;
-    post.parent = shed;
+  const shedBox = (name: string, width: number, height: number, depth: number, x: number, y: number, z: number, material: BABYLON.Material = woodMat) => {
+    const mesh = BABYLONNS.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
+    mesh.parent = shed; mesh.position.set(x, y, z); mesh.material = material;
+    mesh.receiveShadows = true; mesh.checkCollisions = true;
+    shadowGenerator.addShadowCaster(mesh);
+    return mesh;
+  };
+  const roofMat = createWeatheredMaterial(BABYLONNS, scene, "shed-weathered-zinc-roof", "#52615d", "metal");
+  for (let board = 0; board < 15; board++) shedBox(`shed-floor-board-${board}`, 0.227, 0.07, 2.28, -1.64 + board * 0.235, 0.185, 0);
+  for (const x of [-1.7, 1.7]) for (const z of [-1.05, 1.05]) {
+    shedBox(`shed-concrete-pier-${x}-${z}`, 0.3, 0.22, 0.3, x, 0.11, z, launchPadMat);
+    shedBox(`shed-timber-post-${x}-${z}`, 0.16, 2.22, 0.16, x, 1.29, z);
+    shedBox(`shed-steel-post-socket-${x}-${z}`, 0.19, 0.2, 0.19, x, 0.28, z, darkMetalMat);
+    collisionObstacles.push({ minX: 14.2 + x - 0.12, maxX: 14.2 + x + 0.12, minZ: -2.8 + z - 0.12, maxZ: -2.8 + z + 0.12 });
+    createBeam(`shed-knee-brace-${x}-${z}`, new BABYLONNS.Vector3(x, 1.83, z), new BABYLONNS.Vector3(x - Math.sign(x) * 0.47, 2.31, z), 0.09, woodMat, shed);
   }
-  const shedRidge = BABYLONNS.MeshBuilder.CreateBox("shelter-ridge-beam", { width: 3.55, height: 0.12, depth: 0.14 }, scene);
-  shedRidge.position.y = 2.17;
-  shedRidge.material = woodMat;
-  shedRidge.parent = shed;
+  for (const z of [-1.05, 1.05]) shedBox(`shed-eave-beam-${z}`, 3.7, 0.18, 0.16, 0, 2.34, z);
+  for (const x of [-1.7, 0, 1.7]) {
+    for (const side of [-1, 1]) createBeam(`shed-rafter-${x}-${side}`, new BABYLONNS.Vector3(x, 2.35, side * 1.36), new BABYLONNS.Vector3(x, 2.84, 0), 0.09, woodMat, shed);
+    shedBox(`shed-tie-beam-${x}`, 0.12, 0.13, 2.27, x, 2.31, 0);
+  }
+  for (let i = 0; i < 15; i++) {
+    const x = -1.58 + i * 0.226;
+    shedBox(`shed-back-siding-${i}`, 0.216, 1.92, 0.045, x, 1.23, -1.1);
+    for (const y of [0.43, 2.02]) addFrontBolt(`shed-siding-nail-${i}-${y}`, x, y, -1.13, shed, 0.022);
+  }
+  shedBox("shed-rear-sill", 3.55, 0.13, 0.12, 0, 0.27, -1.05);
+  collisionObstacles.push({ minX: 12.45, maxX: 15.95, minZ: -3.95, maxZ: -3.82 });
   for (const side of [-1, 1]) {
-    const roof = BABYLONNS.MeshBuilder.CreateBox(`shelter-gable-roof-${side}`, { width: 3.55, height: 0.11, depth: 1.18 }, scene);
-    roof.position = new BABYLONNS.Vector3(0, 2.02, side * 0.45);
-    roof.rotation.x = side * 0.47;
-    roof.material = woodMat;
-    roof.parent = shed;
-    const brace = BABYLONNS.MeshBuilder.CreateBox(`shelter-roof-brace-${side}`, { width: 0.1, height: 0.85, depth: 0.1 }, scene);
-    brace.position = new BABYLONNS.Vector3(side * 1.1, 1.57, 0);
-    brace.rotation.z = -side * 0.45;
-    brace.material = darkMetalMat;
-    brace.parent = shed;
-  }
-  // Shelves, a latched field chest, and long-handled tools make the purpose legible.
-  for (const y of [0.78, 1.35]) {
-    const shelf = BABYLONNS.MeshBuilder.CreateBox(`shelter-tool-shelf-${y}`, { width: 1.25, height: 0.09, depth: 0.35 }, scene);
-    shelf.position = new BABYLONNS.Vector3(-0.72, y, -0.66);
-    shelf.material = woodMat;
-    shelf.parent = shed;
-    for (let i = 0; i < 3; i++) {
-      const caseBox = BABYLONNS.MeshBuilder.CreateBox(`shelter-tool-case-${y}-${i}`, { width: 0.27, height: 0.2, depth: 0.24 }, scene);
-      caseBox.position = new BABYLONNS.Vector3(-1.12 + i * 0.39, y + 0.14, -0.65);
-      caseBox.material = i === 1 ? markerMat : propMat;
-      caseBox.parent = shed;
+    const roof = shedBox(`shed-zinc-roof-panel-${side}`, 3.95, 0.045, 1.57, 0, 2.58, side * 0.7, roofMat);
+    roof.position.y = 2.65;
+    roof.rotation.x = side * 0.345;
+    for (let rib = 0; rib < 32; rib++) {
+      const raised = shedBox(`shed-roof-standing-seam-${side}-${rib}`, 0.022, 0.034, 1.57, -1.9 + rib * 0.123, 2.682, side * 0.7, roofMat);
+      raised.rotation.x = side * 0.345;
     }
   }
-  const fieldChest = BABYLONNS.MeshBuilder.CreateBox("shelter-field-chest", { width: 0.85, height: 0.55, depth: 0.7 }, scene);
-  fieldChest.position = new BABYLONNS.Vector3(0.9, 0.32, 0.38);
-  fieldChest.material = woodMat;
-  fieldChest.parent = shed;
-  const chestLatch = BABYLONNS.MeshBuilder.CreateBox("shelter-chest-latch", { width: 0.12, height: 0.2, depth: 0.035 }, scene);
-  chestLatch.position = new BABYLONNS.Vector3(0.9, 0.35, 0.02);
-  chestLatch.material = markerMat;
-  chestLatch.parent = shed;
-  for (let i = 0; i < 2; i++) {
-    const handle = BABYLONNS.MeshBuilder.CreateCylinder(`shelter-tool-handle-${i}`, { height: 0.72, diameter: 0.035 }, scene);
-    handle.position = new BABYLONNS.Vector3(1.25 + i * 0.17, 0.55, -0.54);
-    handle.rotation.z = -0.18;
-    handle.material = darkMetalMat;
-    handle.parent = shed;
-    const grip = BABYLONNS.MeshBuilder.CreateBox(`shelter-tool-grip-${i}`, { width: 0.18, height: 0.12, depth: 0.08 }, scene);
-    grip.position = new BABYLONNS.Vector3(1.25 + i * 0.17, 0.92, -0.54);
-    grip.material = markerMat;
-    grip.parent = shed;
-  }
+  shedBox("shed-ridge-cap", 4.02, 0.07, 0.19, 0, 2.94, 0, roofMat);
+  void workshopAssets.place("worn_metal_rack", shed, new BABYLONNS.Vector3(-0.69, 0.22, -0.64), { width: 1.5, height: 1.7, depth: 0.48 });
+  void workshopAssets.place("metal_toolbox", shed, new BABYLONNS.Vector3(0.93, 0.22, 0.18), { width: 0.86 }, -0.14);
+  collisionObstacles.push({ minX: 12.73, maxX: 14.26, minZ: -3.71, maxZ: -3.19 });
+  collisionObstacles.push({ minX: 14.65, maxX: 15.63, minZ: -2.92, maxZ: -2.35 });
+  void workshopAssets.place("metal_toolbox", shed, new BABYLONNS.Vector3(-0.78, 0.88, -0.65), { width: 0.62 }, 0.09);
+  void workshopAssets.place("adjustable_wrench", shed, new BABYLONNS.Vector3(-0.39, 1.42, -0.66), { width: 0.36, rotationZ: Math.PI / 2 }, 0.3);
 
   // Every work area is an outdoor station: plans, engine parts, recorders,
   // or the flight log make its mission role visible before the player reads it.
@@ -785,57 +796,27 @@ export function createGameplayLayer(
     });
     const y = terrain.getHeightAt(station.x, station.z);
     const tableDepth = station.kind === "propulsion" ? 1.1 : 0.9;
-    const tabletopY = y + 0.94;
-    const boardWidth = (station.width - 0.12) / 4;
-    // Four separate, slightly uneven boards and a dark apron replace the flat
-    // single-block tabletop; gaps expose the solid joinery underneath.
-    for (let board = 0; board < 4; board++) {
-      const plank = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-oak-plank-${board}`, {
-        width: boardWidth, height: 0.105, depth: tableDepth,
-      }, scene);
-      plank.position = new BABYLONNS.Vector3(station.x - station.width / 2 + 0.06 + boardWidth * (board + 0.5), tabletopY, station.z);
-      plank.material = woodMat;
-      plank.parent = root;
-      plank.receiveShadows = true;
+    const tableModel: WorkshopAsset = station.kind === "propulsion" ? "WoodenTable_03"
+      : station.kind === "analysis" ? "metal_office_desk" : "painted_wooden_table";
+    const tableLoad = workshopAssets.place(tableModel, root, new BABYLONNS.Vector3(station.x, y, station.z), {
+      width: station.width, height: 0.99, depth: tableDepth,
+    });
+    void workshopAssets.place("wooden_stool_01", root, new BABYLONNS.Vector3(station.x - station.width / 2 - 0.48, y, station.z + 0.38), { height: 0.59 }, 0.21);
+    const stoolX = station.x - station.width / 2 - 0.48;
+    collisionObstacles.push({ minX: stoolX - 0.23, maxX: stoolX + 0.23, minZ: station.z + 0.15, maxZ: station.z + 0.61 });
+    if (station.kind === "propulsion" || station.kind === "drafting") {
+      void workshopAssets.place("metal_toolbox", root, new BABYLONNS.Vector3(station.x + 0.34, y + 1.0, station.z - 0.26), { width: 0.58 }, 0.06);
+      void workshopAssets.place("adjustable_wrench", root, new BABYLONNS.Vector3(station.x - 0.2, y + 1.005, station.z + 0.2), { width: 0.43, rotationZ: Math.PI / 2 }, -0.42);
     }
-    for (const end of [-1, 1]) {
-      const apron = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-long-apron-${end}`, { width: station.width - 0.18, height: 0.14, depth: 0.1 }, scene);
-      apron.position = new BABYLONNS.Vector3(station.x, y + 0.84, station.z + end * (tableDepth / 2 - 0.08));
-      apron.material = darkMetalMat;
-      apron.parent = root;
-    }
-    for (const side of [-1, 1]) {
-      const endApron = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-end-apron-${side}`, { width: 0.1, height: 0.14, depth: tableDepth - 0.16 }, scene);
-      endApron.position = new BABYLONNS.Vector3(station.x + side * (station.width / 2 - 0.06), y + 0.84, station.z);
-      endApron.material = darkMetalMat;
-      endApron.parent = root;
-    }
-    for (const side of [-1, 1]) for (const end of [-1, 1]) {
-      const topX = station.x + side * (station.width / 2 - 0.16);
-      const topZ = station.z + end * (tableDepth / 2 - 0.14);
-      createBeam(`${station.name}-tapered-leg-${side}-${end}`,
-        new BABYLONNS.Vector3(topX, y + 0.84, topZ),
-        new BABYLONNS.Vector3(topX + side * 0.045, y + 0.07, topZ + end * 0.045),
-        0.09, darkMetalMat, root);
-      const foot = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-cast-foot-${side}-${end}`, { width: 0.21, height: 0.06, depth: 0.21 }, scene);
-      foot.position = new BABYLONNS.Vector3(topX + side * 0.045, y + 0.04, topZ + end * 0.045);
-      foot.material = darkMetalMat;
-      foot.parent = root;
-      const shoe = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-foot-bolt-${side}-${end}`, { height: 0.025, diameter: 0.07, tessellation: 6 }, scene);
-      shoe.position = new BABYLONNS.Vector3(foot.position.x, y + 0.08, foot.position.z);
-      shoe.material = brassMat;
-      shoe.parent = root;
-    }
-    // Low stretchers tie the legs together and give the old field benches weight.
-    for (const end of [-1, 1]) {
-      createBeam(`${station.name}-lower-stretcher-${end}`,
-        new BABYLONNS.Vector3(station.x - station.width * 0.38, y + 0.31, station.z + end * (tableDepth / 2 - 0.16)),
-        new BABYLONNS.Vector3(station.x + station.width * 0.38, y + 0.31, station.z + end * (tableDepth / 2 - 0.16)),
-        0.065, darkMetalMat, root);
-    }
-    for (const side of [-1, 1]) {
-      for (const end of [-1, 1]) addFrontBolt(`${station.name}-apron-rivet-${side}-${end}`,
-        station.x + side * (station.width / 2 - 0.16), y + 0.84, station.z + end * (tableDepth / 2 - 0.075), root, 0.07);
+    if (station.kind === "analysis" || station.kind === "drafting" || station.kind === "recorder") {
+      void workshopAssets.place("vintage_oil_lamp", root, new BABYLONNS.Vector3(station.x + station.width / 2 - 0.19, y + 1, station.z - 0.21), { height: 0.4 }).then(async lampModel => {
+        const table = await tableLoad;
+        if (!lampModel || !table || root.isDisposed()) return;
+        const light = new BABYLONNS.PointLight(`${station.name}-oil-lamp-light`, new BABYLONNS.Vector3(station.x + station.width / 2 - 0.19, y + 1.3, station.z - 0.21), scene);
+        light.parent = root; light.diffuse = BABYLONNS.Color3.FromHexString("#ffd6a0");
+        light.intensity = 0.7; light.range = 3; light.radius = 0.25;
+        light.includedOnlyMeshes = [...table.getChildMeshes(), ...lampModel.getChildMeshes(), ...root.getChildMeshes().filter(mesh => mesh.name.startsWith(station.name))];
+      });
     }
     const addBox = (name: string, width: number, height: number, depth: number, x: number, topY: number, z: number, material: BABYLON.Material) => {
       const mesh = BABYLONNS.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
@@ -857,24 +838,40 @@ export function createGameplayLayer(
     }
     if (station.kind === "propulsion") {
       // Bench vise, injector mock-up, short pressure line, and an analogue gauge.
-      addBox(`${station.name}-vise-base`, 0.42, 0.12, 0.3, station.x - 0.74, y + 1.05, station.z - 0.08, darkMetalMat);
-      addBox(`${station.name}-vise-jaw-a`, 0.11, 0.19, 0.3, station.x - 0.9, y + 1.2, station.z - 0.08, markerMat);
-      addBox(`${station.name}-vise-jaw-b`, 0.11, 0.19, 0.3, station.x - 0.58, y + 1.2, station.z - 0.08, markerMat);
-      const injector = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-injector`, { height: 0.6, diameterTop: 0.12, diameterBottom: 0.24, tessellation: 12 }, scene);
-      injector.position = new BABYLONNS.Vector3(station.x + 0.3, y + 1.2, station.z - 0.06);
-      injector.rotation.z = Math.PI / 2;
-      injector.material = propMat;
-      injector.parent = root;
-      createBeam(`${station.name}-pressure-line`, new BABYLONNS.Vector3(station.x + 0.55, y + 1.12, station.z + 0.08), new BABYLONNS.Vector3(station.x + 0.84, y + 1.34, station.z + 0.08), 0.045, markerMat, root);
-      createBeam(`${station.name}-gauge-neck`, new BABYLONNS.Vector3(station.x + 0.88, y + 1.02, station.z + 0.08), new BABYLONNS.Vector3(station.x + 0.88, y + 1.27, station.z + 0.08), 0.09, darkMetalMat, root);
+      // Cast vise, guide screw, machined chamber and flanged fittings.
+      const viseX = station.x - 0.9;
+      addBox(`${station.name}-vise-mount`, 0.46, 0.065, 0.34, viseX, y + 1.025, station.z + 0.22, darkMetalMat);
+      const viseBody = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-vise-swivel-base`, { diameter: 0.29, height: 0.1, tessellation: 32 }, scene);
+      viseBody.position.set(viseX, y + 1.1, station.z + 0.22); viseBody.material = propMat; viseBody.parent = root;
+      for (const side of [-1, 1]) {
+        addBox(`${station.name}-cast-jaw-${side}`, 0.1, 0.17, 0.28, viseX + side * 0.11, y + 1.23, station.z + 0.22, propMat);
+        addBox(`${station.name}-hardened-jaw-${side}`, 0.028, 0.08, 0.29, viseX + side * 0.055, y + 1.28, station.z + 0.22, darkMetalMat);
+      }
+      createBeam(`${station.name}-vise-lead-screw`, new BABYLONNS.Vector3(viseX - 0.35, y + 1.16, station.z + 0.22), new BABYLONNS.Vector3(viseX + 0.2, y + 1.16, station.z + 0.22), 0.045, brassMat, root);
+      createBeam(`${station.name}-vise-sliding-handle`, new BABYLONNS.Vector3(viseX - 0.35, y + 1.01, station.z + 0.22), new BABYLONNS.Vector3(viseX - 0.35, y + 1.32, station.z + 0.22), 0.023, darkMetalMat, root);
+      const profile = [[0.08, 0], [0.11, 0.025], [0.11, 0.07], [0.07, 0.11], [0.065, 0.22], [0.095, 0.3], [0.13, 0.34], [0.13, 0.39], [0.05, 0.39]].map(([r, h]) => new BABYLONNS.Vector3(r, h, 0));
+      const chamber = BABYLONNS.MeshBuilder.CreateLathe(`${station.name}-machined-test-chamber`, { shape: profile, tessellation: 48, sideOrientation: BABYLONNS.Mesh.DOUBLESIDE, cap: BABYLONNS.Mesh.CAP_ALL }, scene);
+      chamber.rotation.z = Math.PI / 2; chamber.position.set(station.x + 0.16, y + 1.19, station.z + 0.02); chamber.material = propMat; chamber.parent = root;
+      for (const dx of [-0.17, 0.13]) addBox(`${station.name}-chamber-saddle-${dx}`, 0.07, 0.1, 0.22, station.x + dx, y + 1.045, station.z + 0.02, darkMetalMat);
+      const hosePath = BABYLONNS.Curve3.CreateCatmullRomSpline([
+        new BABYLONNS.Vector3(station.x + 0.18, y + 1.17, station.z + 0.02),
+        new BABYLONNS.Vector3(station.x + 0.4, y + 1.06, station.z + 0.25),
+        new BABYLONNS.Vector3(station.x + 0.76, y + 1.05, station.z + 0.25),
+        new BABYLONNS.Vector3(station.x + 0.88, y + 1.25, station.z + 0.08),
+      ], 24).getPoints();
+      const hose = BABYLONNS.MeshBuilder.CreateTube(`${station.name}-flexible-pressure-hose`, { path: hosePath, radius: 0.018, tessellation: 10 }, scene);
+      hose.material = saddleLeatherMat; hose.parent = root;
+      createBeam(`${station.name}-gauge-neck`, new BABYLONNS.Vector3(station.x + 0.88, y + 1.0, station.z + 0.08), new BABYLONNS.Vector3(station.x + 0.88, y + 1.27, station.z + 0.08), 0.055, brassMat, root);
       addGauge(`${station.name}-pressure-gauge`, new BABYLONNS.Vector3(station.x + 0.88, y + 1.42, station.z + 0.08), 0.19, root);
     }
     if (station.kind === "recorder") {
       // A paper-drum recorder, stylus arm, and paired test-pressure dials.
+      addBox(`${station.name}-recorder-chassis`, 0.64, 0.06, 0.4, station.x - 0.48, y + 1.04, station.z - 0.06, darkMetalMat);
+      for (const side of [-1, 1]) addBox(`${station.name}-drum-bearing-${side}`, 0.055, 0.15, 0.16, station.x - 0.48 + side * 0.25, y + 1.14, station.z - 0.06, brassMat);
       const drum = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-chart-drum`, { height: 0.43, diameter: 0.3, tessellation: 20 }, scene);
       drum.position = new BABYLONNS.Vector3(station.x - 0.48, y + 1.2, station.z - 0.06);
       drum.rotation.z = Math.PI / 2;
-      drum.material = paperMat;
+      drum.material = chartMat;
       drum.parent = root;
       const axle = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-drum-axle`, { height: 0.55, diameter: 0.055, tessellation: 12 }, scene);
       axle.position.copyFrom(drum.position);
@@ -884,14 +881,15 @@ export function createGameplayLayer(
       for (const side of [-1, 1]) {
         const collar = BABYLONNS.MeshBuilder.CreateTorus(`${station.name}-drum-end-collar-${side}`, { diameter: 0.31, thickness: 0.045, tessellation: 24 }, scene);
         collar.position = new BABYLONNS.Vector3(station.x - 0.48 + side * 0.21, y + 1.2, station.z - 0.06);
-        collar.rotation.y = Math.PI / 2;
+        collar.rotation.z = Math.PI / 2;
         collar.material = brassMat;
         collar.parent = root;
       }
       createBeam(`${station.name}-stylus`, new BABYLONNS.Vector3(station.x - 0.08, y + 1.34, station.z + 0.2), new BABYLONNS.Vector3(station.x - 0.33, y + 1.19, station.z + 0.03), 0.035, markerMat, root);
       for (let i = 0; i < 2; i++) {
         const dialX = station.x + 0.44 + i * 0.42;
-        addBox(`${station.name}-dial-foot-${i}`, 0.3, 0.15, 0.24, dialX, y + 1.08, station.z - 0.06, darkMetalMat);
+        const foot = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-cast-dial-foot-${i}`, { diameter: 0.23, height: 0.045, tessellation: 32 }, scene);
+        foot.position.set(dialX, y + 1.015, station.z - 0.06); foot.material = darkMetalMat; foot.parent = root;
         createBeam(`${station.name}-dial-stem-${i}`, new BABYLONNS.Vector3(dialX, y + 1.08, station.z - 0.06), new BABYLONNS.Vector3(dialX, y + 1.23, station.z - 0.06), 0.06, brassMat, root);
         addGauge(`${station.name}-dial-${i}`, new BABYLONNS.Vector3(dialX, y + 1.31, station.z - 0.06), 0.14, root);
       }
@@ -912,20 +910,35 @@ export function createGameplayLayer(
       glass.rotation.x = Math.PI / 2;
       glass.material = launchContactMat;
       glass.parent = root;
-      for (const side of [-1, 1]) {
-        createBeam(`${station.name}-tripod-leg-${side}`, new BABYLONNS.Vector3(station.x + 0.68, y + 1.01, station.z - 0.1), new BABYLONNS.Vector3(station.x + 0.68 + side * 0.24, y + 0.04, station.z - 0.32), 0.035, darkMetalMat, root);
+      for (let fold = 0; fold < 9; fold++) {
+        const ring = addBox(`${station.name}-camera-bellows-${fold}`, 0.32 - fold * 0.006, 0.24 - fold * 0.004, 0.018, station.x + 0.68, y + 1.16, station.z - 0.05 + fold * 0.018, saddleLeatherMat);
+        ring.rotation.z = 0.015;
+      }
+      for (let leg = 0; leg < 3; leg++) {
+        const angle = (leg * Math.PI * 2) / 3;
+        createBeam(`${station.name}-tripod-leg-${leg}`, new BABYLONNS.Vector3(station.x + 0.68, y + 1.01, station.z - 0.1), new BABYLONNS.Vector3(station.x + 0.68 + Math.cos(angle) * 0.29, y + 0.05, station.z - 0.1 + Math.sin(angle) * 0.29), 0.035, woodMat, root);
       }
     }
     if (station.kind === "analysis") {
       // Sheltered flight-log desk with a specimen tray and ink bottle.
       const tray = addBox(`${station.name}-recovered-parts-tray`, 0.58, 0.06, 0.4, station.x + 0.52, y + 1.04, station.z + 0.12, darkMetalMat);
-      tray.rotation.y = -0.1;
+      tray.rotation.y = 0;
+      for (const dz of [-0.19, 0.19]) addBox(`${station.name}-tray-long-rim-${dz}`, 0.58, 0.045, 0.018, station.x + 0.52, y + 1.085, station.z + 0.12 + dz, darkMetalMat);
+      for (const dx of [-0.28, 0.28]) addBox(`${station.name}-tray-end-rim-${dx}`, 0.018, 0.045, 0.4, station.x + 0.52 + dx, y + 1.085, station.z + 0.12, darkMetalMat);
+      for (let part = 0; part < 3; part++) {
+        const recovered = BABYLONNS.MeshBuilder.CreateTorus(`${station.name}-recovered-seal-${part}`, { diameter: 0.095, thickness: 0.018, tessellation: 20 }, scene);
+        recovered.position.set(station.x + 0.35 + part * 0.16, y + 1.084, station.z + 0.12); recovered.material = brassMat; recovered.parent = root;
+      }
       const ink = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-inkwell`, { height: 0.14, diameter: 0.12, tessellation: 12 }, scene);
       ink.position = new BABYLONNS.Vector3(station.x + 0.82, y + 1.13, station.z - 0.19);
       ink.material = markerMat;
       ink.parent = root;
     }
   }
+
+  void workshopAssets.place("portable_welding_cart", root,
+    new BABYLONNS.Vector3(20.7, terrain.getHeightAt(20.7, 7.8), 7.8), { height: 1.5 }, -0.42);
+  collisionObstacles.push({ minX: 20.25, maxX: 21.15, minZ: 7.4, maxZ: 8.2 });
 
   // Timber-and-canvas observation awning shelters the analysis desk while
   // leaving an unobstructed sightline to the launch apron.
@@ -939,11 +952,43 @@ export function createGameplayLayer(
     post.material = darkMetalMat;
     post.parent = analysisAwning;
   }
-  const canopy = BABYLONNS.MeshBuilder.CreateBox("analysis-awning-canvas", { width: 2.75, height: 0.09, depth: 2.45 }, scene);
-  canopy.position.y = 2.18;
-  canopy.rotation.z = -0.09;
-  canopy.material = woodMat;
-  canopy.parent = analysisAwning;
+  const canvasTexture = new BABYLONNS.DynamicTexture("tent-canvas-weave", { width: 512, height: 512 }, scene, false);
+  const canvasContext = canvasTexture.getContext() as unknown as CanvasRenderingContext2D;
+  canvasContext.fillStyle = "#aaa082"; canvasContext.fillRect(0, 0, 512, 512);
+  canvasContext.strokeStyle = "#6e6653"; canvasContext.globalAlpha = 0.12; canvasContext.lineWidth = 1;
+  for (let i = 0; i < 512; i += 4) {
+    canvasContext.beginPath(); canvasContext.moveTo(i, 0); canvasContext.lineTo(i, 512); canvasContext.stroke();
+    canvasContext.beginPath(); canvasContext.moveTo(0, i); canvasContext.lineTo(512, i); canvasContext.stroke();
+  }
+  canvasContext.globalAlpha = 0.5; canvasContext.strokeStyle = "#d6c8a2";
+  canvasContext.setLineDash([3, 4]);
+  for (const x of [8, 256, 504]) { canvasContext.beginPath(); canvasContext.moveTo(x, 0); canvasContext.lineTo(x, 512); canvasContext.stroke(); }
+  canvasContext.globalAlpha = 1; canvasTexture.update(false);
+  const canvasMat = new BABYLONNS.PBRMaterial("field-tent-woven-canvas", scene);
+  canvasMat.albedoTexture = canvasTexture; canvasMat.roughness = 1; canvasMat.backFaceCulling = false;
+  const canopyPaths: BABYLON.Vector3[][] = [];
+  for (let xIndex = 0; xIndex <= 16; xIndex++) {
+    const x = -1.45 + xIndex * 2.9 / 16;
+    const path: BABYLON.Vector3[] = [];
+    for (let zIndex = 0; zIndex <= 16; zIndex++) {
+      const z = -1.2 + zIndex * 2.4 / 16;
+      const ridge = 0.47 * (1 - Math.abs(z) / 1.2);
+      const sag = 0.075 * Math.sin((xIndex / 16) * Math.PI);
+      path.push(new BABYLONNS.Vector3(x, 2.18 + ridge - sag, z));
+    }
+    canopyPaths.push(path);
+  }
+  const canopy = BABYLONNS.MeshBuilder.CreateRibbon("tensioned-canvas-observation-awning", { pathArray: canopyPaths, sideOrientation: BABYLONNS.Mesh.DOUBLESIDE }, scene);
+  canopy.material = canvasMat; canopy.parent = analysisAwning; canopy.receiveShadows = true;
+  shadowGenerator.addShadowCaster(canopy);
+  for (const side of [-1, 1]) {
+    createBeam(`awning-ridge-support-${side}`, new BABYLONNS.Vector3(side * 1.2, 2.14, -1), new BABYLONNS.Vector3(side * 1.2, 2.63, 0), 0.05, darkMetalMat, analysisAwning);
+    createBeam(`awning-front-rafter-${side}`, new BABYLONNS.Vector3(side * 1.2, 2.63, 0), new BABYLONNS.Vector3(side * 1.2, 2.14, 1), 0.05, darkMetalMat, analysisAwning);
+    for (const z of [-1, 1]) {
+      createBeam(`awning-guy-rope-${side}-${z}`, new BABYLONNS.Vector3(side * 1.2, 2.12, z), new BABYLONNS.Vector3(side * 1.7, 0.12, z * 1.5), 0.012, saddleLeatherMat, analysisAwning);
+      createBeam(`awning-ground-stake-${side}-${z}`, new BABYLONNS.Vector3(side * 1.7, 0.02, z * 1.5), new BABYLONNS.Vector3(side * 1.66, 0.22, z * 1.5), 0.032, darkMetalMat, analysisAwning);
+    }
+  }
 
   pois.forEach((poi) => {
     const { x, z } = poi.position;
@@ -1238,6 +1283,7 @@ export function createGameplayLayer(
         }
         return;
       }
+      gaugeNeedles.forEach((needle, index) => { needle.rotation.z = -0.43 + Math.sin(elapsed * 1.4 + index) * 0.025; });
       cupHead.rotation.y += deltaSeconds * (weather.label === "WINDY" ? 9 : 4.5);
       if (launchElapsed >= 0) {
         launchElapsed += deltaSeconds;
@@ -1320,7 +1366,8 @@ export function createGameplayLayer(
       if (collision.z) velocity.z = 0;
       verticalVelocity -= EARTH_GRAVITY * deltaSeconds;
       astronaut.root.position.y += verticalVelocity * deltaSeconds;
-      const groundY = terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z);
+      const onShedDeck = astronaut.root.position.x > 12.45 && astronaut.root.position.x < 15.95 && astronaut.root.position.z > -3.94 && astronaut.root.position.z < -1.66;
+      const groundY = Math.max(terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z), onShedDeck ? shed.position.y + 0.22 : -Infinity);
       if (astronaut.root.position.y <= groundY) {
         astronaut.root.position.y = groundY;
         verticalVelocity = 0;
@@ -1394,12 +1441,16 @@ export function createGameplayLayer(
       terrain.dispose();
       rocketRoot.dispose(false, true);
       propMat.dispose();
+      workshopAssets.dispose();
+      roofMat.dispose(false, true);
+      canvasMat.dispose(false, true);
       woodMat.dispose(false, true);
       darkMetalMat.dispose(false, true);
       paperMat.dispose(true, true);
       brassMat.dispose();
       saddleLeatherMat.dispose();
       gaugeFaceMat.dispose(true, true);
+      chartMat.dispose(true, true);
       markerMat.dispose();
       launchPadMat.dispose(false, true);
       launchContactMat.dispose(false, true);

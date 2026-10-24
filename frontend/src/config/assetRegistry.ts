@@ -13,22 +13,16 @@ export const MISSION_1_ASSET_REGISTRY = [
     usage: "Open test field with generated rolling relief, deterministic soil color noise, short boardwalks, and restrained atmospheric effects.",
   },
   {
-    id: "procedural-1926-experimental-rocket",
-    source: "generated-in-project",
-    license: "project-generated",
-    usage: "Historically inspired, non-instructional visual prototype.",
-  },
-  {
     id: "polyhaven-pbr-grounds",
     source: "https://polyhaven.com/",
     license: "CC0 1.0",
     usage: "Farm Soil normal and ARM maps, plus Muddy Tracks and Grass Ground albedo, normal and ARM maps for terrain details.",
   },
   {
-    id: "nasa-3d-reference-catalogue",
-    source: "https://science.nasa.gov/3d-resources/",
-    license: "NASA catalogue terms apply to any future downloaded asset",
-    usage: "Official catalogue reviewed; no Auburn-1926-compatible model was found, so no anachronistic NASA vehicle was downloaded.",
+    id: "polyhaven-workshop-glbs",
+    source: "https://polyhaven.com/models/",
+    license: "CC0 1.0",
+    usage: "Nine locally bundled 1K PBR models: Wooden Table 03, Painted Wooden Table, Metal Office Desk, Wooden Stool 01, Metal Toolbox, Adjustable Wrench, Vintage Oil Lamp, Portable Welding Cart and Worn Metal Rack. Per-model sources, sizes and SHA-256 hashes: /assets/workshop/sources.json. Rebuild: tools/download_workshop_assets.py.",
   },
   {
     id: "nasa-3d-resources-repository",

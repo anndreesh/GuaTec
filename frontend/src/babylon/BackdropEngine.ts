@@ -85,6 +85,7 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
     return gameplayLayer;
   }
 
+  let fieldEnvironment: InstanceType<typeof BABYLON.HDRCubeTexture> | null = null;
   let currentMode: BackdropMode = "starfield";
 
   engine.runRenderLoop(() => {
@@ -144,19 +145,20 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           scene.shadowsEnabled = true;
           planet.setEnabled(false);
           starfield.setEnabled(false);
-          scene.environmentTexture = null;
-          scene.environmentIntensity = 0.34;
-          ambient.intensity = 0.48;
+          fieldEnvironment ??= new BABYLON.HDRCubeTexture("/assets/polyhaven/hdri/suburban_field_01_1k.hdr", scene, 128, false, true, false, true);
+          scene.environmentTexture = fieldEnvironment;
+          scene.environmentIntensity = 0.32;
+          ambient.intensity = 0.68;
           ambient.diffuse = BABYLON.Color3.FromHexString("#a8bce9");
           ambient.groundColor = BABYLON.Color3.FromHexString("#1c1a2a");
           sun.direction = new BABYLON.Vector3(-0.18, -0.9, 0.32).normalize();
           sun.position = new BABYLON.Vector3(18, 24, -20);
-          sun.intensity = 0.58;
+          sun.intensity = 0.84;
           sun.diffuse = BABYLON.Color3.FromHexString("#bed0f4");
           sun.specular = BABYLON.Color3.FromHexString("#c9d8ff");
           scene.imageProcessingConfiguration.toneMappingEnabled = true;
-          scene.imageProcessingConfiguration.exposure = 0.98;
-          scene.imageProcessingConfiguration.contrast = 1.13;
+          scene.imageProcessingConfiguration.exposure = 1.08;
+          scene.imageProcessingConfiguration.contrast = 1.06;
           ensureGameplayLayer().enable();
           scene.meshes.forEach((mesh) => {
             let node: Node | null = mesh;

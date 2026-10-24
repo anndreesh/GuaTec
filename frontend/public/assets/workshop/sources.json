@@ -1,0 +1,65 @@
+[
+  {
+    "id": "WoodenTable_03",
+    "source": "https://polyhaven.com/a/WoodenTable_03",
+    "license": "CC0-1.0",
+    "sha256": "084dabfffb39fb99951dbc3399e0549f23af6e68bf543a473e19785316a71817",
+    "bytes": 634344
+  },
+  {
+    "id": "painted_wooden_table",
+    "source": "https://polyhaven.com/a/painted_wooden_table",
+    "license": "CC0-1.0",
+    "sha256": "a4be1ff5e675e95723d6daaea0d51e58fce4a09cedca868621ecaf5e3622e0fc",
+    "bytes": 1778568
+  },
+  {
+    "id": "metal_office_desk",
+    "source": "https://polyhaven.com/a/metal_office_desk",
+    "license": "CC0-1.0",
+    "sha256": "ba5e643dd37d3e17ac6d1cd5f078eeb354b0e6d36d29e7e29855ddd1831d80dc",
+    "bytes": 1601112
+  },
+  {
+    "id": "wooden_stool_01",
+    "source": "https://polyhaven.com/a/wooden_stool_01",
+    "license": "CC0-1.0",
+    "sha256": "8cd7053b95632326676e4c1e703bc4cae2998333655887733c5bb25d70eb7fd4",
+    "bytes": 960828
+  },
+  {
+    "id": "metal_toolbox",
+    "source": "https://polyhaven.com/a/metal_toolbox",
+    "license": "CC0-1.0",
+    "sha256": "184311a0a4a13514ccbdddee83cddf6df371ccaa873697d0de126728cce1fda6",
+    "bytes": 2742644
+  },
+  {
+    "id": "adjustable_wrench",
+    "source": "https://polyhaven.com/a/adjustable_wrench",
+    "license": "CC0-1.0",
+    "sha256": "edb7e9b9126b4058500533875f67b6415cac74e64a34533961cc6b0e6dae24f2",
+    "bytes": 2640088
+  },
+  {
+    "id": "vintage_oil_lamp",
+    "source": "https://polyhaven.com/a/vintage_oil_lamp",
+    "license": "CC0-1.0",
+    "sha256": "1bffd731fe052c225e9a0b26bf726b6e4e0673d5d52834f5c723d9ab7e61e618",
+    "bytes": 2159680
+  },
+  {
+    "id": "portable_welding_cart",
+    "source": "https://polyhaven.com/a/portable_welding_cart",
+    "license": "CC0-1.0",
+    "sha256": "3da163fe20efe86dc03e3f9c7fcc0ba2db131344f4dcd883060a740093316f41",
+    "bytes": 3504664
+  },
+  {
+    "id": "worn_metal_rack",
+    "source": "https://polyhaven.com/a/worn_metal_rack",
+    "license": "CC0-1.0",
+    "sha256": "396f31df168234126646c6f1035daa04cc1ec457f9fdb00a8bdc6cebb333757e",
+    "bytes": 2008200
+  }
+]
