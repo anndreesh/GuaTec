@@ -1137,7 +1137,7 @@ Object.assign(frenchTranslations, {
 // Mission and report strings that were previously rendered without a complete
 // entry in all three catalogs. Keep these exact keys shared by UI call sites.
 Object.assign(translations, {
-  "Restart mission": "Reiniciar misión",
+  "Restart mission": "Restart mission",
   "Joystick de movimiento": "Movement joystick",
   Saltar: "Jump", Correr: "Run", Examinar: "Examine", Cerrar: "Close",
   DISTANCE: "DISTANCE",
