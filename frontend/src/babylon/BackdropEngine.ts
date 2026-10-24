@@ -68,7 +68,9 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
 
   const starfield = BABYLON.MeshBuilder.CreateSphere("starfield", { diameter: 200, sideOrientation: BABYLON.Mesh.BACKSIDE }, scene);
   const starMaterial = new BABYLON.StandardMaterial("starMat", scene);
-  starMaterial.emissiveColor = BABYLON.Color3.FromHexString("#0b0f22");
+  const starTexture = createStarfieldTexture(BABYLON, scene, "ambient-starfield", 1500);
+  starMaterial.diffuseTexture = starTexture;
+  starMaterial.emissiveTexture = starTexture;
   starMaterial.disableLighting = true;
   starfield.material = starMaterial;
 
@@ -186,6 +188,35 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
   };
 }
 
+/** Paint a dense, varied star map instead of relying on a flat dark material.
+ * The larger stars are deliberately sparse so the background reads as depth,
+ * not as uniform visual noise. */
+function createStarfieldTexture(
+  BABYLON: typeof import("@babylonjs/core"),
+  scene: import("@babylonjs/core").Scene,
+  name: string,
+  count: number,
+): import("@babylonjs/core").DynamicTexture {
+  const texture = new BABYLON.DynamicTexture(name, { width: 2048, height: 1024 }, scene, false);
+  const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
+  ctx.fillStyle = "#030714";
+  ctx.fillRect(0, 0, 2048, 1024);
+  for (let i = 0; i < count; i++) {
+    const x = Math.random() * 2048;
+    const y = Math.random() * 1024;
+    const bright = Math.random() < 0.07;
+    const radius = bright ? 1.1 + Math.random() * 1.3 : 0.2 + Math.random() * 0.75;
+    ctx.globalAlpha = bright ? 0.68 + Math.random() * 0.32 : 0.28 + Math.random() * 0.55;
+    ctx.fillStyle = Math.random() < 0.12 ? "#b9d4ff" : Math.random() < 0.12 ? "#ffe3b0" : "#f4f7ff";
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  texture.update();
+  return texture;
+}
+
 /** No-3D-dependency fallback: an animated CSS/canvas-2D starfield gradient. */
 function createCssFallbackBackdrop(canvas: HTMLCanvasElement): Backdrop {
   canvas.classList.add("backdrop-fallback");
@@ -196,7 +227,7 @@ function createCssFallbackBackdrop(canvas: HTMLCanvasElement): Backdrop {
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    stars = Array.from({ length: 140 }, () => ({
+    stars = Array.from({ length: 420 }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       r: Math.random() * 1.4 + 0.2,
