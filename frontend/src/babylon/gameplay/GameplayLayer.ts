@@ -2,6 +2,7 @@ import type * as BABYLON from "@babylonjs/core";
 import type { MissionPointOfInterest } from "@/config/gameConfig";
 import { createAstronautCharacter, type BabylonNamespace } from "@/babylon/gameplay/AstronautCharacter";
 import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
+import { createLaunchSupport } from "./LaunchSupport";
 
 export interface NearbyPoi {
   id: string;
@@ -513,104 +514,11 @@ export function createGameplayLayer(
     anchor.parent = groundPadRoot;
   }
 
-  const verticalStandRoot = new BABYLONNS.TransformNode("rocket-ground-support-cradle", scene);
-  verticalStandRoot.position = groundPadRoot.position.clone();
-  verticalStandRoot.parent = root;
-  const standWidth = 3.5;
-  const standBackZ = -0.92;
-  const standHeight = 5.9;
-  const standSteel = propMat;
-  const addStandBox = (name: string, width: number, height: number, depth: number, x: number, y: number, z: number, material: BABYLON.Material): BABYLON.Mesh => {
-    const mesh = BABYLONNS.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
-    mesh.position = new BABYLONNS.Vector3(x, y, z);
-    mesh.material = material;
-    mesh.parent = verticalStandRoot;
-    mesh.receiveShadows = true;
-    return mesh;
-  };
-  const addTopBolt = (name: string, x: number, y: number, z: number): void => {
-    const bolt = BABYLONNS.MeshBuilder.CreateCylinder(name, { height: 0.045, diameter: 0.09, tessellation: 6 }, scene);
-    bolt.position = new BABYLONNS.Vector3(x, y, z);
-    bolt.material = brassMat;
-    bolt.parent = verticalStandRoot;
-  };
-
-  // Riveted channel columns and boxed cross-members form a service gantry,
-  // not a handful of thin poles. The rear face stays behind the vehicle.
-  for (const x of [-standWidth / 2, standWidth / 2]) {
-    for (const offsetZ of [-0.09, 0.09]) addStandBox(`gantry-column-flange-${x}-${offsetZ}`, 0.18, standHeight, 0.055, x, standHeight / 2, standBackZ + offsetZ, standSteel);
-    addStandBox(`gantry-column-web-${x}`, 0.075, standHeight - 0.08, 0.14, x, standHeight / 2, standBackZ, darkMetalMat);
-    const foot = addStandBox(`gantry-spread-foot-${x}`, 0.62, 0.13, 0.74, x, 0.18, standBackZ + 0.12, darkMetalMat);
-    foot.material = launchContactMat;
-    for (const dx of [-0.2, 0.2]) for (const dz of [-0.22, 0.22]) addTopBolt(`gantry-foot-anchor-${x}-${dx}-${dz}`, x + dx, 0.25, standBackZ + 0.12 + dz);
-    // Bolted splice plates make the fabricated frame read as assembled steel.
-    for (const y of [1.65, 3.2, 4.75]) {
-      addStandBox(`gantry-column-splice-${x}-${y}`, 0.25, 0.34, 0.035, x, y, standBackZ - 0.115, markerMat);
-      for (const dy of [-0.1, 0.1]) addFrontBolt(`gantry-splice-rivet-${x}-${y}-${dy}`, x, y + dy, standBackZ - 0.14, verticalStandRoot, 0.065);
-    }
-  }
-  for (const y of [0.48, 1.65, 3.2, 4.75, 5.82]) {
-    addStandBox(`gantry-transom-${y}`, standWidth + 0.18, 0.2, 0.2, 0, y, standBackZ, y === 1.65 || y === 4.75 ? markerMat : darkMetalMat);
-  }
-  // Deep X braces stop the tall narrow gantry from racking under load.
-  for (const [index, endpoints] of [
-    [new BABYLONNS.Vector3(-1.55, 0.65, standBackZ - 0.12), new BABYLONNS.Vector3(1.55, 5.45, standBackZ - 0.12)],
-    [new BABYLONNS.Vector3(1.55, 0.65, standBackZ - 0.12), new BABYLONNS.Vector3(-1.55, 5.45, standBackZ - 0.12)],
-  ].entries()) {
-    createBeam(`gantry-rear-cross-brace-${index}`, endpoints[0], endpoints[1], 0.065, standSteel, verticalStandRoot);
-    for (const endpoint of endpoints) {
-      const plate = addStandBox(`gantry-cross-brace-plate-${index}-${endpoint.x}-${endpoint.y}`, 0.24, 0.28, 0.045, endpoint.x, endpoint.y, endpoint.z - 0.035, markerMat);
-      plate.rotation.z = index === 0 ? -0.55 : 0.55;
-      addFrontBolt(`gantry-cross-brace-bolt-${index}-${endpoint.x}-${endpoint.y}`, endpoint.x, endpoint.y, endpoint.z - 0.075, verticalStandRoot, 0.07);
-    }
-  }
-
-  // Rear access ladder and a narrow grated service platform with guard rails.
-  const ladderBottom = 0.52;
-  const ladderTop = 4.5;
-  for (const x of [1.12, 1.46]) {
-    createBeam(`gantry-ladder-side-${x}`, new BABYLONNS.Vector3(x, ladderBottom, standBackZ - 0.24), new BABYLONNS.Vector3(x, ladderTop, standBackZ - 0.24), 0.055, darkMetalMat, verticalStandRoot);
-  }
-  for (let rung = 0; rung <= 11; rung++) {
-    const y = ladderBottom + rung * ((ladderTop - ladderBottom) / 11);
-    createBeam(`gantry-ladder-rung-${rung}`, new BABYLONNS.Vector3(1.12, y, standBackZ - 0.24), new BABYLONNS.Vector3(1.46, y, standBackZ - 0.24), 0.04, brassMat, verticalStandRoot);
-  }
-  const serviceDeckY = 4.55;
-  const serviceDeckZ = -1.55;
-  for (let slat = 0; slat < 9; slat++) {
-    const x = -1.52 + slat * 0.38;
-    addStandBox(`gantry-grated-deck-${slat}`, 0.31, 0.065, 0.78, x, serviceDeckY, serviceDeckZ, slat % 2 ? darkMetalMat : launchContactMat);
-  }
-  for (const x of [-1.58, 1.58]) {
-    createBeam(`gantry-platform-rail-post-${x}`, new BABYLONNS.Vector3(x, serviceDeckY, -1.92), new BABYLONNS.Vector3(x, 5.46, -1.92), 0.07, darkMetalMat, verticalStandRoot);
-    for (const y of [4.88, 5.42]) createBeam(`gantry-platform-side-rail-${x}-${y}`, new BABYLONNS.Vector3(x, y, -1.92), new BABYLONNS.Vector3(x, y, -1.08), 0.055, brassMat, verticalStandRoot);
-  }
-  for (const y of [4.88, 5.42]) createBeam(`gantry-platform-back-rail-${y}`, new BABYLONNS.Vector3(-1.58, y, -1.92), new BABYLONNS.Vector3(1.58, y, -1.92), 0.055, brassMat, verticalStandRoot);
-
-  // Twin screw-adjusted saddles carry the fuselage on broad, leather-faced shoes.
-  for (const y of [1.3, 3.8]) {
-    for (const side of [-1, 1]) {
-      createBeam(
-        `cradle-support-arm-${y}-${side}`,
-        new BABYLONNS.Vector3(side * (standWidth / 2 - 0.08), y, standBackZ),
-        new BABYLONNS.Vector3(side * 0.56, y, -0.14),
-        0.12,
-        darkMetalMat,
-        verticalStandRoot,
-      );
-      createBeam(`cradle-adjuster-screw-${y}-${side}`, new BABYLONNS.Vector3(side * 0.56, y - 0.24, -0.14), new BABYLONNS.Vector3(side * 0.56, y + 0.1, -0.14), 0.055, brassMat, verticalStandRoot);
-      const pad = BABYLONNS.MeshBuilder.CreateSphere(`cradle-leather-contact-shoe-${y}-${side}`, { diameter: 0.38, segments: 16 }, scene);
-      pad.scaling.set(1.1, 0.42, 0.58);
-      pad.position = new BABYLONNS.Vector3(side * 0.52, y + 0.05, -0.12);
-      pad.material = saddleLeatherMat;
-      pad.parent = verticalStandRoot;
-      addFrontBolt(`cradle-shoe-fastener-${y}-${side}`, side * 0.52, y + 0.05, -0.25, verticalStandRoot, 0.06);
-    }
-  }
-
-  const collisionObstacles = [
-    { minX: -3.0, maxX: 3.0, minZ: ROCKET_PLATFORM_Z - 3.0, maxZ: ROCKET_PLATFORM_Z + 3.0 },
-  ];
+  let vehicleMeshes: BABYLON.AbstractMesh[] = [];
+  const launchSupport = createLaunchSupport(BABYLONNS, scene, root, groundPadRoot.position, {
+    steel: propMat, dark: darkMetalMat, paint: markerMat, pad: saddleLeatherMat, hardware: brassMat,
+  }, shadowGenerator);
+  const collisionObstacles = [launchSupport.footprint];
 
   function resolveObjectCollisions(position: BABYLON.Vector3): { x: boolean; z: boolean } {
     let blockedX = false;
@@ -790,6 +698,9 @@ export function createGameplayLayer(
         shuttleModelRoot.position.z += ROCKET_PLATFORM_Z - (scaledBounds.minZ + scaledBounds.maxZ) / 2;
       }
       shuttleModelRoot.setEnabled(true);
+      vehicleMeshes = modelMeshes;
+      vehicleMeshes.forEach(mesh => { mesh.checkCollisions = true; mesh.receiveShadows = true; });
+      launchSupport.fitToVehicle(vehicleMeshes);
     } catch (error) {
       console.warn("Could not load the NASA-marked mission rocket model; no substitute vehicle will be shown.", error);
     }
@@ -1163,6 +1074,7 @@ export function createGameplayLayer(
         rocketRoot.position.copyFrom(rocketStart);
         rocketRoot.scaling.setAll(1);
         launchElapsed = -1;
+        launchSupport.setRelease(0);
         openingElapsed = -1;
         launchSmoke.stop();
         launchFlame.stop();
@@ -1177,6 +1089,8 @@ export function createGameplayLayer(
         rocketRoot.scaling.y = structure === "light" ? 0.92 : structure === "reinforced" ? 1.12 : 1;
         rocketRoot.scaling.x = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
         rocketRoot.scaling.z = structure === "reinforced" ? 1.08 : structure === "light" ? 0.94 : 1;
+        rocketRoot.computeWorldMatrix(true);
+        launchSupport.fitToVehicle(vehicleMeshes);
       },
       navigateTo(poiId) {
         const target = poiMeshes.find((entry) => entry.poi.id === poiId);
@@ -1184,6 +1098,7 @@ export function createGameplayLayer(
       },
       playLaunch() {
         launchElapsed = 0;
+        launchSupport.setRelease(0);
         rocketRoot.position.copyFrom(rocketStart);
         camera.lockedTarget = null;
         camera.radius = 8.5;
@@ -1258,6 +1173,9 @@ export function createGameplayLayer(
       verticalVelocity = 0;
       grounded = true;
       root.setEnabled(true);
+      scene.collisionsEnabled = true;
+      camera.checkCollisions = true;
+      camera.collisionRadius = new BABYLONNS.Vector3(0.28, 0.28, 0.28);
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup", onKeyUp);
       // The ambient backdrop keeps `camera.inputs` empty (no user control);
@@ -1282,6 +1200,7 @@ export function createGameplayLayer(
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       camera.detachControl();
+      camera.checkCollisions = false;
       camera.inputs.clear();
       camera.lockedTarget = null;
       root.setEnabled(false);
@@ -1322,10 +1241,14 @@ export function createGameplayLayer(
       cupHead.rotation.y += deltaSeconds * (weather.label === "WINDY" ? 9 : 4.5);
       if (launchElapsed >= 0) {
         launchElapsed += deltaSeconds;
-        const climb = launchPeakAltitude * (1 - Math.exp(-launchElapsed / 1.8));
-        const drift = launchElapsed * 0.55;
-        rocketRoot.position.x = rocketStart.x + drift * 0.15;
-        rocketRoot.position.z = rocketStart.z - drift;
+        // Contact jacks withdraw completely before the vehicle rises. Keep the
+        // climb vertical until the tail clears the rear gantry and its deck.
+        launchSupport.setRelease(launchElapsed / 0.85);
+        const flightTime = Math.max(0, launchElapsed - 0.95);
+        const climb = launchPeakAltitude * (1 - Math.exp(-flightTime / 1.8));
+        const drift = Math.max(0, flightTime - 2.6) * 0.3;
+        rocketRoot.position.x = rocketStart.x + drift * 0.1;
+        rocketRoot.position.z = rocketStart.z + drift;
         rocketRoot.position.y = rocketStart.y + climb;
         if (launchElapsed > 4.5) {
           launchSmoke.stop();
