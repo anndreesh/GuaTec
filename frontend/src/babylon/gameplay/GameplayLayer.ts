@@ -536,7 +536,7 @@ export function createGameplayLayer(
 
   let vehicleMeshes: BABYLON.AbstractMesh[] = [];
   const launchSupport = createLaunchSupport(BABYLONNS, scene, root, groundPadRoot.position, {
-    steel: propMat, dark: darkMetalMat, paint: markerMat, pad: saddleLeatherMat, hardware: brassMat,
+    steel: propMat, dark: darkMetalMat, paint: markerMat, pad: saddleLeatherMat, hardware: brassMat, foundation: launchPadMat,
   }, shadowGenerator);
   const collisionObstacles = [launchSupport.footprint];
 
@@ -682,15 +682,24 @@ export function createGameplayLayer(
       const worldBounds = () => {
         shuttleModelRoot.computeWorldMatrix(true);
         modelMeshes.forEach((mesh) => mesh.computeWorldMatrix(true));
-        const boxes = modelMeshes.map((mesh) => mesh.getBoundingInfo().boundingBox);
-        return {
-          minX: Math.min(...boxes.map((box) => box.minimumWorld.x)),
-          maxX: Math.max(...boxes.map((box) => box.maximumWorld.x)),
-          minY: Math.min(...boxes.map((box) => box.minimumWorld.y)),
-          maxY: Math.max(...boxes.map((box) => box.maximumWorld.y)),
-          minZ: Math.min(...boxes.map((box) => box.minimumWorld.z)),
-          maxZ: Math.max(...boxes.map((box) => box.maximumWorld.z)),
-        };
+        // Rotated per-mesh boxes overestimate the outline and can leave the
+        // real landing surface above the pad. Measure transformed vertices.
+        const measured = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+        const local = new BABYLONNS.Vector3();
+        const world = new BABYLONNS.Vector3();
+        for (const mesh of modelMeshes) {
+          const positions = mesh.getVerticesData(BABYLONNS.VertexBuffer.PositionKind);
+          if (!positions) continue;
+          const matrix = mesh.getWorldMatrix();
+          for (let i = 0; i < positions.length; i += 3) {
+            local.set(positions[i]!, positions[i + 1]!, positions[i + 2]!);
+            BABYLONNS.Vector3.TransformCoordinatesToRef(local, matrix, world);
+            measured.minX = Math.min(measured.minX, world.x); measured.maxX = Math.max(measured.maxX, world.x);
+            measured.minY = Math.min(measured.minY, world.y); measured.maxY = Math.max(measured.maxY, world.y);
+            measured.minZ = Math.min(measured.minZ, world.z); measured.maxZ = Math.max(measured.maxZ, world.z);
+          }
+        }
+        return measured;
       };
       const initialBounds = worldBounds();
       if (modelMeshes.length && initialBounds.maxY > initialBounds.minY) {

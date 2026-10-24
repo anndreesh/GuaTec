@@ -9,7 +9,7 @@ export function createLaunchSupport(
   scene: BABYLON.Scene,
   parent: BABYLON.TransformNode,
   origin: BABYLON.Vector3,
-  materials: { steel: BABYLON.Material; dark: BABYLON.Material; paint: BABYLON.Material; pad: BABYLON.Material; hardware: BABYLON.Material },
+  materials: { steel: BABYLON.Material; dark: BABYLON.Material; paint: BABYLON.Material; pad: BABYLON.Material; hardware: BABYLON.Material; foundation: BABYLON.Material },
   shadows: BABYLON.ShadowGenerator,
 ) {
   const root = new B.TransformNode("vehicle-fitted-service-gantry", scene);
@@ -83,6 +83,7 @@ export function createLaunchSupport(
       const x = centerX + side * halfWidth;
       for (const dz of [-0.11, 0.11]) box(`gantry-I-flange-${side}-${dz}`, 0.24, height, 0.055, x, height / 2 + 0.15, backZ + dz);
       box(`gantry-I-web-${side}`, 0.065, height, 0.22, x, height / 2 + 0.15, backZ);
+      box(`gantry-concrete-plinth-${side}`, 0.86, 0.15, 1.04, x, 0.075, backZ, materials.foundation);
       box(`gantry-foundation-${side}`, 0.76, 0.16, 0.94, x, 0.2, backZ, materials.dark);
       for (const dx of [-0.25, 0.25]) for (const dz of [-0.32, 0.32]) {
         const bolt = finish(B.MeshBuilder.CreateCylinder(`foundation-anchor-${side}-${dx}-${dz}`, { diameter: 0.085, height: 0.09, tessellation: 6 }, scene), materials.hardware);
