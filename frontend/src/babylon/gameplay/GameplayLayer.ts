@@ -189,6 +189,81 @@ export function createGameplayLayer(
     return beam;
   };
 
+  const brassMat = new BABYLONNS.PBRMaterial("field-hardware-aged-brass", scene);
+  brassMat.albedoColor = BABYLONNS.Color3.FromHexString("#8d7046");
+  brassMat.metallic = 0.72;
+  brassMat.roughness = 0.48;
+  const saddleLeatherMat = new BABYLONNS.PBRMaterial("rocket-saddle-dark-leather", scene);
+  saddleLeatherMat.albedoColor = BABYLONNS.Color3.FromHexString("#51372d");
+  saddleLeatherMat.metallic = 0.02;
+  saddleLeatherMat.roughness = 0.92;
+  const gaugeTexture = new BABYLONNS.DynamicTexture("aged-analogue-gauge-face", { width: 512, height: 512 }, scene, false);
+  const gaugeContext = gaugeTexture.getContext() as unknown as CanvasRenderingContext2D;
+  gaugeContext.fillStyle = "#d8cba9";
+  gaugeContext.fillRect(0, 0, 512, 512);
+  gaugeContext.strokeStyle = "#493c2d";
+  gaugeContext.lineWidth = 8;
+  gaugeContext.beginPath(); gaugeContext.arc(256, 256, 226, 0, Math.PI * 2); gaugeContext.stroke();
+  gaugeContext.lineWidth = 5;
+  for (let i = 0; i <= 20; i++) {
+    const angle = Math.PI * 0.76 + (Math.PI * 1.48 * i) / 20;
+    const major = i % 5 === 0;
+    const innerRadius = major ? 167 : 183;
+    gaugeContext.beginPath();
+    gaugeContext.moveTo(256 + Math.cos(angle) * innerRadius, 256 + Math.sin(angle) * innerRadius);
+    gaugeContext.lineTo(256 + Math.cos(angle) * 206, 256 + Math.sin(angle) * 206);
+    gaugeContext.stroke();
+    if (major) {
+      gaugeContext.font = "bold 26px Georgia";
+      gaugeContext.textAlign = "center";
+      gaugeContext.textBaseline = "middle";
+      gaugeContext.fillText(String(i * 5), 256 + Math.cos(angle) * 137, 256 + Math.sin(angle) * 137);
+    }
+  }
+  gaugeContext.font = "bold 30px Georgia";
+  gaugeContext.textAlign = "center";
+  gaugeContext.fillText("PRESSURE", 256, 322);
+  gaugeContext.font = "20px Georgia";
+  gaugeContext.fillText("FIELD INSTRUMENT · 1926", 256, 370);
+  gaugeTexture.update(false);
+  const gaugeFaceMat = new BABYLONNS.PBRMaterial("ivory-printed-instrument-dial", scene);
+  gaugeFaceMat.albedoTexture = gaugeTexture;
+  gaugeFaceMat.roughness = 0.94;
+  gaugeFaceMat.metallic = 0;
+
+  const addGauge = (name: string, position: BABYLON.Vector3, radius: number, parent: BABYLON.TransformNode): void => {
+    const body = BABYLONNS.MeshBuilder.CreateCylinder(`${name}-cast-case`, { height: radius * 0.38, diameter: radius * 2.16, tessellation: 32 }, scene);
+    body.position = position.clone();
+    body.rotation.x = Math.PI / 2;
+    body.material = darkMetalMat;
+    body.parent = parent;
+    const bezel = BABYLONNS.MeshBuilder.CreateTorus(`${name}-brass-bezel`, { diameter: radius * 2.04, thickness: radius * 0.12, tessellation: 40 }, scene);
+    bezel.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.2);
+    bezel.material = brassMat;
+    bezel.parent = parent;
+    const face = BABYLONNS.MeshBuilder.CreatePlane(`${name}-printed-face`, { size: radius * 1.84 }, scene);
+    face.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.21);
+    face.material = gaugeFaceMat;
+    face.parent = parent;
+    const needle = BABYLONNS.MeshBuilder.CreateBox(`${name}-needle`, { width: radius * 0.045, height: radius * 0.92, depth: radius * 0.025 }, scene);
+    needle.position = new BABYLONNS.Vector3(position.x + radius * 0.07, position.y + radius * 0.12, position.z + radius * 0.235);
+    needle.rotation.z = -0.43;
+    needle.material = markerMat;
+    needle.parent = parent;
+    const pivot = BABYLONNS.MeshBuilder.CreateSphere(`${name}-needle-pivot`, { diameter: radius * 0.16, segments: 12 }, scene);
+    pivot.position = new BABYLONNS.Vector3(position.x, position.y, position.z + radius * 0.25);
+    pivot.material = brassMat;
+    pivot.parent = parent;
+  };
+
+  const addFrontBolt = (name: string, x: number, y: number, z: number, parent: BABYLON.TransformNode, diameter = 0.085): void => {
+    const bolt = BABYLONNS.MeshBuilder.CreateCylinder(name, { height: 0.035, diameter, tessellation: 6 }, scene);
+    bolt.position = new BABYLONNS.Vector3(x, y, z);
+    bolt.rotation.x = Math.PI / 2;
+    bolt.material = brassMat;
+    bolt.parent = parent;
+  };
+
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
   // Locations become "discovered" once the player has been near them (see updateNearestPoi).
   const discoveredPoiIds = new Set<string>();
@@ -444,55 +519,92 @@ export function createGameplayLayer(
   const standWidth = 3.5;
   const standBackZ = -0.92;
   const standHeight = 5.9;
+  const standSteel = propMat;
+  const addStandBox = (name: string, width: number, height: number, depth: number, x: number, y: number, z: number, material: BABYLON.Material): BABYLON.Mesh => {
+    const mesh = BABYLONNS.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
+    mesh.position = new BABYLONNS.Vector3(x, y, z);
+    mesh.material = material;
+    mesh.parent = verticalStandRoot;
+    mesh.receiveShadows = true;
+    return mesh;
+  };
+  const addTopBolt = (name: string, x: number, y: number, z: number): void => {
+    const bolt = BABYLONNS.MeshBuilder.CreateCylinder(name, { height: 0.045, diameter: 0.09, tessellation: 6 }, scene);
+    bolt.position = new BABYLONNS.Vector3(x, y, z);
+    bolt.material = brassMat;
+    bolt.parent = verticalStandRoot;
+  };
+
+  // Riveted channel columns and boxed cross-members form a service gantry,
+  // not a handful of thin poles. The rear face stays behind the vehicle.
   for (const x of [-standWidth / 2, standWidth / 2]) {
-    const upright = BABYLONNS.MeshBuilder.CreateCylinder(`cradle-upright-${x}`, {
-      height: standHeight, diameter: 0.14, tessellation: 12,
-    }, scene);
-    upright.position = new BABYLONNS.Vector3(x, standHeight / 2, standBackZ);
-    upright.material = darkMetalMat;
-    upright.parent = verticalStandRoot;
-    const foot = BABYLONNS.MeshBuilder.CreateBox(`cradle-foot-${x}`, {
-      width: 0.55, height: 0.12, depth: 0.7,
-    }, scene);
-    foot.position = new BABYLONNS.Vector3(x, 0.2, standBackZ + 0.15);
-    foot.material = propMat;
-    foot.parent = verticalStandRoot;
-    createBeam(
-      `cradle-diagonal-brace-${x}`,
-      new BABYLONNS.Vector3(x, 0.22, standBackZ + 0.35),
-      new BABYLONNS.Vector3(x, 4.9, standBackZ),
-      0.085,
-      propMat,
-      verticalStandRoot,
-    );
+    for (const offsetZ of [-0.09, 0.09]) addStandBox(`gantry-column-flange-${x}-${offsetZ}`, 0.18, standHeight, 0.055, x, standHeight / 2, standBackZ + offsetZ, standSteel);
+    addStandBox(`gantry-column-web-${x}`, 0.075, standHeight - 0.08, 0.14, x, standHeight / 2, standBackZ, darkMetalMat);
+    const foot = addStandBox(`gantry-spread-foot-${x}`, 0.62, 0.13, 0.74, x, 0.18, standBackZ + 0.12, darkMetalMat);
+    foot.material = launchContactMat;
+    for (const dx of [-0.2, 0.2]) for (const dz of [-0.22, 0.22]) addTopBolt(`gantry-foot-anchor-${x}-${dx}-${dz}`, x + dx, 0.25, standBackZ + 0.12 + dz);
+    // Bolted splice plates make the fabricated frame read as assembled steel.
+    for (const y of [1.65, 3.2, 4.75]) {
+      addStandBox(`gantry-column-splice-${x}-${y}`, 0.25, 0.34, 0.035, x, y, standBackZ - 0.115, markerMat);
+      for (const dy of [-0.1, 0.1]) addFrontBolt(`gantry-splice-rivet-${x}-${y}-${dy}`, x, y + dy, standBackZ - 0.14, verticalStandRoot, 0.065);
+    }
   }
-  for (const y of [0.55, 1.7, 3.2, 4.75, 5.85]) {
-    createBeam(
-      `cradle-crossbar-${y}`,
-      new BABYLONNS.Vector3(-standWidth / 2, y, standBackZ),
-      new BABYLONNS.Vector3(standWidth / 2, y, standBackZ),
-      y === 5.85 ? 0.09 : 0.075,
-      y === 1.7 || y === 4.75 ? markerMat : darkMetalMat,
-      verticalStandRoot,
-    );
+  for (const y of [0.48, 1.65, 3.2, 4.75, 5.82]) {
+    addStandBox(`gantry-transom-${y}`, standWidth + 0.18, 0.2, 0.2, 0, y, standBackZ, y === 1.65 || y === 4.75 ? markerMat : darkMetalMat);
   }
-  // Two padded arms at different heights visibly carry the vehicle's body.
+  // Deep X braces stop the tall narrow gantry from racking under load.
+  for (const [index, endpoints] of [
+    [new BABYLONNS.Vector3(-1.55, 0.65, standBackZ - 0.12), new BABYLONNS.Vector3(1.55, 5.45, standBackZ - 0.12)],
+    [new BABYLONNS.Vector3(1.55, 0.65, standBackZ - 0.12), new BABYLONNS.Vector3(-1.55, 5.45, standBackZ - 0.12)],
+  ].entries()) {
+    createBeam(`gantry-rear-cross-brace-${index}`, endpoints[0], endpoints[1], 0.065, standSteel, verticalStandRoot);
+    for (const endpoint of endpoints) {
+      const plate = addStandBox(`gantry-cross-brace-plate-${index}-${endpoint.x}-${endpoint.y}`, 0.24, 0.28, 0.045, endpoint.x, endpoint.y, endpoint.z - 0.035, markerMat);
+      plate.rotation.z = index === 0 ? -0.55 : 0.55;
+      addFrontBolt(`gantry-cross-brace-bolt-${index}-${endpoint.x}-${endpoint.y}`, endpoint.x, endpoint.y, endpoint.z - 0.075, verticalStandRoot, 0.07);
+    }
+  }
+
+  // Rear access ladder and a narrow grated service platform with guard rails.
+  const ladderBottom = 0.52;
+  const ladderTop = 4.5;
+  for (const x of [1.12, 1.46]) {
+    createBeam(`gantry-ladder-side-${x}`, new BABYLONNS.Vector3(x, ladderBottom, standBackZ - 0.24), new BABYLONNS.Vector3(x, ladderTop, standBackZ - 0.24), 0.055, darkMetalMat, verticalStandRoot);
+  }
+  for (let rung = 0; rung <= 11; rung++) {
+    const y = ladderBottom + rung * ((ladderTop - ladderBottom) / 11);
+    createBeam(`gantry-ladder-rung-${rung}`, new BABYLONNS.Vector3(1.12, y, standBackZ - 0.24), new BABYLONNS.Vector3(1.46, y, standBackZ - 0.24), 0.04, brassMat, verticalStandRoot);
+  }
+  const serviceDeckY = 4.55;
+  const serviceDeckZ = -1.55;
+  for (let slat = 0; slat < 9; slat++) {
+    const x = -1.52 + slat * 0.38;
+    addStandBox(`gantry-grated-deck-${slat}`, 0.31, 0.065, 0.78, x, serviceDeckY, serviceDeckZ, slat % 2 ? darkMetalMat : launchContactMat);
+  }
+  for (const x of [-1.58, 1.58]) {
+    createBeam(`gantry-platform-rail-post-${x}`, new BABYLONNS.Vector3(x, serviceDeckY, -1.92), new BABYLONNS.Vector3(x, 5.46, -1.92), 0.07, darkMetalMat, verticalStandRoot);
+    for (const y of [4.88, 5.42]) createBeam(`gantry-platform-side-rail-${x}-${y}`, new BABYLONNS.Vector3(x, y, -1.92), new BABYLONNS.Vector3(x, y, -1.08), 0.055, brassMat, verticalStandRoot);
+  }
+  for (const y of [4.88, 5.42]) createBeam(`gantry-platform-back-rail-${y}`, new BABYLONNS.Vector3(-1.58, y, -1.92), new BABYLONNS.Vector3(1.58, y, -1.92), 0.055, brassMat, verticalStandRoot);
+
+  // Twin screw-adjusted saddles carry the fuselage on broad, leather-faced shoes.
   for (const y of [1.3, 3.8]) {
     for (const side of [-1, 1]) {
       createBeam(
         `cradle-support-arm-${y}-${side}`,
         new BABYLONNS.Vector3(side * (standWidth / 2 - 0.08), y, standBackZ),
-        new BABYLONNS.Vector3(side * 0.58, y, -0.18),
-        0.085,
+        new BABYLONNS.Vector3(side * 0.56, y, -0.14),
+        0.12,
         darkMetalMat,
         verticalStandRoot,
       );
-      const pad = BABYLONNS.MeshBuilder.CreateBox(`cradle-contact-pad-${y}-${side}`, {
-        width: 0.26, height: 0.22, depth: 0.14,
-      }, scene);
-      pad.position = new BABYLONNS.Vector3(side * 0.58, y, -0.1);
-      pad.material = markerMat;
+      createBeam(`cradle-adjuster-screw-${y}-${side}`, new BABYLONNS.Vector3(side * 0.56, y - 0.24, -0.14), new BABYLONNS.Vector3(side * 0.56, y + 0.1, -0.14), 0.055, brassMat, verticalStandRoot);
+      const pad = BABYLONNS.MeshBuilder.CreateSphere(`cradle-leather-contact-shoe-${y}-${side}`, { diameter: 0.38, segments: 16 }, scene);
+      pad.scaling.set(1.1, 0.42, 0.58);
+      pad.position = new BABYLONNS.Vector3(side * 0.52, y + 0.05, -0.12);
+      pad.material = saddleLeatherMat;
       pad.parent = verticalStandRoot;
+      addFrontBolt(`cradle-shoe-fastener-${y}-${side}`, side * 0.52, y + 0.05, -0.25, verticalStandRoot, 0.06);
     }
   }
 
@@ -590,6 +702,34 @@ export function createGameplayLayer(
   const paperMat = new BABYLONNS.PBRMaterial("gameplay-aged-paper", scene);
   paperMat.albedoColor = BABYLONNS.Color3.FromHexString("#cbbb96");
   paperMat.roughness = 0.98;
+  const fieldPlanTexture = new BABYLONNS.DynamicTexture("hand-inked-field-schematic", { width: 512, height: 512 }, scene, false);
+  const planContext = fieldPlanTexture.getContext() as unknown as CanvasRenderingContext2D;
+  planContext.fillStyle = "#d5c7a4"; planContext.fillRect(0, 0, 512, 512);
+  planContext.strokeStyle = "#6a5942"; planContext.lineWidth = 2;
+  planContext.strokeRect(18, 18, 476, 476);
+  planContext.font = "bold 24px Georgia"; planContext.fillStyle = "#493d31";
+  planContext.fillText("AUBURN TEST RANGE · FLIGHT SHEET", 34, 54);
+  planContext.font = "17px Georgia"; planContext.fillText("LIQUID PROPULSION / MARCH 1926", 34, 80);
+  planContext.beginPath(); planContext.moveTo(34, 94); planContext.lineTo(478, 94); planContext.stroke();
+  planContext.strokeStyle = "#4b5c60"; planContext.lineWidth = 3;
+  // Hand-drawn vehicle elevation and dimension callouts.
+  planContext.beginPath();
+  planContext.moveTo(137, 410); planContext.lineTo(137, 198); planContext.lineTo(148, 163);
+  planContext.lineTo(159, 198); planContext.lineTo(159, 410); planContext.closePath(); planContext.stroke();
+  planContext.moveTo(137, 338); planContext.lineTo(116, 360); planContext.lineTo(137, 354);
+  planContext.moveTo(159, 338); planContext.lineTo(180, 360); planContext.lineTo(159, 354); planContext.stroke();
+  planContext.beginPath(); planContext.moveTo(106, 410); planContext.lineTo(190, 410); planContext.moveTo(111, 416); planContext.lineTo(185, 416); planContext.stroke();
+  planContext.strokeStyle = "#9a563d"; planContext.lineWidth = 2;
+  planContext.beginPath(); planContext.moveTo(203, 165); planContext.lineTo(203, 410); planContext.moveTo(196, 174); planContext.lineTo(203, 165); planContext.lineTo(210, 174); planContext.moveTo(196, 401); planContext.lineTo(203, 410); planContext.lineTo(210, 401); planContext.stroke();
+  planContext.font = "18px Georgia"; planContext.fillStyle = "#493d31"; planContext.fillText("8.4 M", 213, 290);
+  // Simple cross-section, bench notes, ruled log and a stamped revision box.
+  planContext.strokeStyle = "#4b5c60"; planContext.lineWidth = 2;
+  planContext.beginPath(); planContext.arc(337, 221, 55, 0, Math.PI * 2); planContext.moveTo(337, 160); planContext.lineTo(337, 282); planContext.moveTo(276, 221); planContext.lineTo(398, 221); planContext.stroke();
+  for (let row = 0; row < 5; row++) { planContext.beginPath(); planContext.moveTo(245, 321 + row * 23); planContext.lineTo(463 - (row % 2) * 28, 321 + row * 23); planContext.stroke(); }
+  planContext.strokeStyle = "#9a563d"; planContext.strokeRect(326, 414, 140, 55);
+  planContext.font = "bold 18px Georgia"; planContext.fillText("REV. 02 · FIELD", 338, 448);
+  fieldPlanTexture.update(false);
+  paperMat.albedoTexture = fieldPlanTexture;
   // Load the mission's NASA-marked model as the only vehicle shown in the scene.
   void (async () => {
     try {
@@ -733,15 +873,58 @@ export function createGameplayLayer(
       maxZ: station.z + 0.55,
     });
     const y = terrain.getHeightAt(station.x, station.z);
-    const top = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-weathered-top`, { width: station.width, height: 0.14, depth: station.kind === "propulsion" ? 1.1 : 0.9 }, scene);
-    top.position = new BABYLONNS.Vector3(station.x, y + 0.92, station.z);
-    top.material = woodMat;
-    top.parent = root;
+    const tableDepth = station.kind === "propulsion" ? 1.1 : 0.9;
+    const tabletopY = y + 0.94;
+    const boardWidth = (station.width - 0.12) / 4;
+    // Four separate, slightly uneven boards and a dark apron replace the flat
+    // single-block tabletop; gaps expose the solid joinery underneath.
+    for (let board = 0; board < 4; board++) {
+      const plank = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-oak-plank-${board}`, {
+        width: boardWidth, height: 0.105, depth: tableDepth,
+      }, scene);
+      plank.position = new BABYLONNS.Vector3(station.x - station.width / 2 + 0.06 + boardWidth * (board + 0.5), tabletopY, station.z);
+      plank.material = woodMat;
+      plank.parent = root;
+      plank.receiveShadows = true;
+    }
+    for (const end of [-1, 1]) {
+      const apron = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-long-apron-${end}`, { width: station.width - 0.18, height: 0.14, depth: 0.1 }, scene);
+      apron.position = new BABYLONNS.Vector3(station.x, y + 0.84, station.z + end * (tableDepth / 2 - 0.08));
+      apron.material = darkMetalMat;
+      apron.parent = root;
+    }
+    for (const side of [-1, 1]) {
+      const endApron = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-end-apron-${side}`, { width: 0.1, height: 0.14, depth: tableDepth - 0.16 }, scene);
+      endApron.position = new BABYLONNS.Vector3(station.x + side * (station.width / 2 - 0.06), y + 0.84, station.z);
+      endApron.material = darkMetalMat;
+      endApron.parent = root;
+    }
     for (const side of [-1, 1]) for (const end of [-1, 1]) {
-      const leg = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-leg-${side}-${end}`, { width: 0.1, height: 0.86, depth: 0.1 }, scene);
-      leg.position = new BABYLONNS.Vector3(station.x + side * (station.width * 0.38), y + 0.43, station.z + end * 0.3);
-      leg.material = darkMetalMat;
-      leg.parent = root;
+      const topX = station.x + side * (station.width / 2 - 0.16);
+      const topZ = station.z + end * (tableDepth / 2 - 0.14);
+      createBeam(`${station.name}-tapered-leg-${side}-${end}`,
+        new BABYLONNS.Vector3(topX, y + 0.84, topZ),
+        new BABYLONNS.Vector3(topX + side * 0.045, y + 0.07, topZ + end * 0.045),
+        0.09, darkMetalMat, root);
+      const foot = BABYLONNS.MeshBuilder.CreateBox(`${station.name}-cast-foot-${side}-${end}`, { width: 0.21, height: 0.06, depth: 0.21 }, scene);
+      foot.position = new BABYLONNS.Vector3(topX + side * 0.045, y + 0.04, topZ + end * 0.045);
+      foot.material = darkMetalMat;
+      foot.parent = root;
+      const shoe = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-foot-bolt-${side}-${end}`, { height: 0.025, diameter: 0.07, tessellation: 6 }, scene);
+      shoe.position = new BABYLONNS.Vector3(foot.position.x, y + 0.08, foot.position.z);
+      shoe.material = brassMat;
+      shoe.parent = root;
+    }
+    // Low stretchers tie the legs together and give the old field benches weight.
+    for (const end of [-1, 1]) {
+      createBeam(`${station.name}-lower-stretcher-${end}`,
+        new BABYLONNS.Vector3(station.x - station.width * 0.38, y + 0.31, station.z + end * (tableDepth / 2 - 0.16)),
+        new BABYLONNS.Vector3(station.x + station.width * 0.38, y + 0.31, station.z + end * (tableDepth / 2 - 0.16)),
+        0.065, darkMetalMat, root);
+    }
+    for (const side of [-1, 1]) {
+      for (const end of [-1, 1]) addFrontBolt(`${station.name}-apron-rivet-${side}-${end}`,
+        station.x + side * (station.width / 2 - 0.16), y + 0.84, station.z + end * (tableDepth / 2 - 0.075), root, 0.07);
     }
     const addBox = (name: string, width: number, height: number, depth: number, x: number, topY: number, z: number, material: BABYLON.Material) => {
       const mesh = BABYLONNS.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
@@ -772,12 +955,8 @@ export function createGameplayLayer(
       injector.material = propMat;
       injector.parent = root;
       createBeam(`${station.name}-pressure-line`, new BABYLONNS.Vector3(station.x + 0.55, y + 1.12, station.z + 0.08), new BABYLONNS.Vector3(station.x + 0.84, y + 1.34, station.z + 0.08), 0.045, markerMat, root);
-      const gauge = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-pressure-gauge`, { height: 0.09, diameter: 0.32, tessellation: 20 }, scene);
-      gauge.position = new BABYLONNS.Vector3(station.x + 0.88, y + 1.38, station.z + 0.08);
-      gauge.rotation.x = Math.PI / 2;
-      gauge.material = paperMat;
-      gauge.parent = root;
-      addBox(`${station.name}-gauge-rim`, 0.36, 0.055, 0.36, station.x + 0.88, y + 1.23, station.z + 0.08, darkMetalMat);
+      createBeam(`${station.name}-gauge-neck`, new BABYLONNS.Vector3(station.x + 0.88, y + 1.02, station.z + 0.08), new BABYLONNS.Vector3(station.x + 0.88, y + 1.27, station.z + 0.08), 0.09, darkMetalMat, root);
+      addGauge(`${station.name}-pressure-gauge`, new BABYLONNS.Vector3(station.x + 0.88, y + 1.42, station.z + 0.08), 0.19, root);
     }
     if (station.kind === "recorder") {
       // A paper-drum recorder, stylus arm, and paired test-pressure dials.
@@ -791,23 +970,40 @@ export function createGameplayLayer(
       axle.rotation.z = Math.PI / 2;
       axle.material = darkMetalMat;
       axle.parent = root;
+      for (const side of [-1, 1]) {
+        const collar = BABYLONNS.MeshBuilder.CreateTorus(`${station.name}-drum-end-collar-${side}`, { diameter: 0.31, thickness: 0.045, tessellation: 24 }, scene);
+        collar.position = new BABYLONNS.Vector3(station.x - 0.48 + side * 0.21, y + 1.2, station.z - 0.06);
+        collar.rotation.y = Math.PI / 2;
+        collar.material = brassMat;
+        collar.parent = root;
+      }
       createBeam(`${station.name}-stylus`, new BABYLONNS.Vector3(station.x - 0.08, y + 1.34, station.z + 0.2), new BABYLONNS.Vector3(station.x - 0.33, y + 1.19, station.z + 0.03), 0.035, markerMat, root);
       for (let i = 0; i < 2; i++) {
-        const dial = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-dial-${i}`, { height: 0.1, diameter: 0.28, tessellation: 16 }, scene);
-        dial.position = new BABYLONNS.Vector3(station.x + 0.44 + i * 0.42, y + 1.15, station.z - 0.06);
-        dial.material = paperMat;
-        dial.parent = root;
-        addBox(`${station.name}-dial-foot-${i}`, 0.32, 0.13, 0.3, station.x + 0.44 + i * 0.42, y + 1.06, station.z - 0.06, darkMetalMat);
+        const dialX = station.x + 0.44 + i * 0.42;
+        addBox(`${station.name}-dial-foot-${i}`, 0.3, 0.15, 0.24, dialX, y + 1.08, station.z - 0.06, darkMetalMat);
+        createBeam(`${station.name}-dial-stem-${i}`, new BABYLONNS.Vector3(dialX, y + 1.08, station.z - 0.06), new BABYLONNS.Vector3(dialX, y + 1.23, station.z - 0.06), 0.06, brassMat, root);
+        addGauge(`${station.name}-dial-${i}`, new BABYLONNS.Vector3(dialX, y + 1.31, station.z - 0.06), 0.14, root);
       }
     }
     if (station.kind === "observation") {
-      // Field camera on a compact tripod and a photographic plate for the log.
-      addBox(`${station.name}-photo-plate`, 0.4, 0.04, 0.3, station.x + 0.62, y + 1.04, station.z + 0.06, markerMat);
-      const lens = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-camera-lens`, { height: 0.3, diameter: 0.18, tessellation: 16 }, scene);
-      lens.position = new BABYLONNS.Vector3(station.x + 0.72, y + 1.2, station.z - 0.16);
+      // Wooden plate camera and hood point back to the launch pad.
+      const cameraBody = addBox(`${station.name}-plate-camera-body`, 0.42, 0.32, 0.28, station.x + 0.68, y + 1.16, station.z - 0.1, darkMetalMat);
+      cameraBody.material = woodMat;
+      const cameraFront = addBox(`${station.name}-camera-standard`, 0.28, 0.22, 0.09, station.x + 0.68, y + 1.16, station.z + 0.08, propMat);
+      cameraFront.material = darkMetalMat;
+      const lens = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-camera-lens`, { height: 0.23, diameterTop: 0.12, diameterBottom: 0.16, tessellation: 20 }, scene);
+      lens.position = new BABYLONNS.Vector3(station.x + 0.68, y + 1.16, station.z + 0.23);
       lens.rotation.x = Math.PI / 2;
       lens.material = darkMetalMat;
       lens.parent = root;
+      const glass = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-camera-lens-glass`, { height: 0.018, diameter: 0.1, tessellation: 20 }, scene);
+      glass.position = new BABYLONNS.Vector3(station.x + 0.68, y + 1.16, station.z + 0.35);
+      glass.rotation.x = Math.PI / 2;
+      glass.material = launchContactMat;
+      glass.parent = root;
+      for (const side of [-1, 1]) {
+        createBeam(`${station.name}-tripod-leg-${side}`, new BABYLONNS.Vector3(station.x + 0.68, y + 1.01, station.z - 0.1), new BABYLONNS.Vector3(station.x + 0.68 + side * 0.24, y + 0.04, station.z - 0.32), 0.035, darkMetalMat, root);
+      }
     }
     if (station.kind === "analysis") {
       // Sheltered flight-log desk with a specimen tray and ink bottle.
@@ -1277,7 +1473,10 @@ export function createGameplayLayer(
       propMat.dispose();
       woodMat.dispose(false, true);
       darkMetalMat.dispose(false, true);
-      paperMat.dispose();
+      paperMat.dispose(true, true);
+      brassMat.dispose();
+      saddleLeatherMat.dispose();
+      gaugeFaceMat.dispose(true, true);
       markerMat.dispose();
       launchPadMat.dispose(false, true);
       launchContactMat.dispose(false, true);
