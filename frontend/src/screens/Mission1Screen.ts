@@ -862,6 +862,207 @@ export class Mission1Screen implements Screen {
     wrap.append(close); card.append(wrap); this.modalRoot.append(card);
   }
 
+  /** A compact, retryable task panel used by the field tests and launch prep. */
+  private showTaskModal(
+    title: string,
+    description: string,
+    buildTask: (setReady: (ready: boolean, message: string) => void) => HTMLElement,
+    onComplete: () => void,
+    confirmLabel: string,
+    secondaryAction?: { label: string; run: () => void },
+  ): void {
+    if (!this.modalRoot) return;
+    this.paused = true;
+    this.modalRoot.classList.remove("modal-overlay--hidden");
+    this.modalRoot.innerHTML = "";
+    const card = el("div", { className: "modal-card mission-task-card" });
+    const status = el("p", { className: "mission-task-status", attrs: { role: "status", "aria-live": "polite" } });
+    const complete = el("button", { className: "btn btn-primary", text: t(confirmLabel), attrs: { type: "button", disabled: "" } });
+    const controls = el("div", { className: "mission-task-actions" });
+    const setReady = (ready: boolean, message: string): void => {
+      complete.disabled = !ready;
+      status.textContent = t(message);
+      status.classList.toggle("mission-task-status--ready", ready);
+    };
+    complete.addEventListener("click", () => {
+      if (complete.disabled) return;
+      this.modalRoot?.classList.add("modal-overlay--hidden");
+      this.paused = false;
+      this.state.decisionsMade += 1;
+      onComplete();
+      this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
+      void this.autosave();
+    });
+    controls.append(complete);
+    if (secondaryAction) {
+      const secondary = el("button", { className: "btn btn-secondary", text: t(secondaryAction.label), attrs: { type: "button" } });
+      secondary.addEventListener("click", () => {
+        this.modalRoot?.classList.add("modal-overlay--hidden");
+        this.paused = false;
+        secondaryAction.run();
+        this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
+        void this.autosave();
+      });
+      controls.append(secondary);
+    }
+    const close = el("button", { className: "btn btn-ghost", text: t("Cerrar tarea"), attrs: { type: "button" } });
+    close.addEventListener("click", () => {
+      this.modalRoot?.classList.add("modal-overlay--hidden");
+      this.paused = false;
+    });
+    controls.append(close);
+    card.append(
+      el("h3", { className: "modal-title", text: t(title) }),
+      el("p", { className: "modal-description", text: t(description) }),
+      buildTask(setReady),
+      status,
+      controls,
+    );
+    this.modalRoot.append(card);
+    setReady(false, "Sigue la indicación. Puedes volver a intentarlo sin penalización.");
+  }
+
+  private buildPressureCalibrationTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const panel = el("div", { className: "mission-task-console mission-gauge-task" });
+    const value = el("output", { className: "mission-gauge-value", text: "30" });
+    const track = el("div", { className: "mission-gauge-track", attrs: { "aria-hidden": "true" } });
+    const target = el("span", { className: "mission-gauge-target" });
+    const needle = el("span", { className: "mission-gauge-needle" });
+    track.append(target, needle);
+    const range = el("input", {
+      className: "mission-gauge-slider",
+      attrs: { type: "range", min: "0", max: "100", value: "30", "aria-label": t("Lectura del manómetro") },
+    });
+    const read = el("button", { className: "btn btn-secondary mission-task-readout", text: t("Leer manómetro"), attrs: { type: "button" } });
+    const update = (): void => {
+      const reading = Number(range.value);
+      value.textContent = String(reading);
+      needle.style.left = reading + "%";
+      setReady(false, "Coloca la aguja en la banda verde y registra la lectura.");
+    };
+    range.addEventListener("input", update);
+    read.addEventListener("click", () => {
+      const reading = Number(range.value);
+      if (reading >= 62 && reading <= 74) {
+        setReady(true, "Lectura estable registrada. El manómetro quedó dentro de la banda.");
+      } else {
+        setReady(false, "La aguja sigue fuera de la banda verde. Ajusta y prueba otra vez.");
+      }
+    });
+    panel.append(
+      el("div", { className: "mission-gauge-readout", children: [el("span", { text: t("PRESIÓN SIMULADA") }), value, el("span", { text: "%" })] }),
+      track,
+      range,
+      read,
+      el("p", { className: "mission-task-hint", text: t("Objetivo: deja la aguja entre 62 y 74.") }),
+    );
+    return panel;
+  }
+
+  private buildSignalRoutingTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const pairs = [
+      { source: "Alimentación", target: "Presión" },
+      { source: "Registrador", target: "Marcas de tiempo" },
+      { source: "Estructura", target: "Vibración" },
+    ];
+    const targets = ["Vibración", "Presión", "Marcas de tiempo"];
+    const panel = el("div", { className: "mission-task-console mission-wire-task" });
+    const progress = el("p", { className: "mission-wire-progress", text: "0/3" });
+    const columns = el("div", { className: "mission-wire-columns" });
+    const sourceColumn = el("div", { className: "mission-wire-column" });
+    const targetColumn = el("div", { className: "mission-wire-column" });
+    const matched = new Set<string>();
+    let selected: string | null = null;
+    const sourceButtons = new Map<string, HTMLButtonElement>();
+    const updateProgress = (message: string): void => {
+      progress.textContent = matched.size + "/3";
+      setReady(matched.size === pairs.length, message);
+    };
+    const chooseTarget = (target: string, button: HTMLButtonElement): void => {
+      if (!selected) {
+        updateProgress("Primero elige una fuente de señal.");
+        return;
+      }
+      const pair = pairs.find((item) => item.source === selected);
+      if (pair?.target === target) {
+        matched.add(selected);
+        button.disabled = true;
+        sourceButtons.get(selected)?.setAttribute("disabled", "");
+        sourceButtons.get(selected)?.classList.add("mission-wire-port--matched");
+        button.classList.add("mission-wire-port--matched");
+        selected = null;
+        updateProgress(matched.size === pairs.length ? "Las tres señales llegan al instrumento correcto." : "Conexión correcta. Busca la siguiente pareja.");
+      } else {
+        selected = null;
+        sourceButtons.forEach((sourceButton) => {
+          sourceButton.classList.remove("mission-wire-port--selected");
+          sourceButton.setAttribute("aria-pressed", "false");
+        });
+        updateProgress("Esa conexión no coincide. Intenta con otro puerto.");
+      }
+    };
+    for (const pair of pairs) {
+      const button = el("button", { className: "mission-wire-port", text: pair.source, attrs: { type: "button", "aria-pressed": "false" } });
+      button.addEventListener("click", () => {
+        if (matched.has(pair.source)) return;
+        selected = pair.source;
+        sourceButtons.forEach((sourceButton) => {
+          sourceButton.classList.remove("mission-wire-port--selected");
+          sourceButton.setAttribute("aria-pressed", "false");
+        });
+        button.classList.add("mission-wire-port--selected");
+        button.setAttribute("aria-pressed", "true");
+        updateProgress("Ahora selecciona el registro que corresponde a esta fuente.");
+      });
+      sourceButtons.set(pair.source, button);
+      sourceColumn.append(button);
+    }
+    for (const target of targets) {
+      const button = el("button", { className: "mission-wire-port", text: target, attrs: { type: "button" } });
+      button.addEventListener("click", () => chooseTarget(target, button));
+      targetColumn.append(button);
+    }
+    columns.append(sourceColumn, targetColumn);
+    panel.append(
+      el("div", { className: "mission-wire-headings", children: [el("span", { text: t("FUENTES") }), el("span", { text: t("REGISTROS") })] }),
+      columns,
+      progress,
+    );
+    updateProgress("Empareja cada fuente con su registro.");
+    return panel;
+  }
+
+  private buildVibrationTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const panel = el("div", { className: "mission-task-console mission-wave-task" });
+    const traces = [
+      { id: "steady", label: "TRAZA A", path: "M8 40 C22 34 30 46 44 40 S66 34 80 40 S102 46 116 40 S138 34 152 40 S174 46 188 40" },
+      { id: "noise", label: "TRAZA B", path: "M8 42 L18 40 L27 44 L36 34 L46 45 L55 37 L64 43 L73 25 L82 48 L92 38 L101 44 L110 29 L120 50 L130 34 L140 43 L150 22 L160 49 L170 36 L180 45 L188 39" },
+      { id: "drift", label: "TRAZA C", path: "M8 45 C30 42 34 39 50 38 S75 36 91 34 S116 31 132 29 S164 26 188 23" },
+    ];
+    const choices = el("div", { className: "mission-wave-choices" });
+    for (const trace of traces) {
+      const button = el("button", {
+        className: "mission-wave-choice",
+        attrs: { type: "button", "aria-label": t("Seleccionar") + " " + trace.label },
+      });
+      const chart = el("span", { className: "mission-wave-chart" });
+      chart.innerHTML = '<svg viewBox="0 0 196 64" aria-hidden="true"><path class="mission-wave-grid" d="M0 16H196M0 32H196M0 48H196M49 0V64M98 0V64M147 0V64"/><path class="mission-wave-line" d="' + trace.path + '"/></svg>';
+      button.append(el("strong", { text: trace.label }), chart);
+      button.addEventListener("click", () => {
+        choices.querySelectorAll(".mission-wave-choice").forEach((node) => node.classList.remove("mission-wave-choice--selected"));
+        button.classList.add("mission-wave-choice--selected");
+        if (trace.id === "noise") {
+          setReady(true, "La traza irregular coincide con la vibración detectada.");
+        } else {
+          setReady(false, "Esa señal no muestra la anomalía. Revisa otra traza.");
+        }
+      });
+      choices.append(button);
+    }
+    panel.append(choices, el("p", { className: "mission-task-hint", text: t("Marca la traza que se aparta del patrón regular.") }));
+    return panel;
+  }
+
   private showEngineeringLeadDialogue(onContinue: () => void): void {
     const lines = MISSION_01_DIALOGUE.engineeringLead;
     this.state.addLogEntry(`RADIO — ENGINEERING LEAD: ${lines[1]}`);
@@ -935,36 +1136,72 @@ export class Mission1Screen implements Screen {
 
     this.showChoice(
       "TEST AREA · SYSTEMS REVIEW",
-      `Outdoor Test Stand & Blast Shields.\nStability rating: ${metrics.stability}% · Mass: ${metrics.mass}% · Data: ${metrics.data}%\n\nRun the static review tests before fueling the flight vehicle:`,
+      `Outdoor Test Stand & Blast Shields.\nStability rating: ${metrics.stability}% · Mass: ${metrics.mass}% · Data: ${metrics.data}%\n\nComplete three short console tasks. Each one can be retried without a penalty:`,
       [
         {
-          label: `${systemDone ? "✓" : "1."} System Feed & Pressure Test`,
-          run: () => {
-            this.state.runTest("system");
-            this.state.addLogEntry("TEST AREA — Nitrogen feed and propellant lines pressurized.");
-            this.showToast(t("FEED PRESSURE TEST · Static pressure verified."));
-            this.checkTestProgress();
-          },
+          label: `${systemDone ? "✓" : "1."} ${t("Calibrar el manómetro")}`,
+          run: () => this.runPressureTest(),
         },
         {
-          label: `${instDone ? "✓" : "2."} Instrumentation & Stylus Test`,
-          run: () => {
-            this.state.runTest("instrumentation");
-            this.state.addLogEntry("TEST AREA — Smoked drum recorder paper engaged.");
-            this.showToast(t("INSTRUMENTATION TEST · Stylus responding to pulses."));
-            this.checkTestProgress();
-          },
+          label: `${instDone ? "✓" : "2."} ${t("Conectar las señales")}`,
+          run: () => this.runInstrumentationTest(),
         },
         {
-          label: `${stabDone ? "✓" : "3."} Structural & Vibration Check`,
-          run: () => {
-            this.state.runTest("stability");
-            this.state.addLogEntry("TEST AREA — Vibration check run against frame clamps.");
-            this.showToast(t("VIBRATION CHECK · Frame resonance recorded."));
-            this.checkTestProgress();
-          },
+          label: `${stabDone ? "✓" : "3."} ${t("Encontrar la traza irregular")}`,
+          run: () => this.runStabilityTest(),
         },
       ]
+    );
+  }
+
+  private runPressureTest(): void {
+    if (this.state.testsRun.has("system")) { this.showToast(t("PRUEBA DE PRESIÓN COMPLETADA · Lectura estable.")); return; }
+    this.showTaskModal(
+      "PRUEBA DE PRESIÓN · CALIBRACIÓN",
+      "Ajusta la aguja del panel simulado hasta la banda verde y registra la lectura.",
+      (setReady) => this.buildPressureCalibrationTask(setReady),
+      () => {
+        this.state.runTest("system");
+        this.state.addLogEntry("TEST AREA — The simulated pressure trace held steady.");
+        this.showToast(t("PRUEBA DE PRESIÓN COMPLETADA · Lectura estable."));
+        this.checkTestProgress();
+        if (!this.state.testsComplete()) this.openTesting();
+      },
+      "Guardar lectura",
+    );
+  }
+
+  private runInstrumentationTest(): void {
+    if (this.state.testsRun.has("instrumentation")) { this.showToast(t("CANALES CONECTADOS · El registrador recibe las señales.")); return; }
+    this.showTaskModal(
+      "PRUEBA DE INSTRUMENTACIÓN · CONECTA LOS REGISTROS",
+      "Une cada fuente de señal con el instrumento que la registra. Si no coincide, prueba otro puerto.",
+      (setReady) => this.buildSignalRoutingTask(setReady),
+      () => {
+        this.state.runTest("instrumentation");
+        this.state.addLogEntry("TEST AREA — The recorder, pressure, and vibration channels were matched.");
+        this.showToast(t("CANALES CONECTADOS · El registrador recibe las señales."));
+        this.checkTestProgress();
+        if (!this.state.testsComplete()) this.openTesting();
+      },
+      "Guardar conexiones",
+    );
+  }
+
+  private runStabilityTest(): void {
+    if (this.state.testsRun.has("stability")) { this.showToast(t("TRAZA MARCADA · El equipo revisará el origen de la vibración.")); return; }
+    this.showTaskModal(
+      "PRUEBA ESTRUCTURAL · DETECTA LA TRAZA",
+      "Compara las tres señales y marca la que se aparta del patrón regular observado por el equipo.",
+      (setReady) => this.buildVibrationTask(setReady),
+      () => {
+        this.state.runTest("stability");
+        this.state.addLogEntry("TEST AREA — An irregular vibration trace was marked for inspection.");
+        this.showToast(t("TRAZA MARCADA · El equipo revisará el origen de la vibración."));
+        this.checkTestProgress();
+        if (!this.state.testsComplete()) this.openTesting();
+      },
+      "Registrar traza",
     );
   }
 
@@ -1005,69 +1242,76 @@ export class Mission1Screen implements Screen {
     const weather = this.gameplay?.getWeather() ?? "CLOUDY";
     const cl = this.state.checklist;
 
-    const items = [
-      { id: "inspect-vehicle", label: "Inspect vehicle on launch frame" },
-      { id: "check-instruments", label: "Check observation instruments" },
-      { id: "review-conditions", label: `Review weather conditions (${weather})` },
-      { id: "confirm-observation", label: "Confirm observation barricades" },
-      { id: "confirm-telemetry", label: "Confirm telemetry recorder drum" },
+    const checklistItems = [
+      { id: "inspect-vehicle", label: "Inspeccionar el vehículo" },
+      { id: "check-instruments", label: "Revisar los instrumentos de observación" },
+      { id: "review-conditions", label: "Revisar las condiciones meteorológicas" },
+      { id: "confirm-observation", label: "Confirmar la zona de observación" },
+      { id: "confirm-telemetry", label: "Confirmar el registrador de telemetría" },
     ];
-
-    const options = items.map((item) => ({
-      label: `${cl.has(item.id) ? "✓" : "□"} ${item.label}`,
-      run: () => {
-        this.state.markChecklist(item.id);
-        this.showToast(`CHECKLIST · ${item.label} confirmed.`);
-        this.openLaunchPreparation();
+    const selected = new Set(cl);
+    this.showTaskModal(
+      "CAMPO DE LANZAMIENTO · LISTA PREVIA",
+      `Auburn, Massachusetts · 16 de marzo de 1926.\nMarca cada control para despejar la plataforma.`,
+      (setReady) => {
+        const panel = el("div", { className: "mission-task-console mission-checklist-task" });
+        const count = el("p", { className: "mission-checklist-count" });
+        const rows = el("div", { className: "mission-checklist-rows" });
+        const refresh = (): void => {
+          count.textContent = selected.size + "/" + checklistItems.length + " " + t("controles confirmados");
+          setReady(selected.size === checklistItems.length, selected.size === checklistItems.length
+            ? "Lista completa. El equipo está listo para continuar."
+            : "Marca los cinco controles para despejar la plataforma.");
+        };
+        for (const item of checklistItems) {
+          const button = el("button", {
+            className: "mission-checklist-row" + (selected.has(item.id) ? " mission-checklist-row--checked" : ""),
+            attrs: { type: "button", "aria-pressed": String(selected.has(item.id)) },
+          });
+          const mark = el("span", { className: "mission-checklist-mark", text: selected.has(item.id) ? "✓" : "□" });
+          button.append(mark, el("span", { text: t(item.label) + (item.id === "review-conditions" ? " · " + t(weather) : "") }));
+          button.addEventListener("click", () => {
+            if (selected.has(item.id)) selected.delete(item.id);
+            else selected.add(item.id);
+            const checked = selected.has(item.id);
+            button.classList.toggle("mission-checklist-row--checked", checked);
+            button.setAttribute("aria-pressed", String(checked));
+            mark.textContent = checked ? "✓" : "□";
+            refresh();
+          });
+          rows.append(button);
+        }
+        panel.append(rows, count);
+        refresh();
+        return panel;
       },
-    }));
-
-    if (this.state.checklistComplete()) {
-      options.push({
-        label: "PROCEED · Confirm readiness and attempt flight",
-        run: () => {
-          this.state.engineering.launchDecision = "proceed";
-          this.state.completeObjective("prepare");
-          this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry);
-          this.gameplay?.setPeakAltitude(flightPeakAltitude(this.state.flightResult));
-          this.renderObjectives();
-          void this.autosave();
-          this.showChoice(
-            "PRE-LAUNCH BRIEFING",
-            `MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`,
-            [
-              {
-                label: "Head to the Observation Area",
-                run: () => {
-                  this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch."));
-                },
-              },
-            ]
-          );
-        },
-      });
-      options.push({
-        label: "DELAY · Recheck conditions before clearing the pad",
+      () => {
+        for (const item of checklistItems) this.state.markChecklist(item.id);
+        this.state.engineering.launchDecision = "proceed";
+        this.state.completeObjective("prepare");
+        this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry);
+        this.gameplay?.setPeakAltitude(flightPeakAltitude(this.state.flightResult));
+        this.renderObjectives();
+        this.showChoice(
+          "PRE-LAUNCH BRIEFING",
+          `MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`,
+          [{ label: "Head to the Observation Area", run: () => this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch.")) }],
+        );
+      },
+      "Confirmar lista y seguir",
+      {
+        label: "Aplazar y volver a revisar",
         run: () => {
           this.state.engineering.launchDecision = "delay";
           this.state.flightResult = null;
           this.state.checklist.clear();
-          // Delaying costs budget and time (MISSION_01_DESIGN_SPEC, phase F.7).
           this.state.engineering.budget = Math.max(0, this.state.engineering.budget - LAUNCH_DELAY_BUDGET_COST);
           this.state.advanceTick();
           this.state.addLogEntry(`[T${this.state.tick}] Launch delayed: budget −${LAUNCH_DELAY_BUDGET_COST}, one time step lost.`);
-          this.renderObjectives();
-          void this.autosave();
           this.showToast(t("LAUNCH DELAYED · The flight has not started. Recheck the launch conditions before proceeding."));
           this.openLaunchPreparation();
         },
-      });
-    }
-
-    this.showChoice(
-      "LAUNCH FIELD · PRE-FLIGHT CHECKLIST",
-      `Auburn, Massachusetts · March 16, 1926.\nWeather: ${weather} · Time: ${this.state.tick < 20 ? "DAWN" : "MORNING"}\nComplete all items before clearing the launch pad:`,
-      options
+      },
     );
   }
 

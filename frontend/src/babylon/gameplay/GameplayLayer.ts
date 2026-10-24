@@ -199,6 +199,18 @@ export function createGameplayLayer(
   saddleLeatherMat.albedoColor = BABYLONNS.Color3.FromHexString("#51372d");
   saddleLeatherMat.metallic = 0.02;
   saddleLeatherMat.roughness = 0.92;
+  const recorderLampMaterials = [
+    { name: "recorder-lamp-green", color: "#71bc79" },
+    { name: "recorder-lamp-amber", color: "#dda45a" },
+    { name: "recorder-lamp-red", color: "#bd6652" },
+  ].map(({ name, color }) => {
+    const material = new BABYLONNS.PBRMaterial(name, scene);
+    material.albedoColor = BABYLONNS.Color3.FromHexString(color);
+    material.emissiveColor = BABYLONNS.Color3.FromHexString(color).scale(0.42);
+    material.metallic = 0.08;
+    material.roughness = 0.38;
+    return material;
+  });
   const gaugeTexture = new BABYLONNS.DynamicTexture("aged-analogue-gauge-face", { width: 512, height: 512 }, scene, false);
   const gaugeContext = gaugeTexture.getContext() as unknown as CanvasRenderingContext2D;
   gaugeContext.fillStyle = "#d8cba9";
@@ -902,6 +914,30 @@ export function createGameplayLayer(
         createBeam(`${station.name}-dial-stem-${i}`, new BABYLONNS.Vector3(dialX, y + 1.08, station.z - 0.06), new BABYLONNS.Vector3(dialX, y + 1.23, station.z - 0.06), 0.06, brassMat, root);
         addGauge(`${station.name}-dial-${i}`, new BABYLONNS.Vector3(dialX, y + 1.31, station.z - 0.06), 0.14, root);
       }
+      // A tactile channel board makes the pressure, recorder and vibration
+      // tasks legible in the 3D world before the player opens the console.
+      const channelBoard = addBox(`${station.name}-signal-routing-board`, 0.72, 0.075, 0.34, station.x - 0.04, y + 1.045, station.z + 0.31, darkMetalMat);
+      channelBoard.rotation.x = -0.13;
+      for (let i = 0; i < 3; i++) {
+        const portX = station.x - 0.27 + i * 0.23;
+        const bezel = BABYLONNS.MeshBuilder.CreateTorus(`${station.name}-signal-port-bezel-${i}`, { diameter: 0.13, thickness: 0.018, tessellation: 20 }, scene);
+        bezel.position.set(portX, y + 1.12, station.z + 0.32);
+        bezel.rotation.x = Math.PI / 2;
+        bezel.material = brassMat;
+        bezel.parent = root;
+        const lamp = BABYLONNS.MeshBuilder.CreateSphere(`${station.name}-channel-lamp-${i}`, { diameter: 0.071, segments: 12 }, scene);
+        lamp.position.set(portX, y + 1.125, station.z + 0.32);
+        lamp.material = recorderLampMaterials[i]!;
+        lamp.parent = root;
+      }
+      for (let screw = 0; screw < 4; screw++) {
+        const x = station.x - 0.35 + (screw % 2) * 0.62;
+        const z = station.z + 0.19 + Math.floor(screw / 2) * 0.23;
+        const fastener = BABYLONNS.MeshBuilder.CreateCylinder(`${station.name}-board-fastener-${screw}`, { diameter: 0.035, height: 0.016, tessellation: 12 }, scene);
+        fastener.position.set(x, y + 1.091, z);
+        fastener.material = brassMat;
+        fastener.parent = root;
+      }
     }
     if (station.kind === "observation") {
       // Wooden plate camera and hood point back to the launch pad.
@@ -1458,6 +1494,7 @@ export function createGameplayLayer(
       paperMat.dispose(true, true);
       brassMat.dispose();
       saddleLeatherMat.dispose();
+      recorderLampMaterials.forEach(material => material.dispose());
       gaugeFaceMat.dispose(true, true);
       chartMat.dispose(true, true);
       markerMat.dispose();

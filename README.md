@@ -137,6 +137,15 @@ procedencia aprobada para futuras referencias/modelos está registrada en
 [NASA 3D Resources](https://science.nasa.gov/3d-resources/); no se descargan
 modelos de marketplaces ni sitios desconocidos en tiempo de ejecución.
 
+Las estaciones exteriores muestran qué se puede hacer allí antes de abrir un
+diálogo: el banco de ingeniería tiene mordaza, cámara de ensayo, mangueras y
+manómetro; la mesa de pruebas incorpora un registrador de tambor, diales y un
+panel de tres canales iluminados que corresponde al minijuego de señales; el
+puesto de observación tiene una cámara de placas con fuelle y trípode; y la
+mesa de análisis incluye bandeja de recuperación y lámpara. El soporte del
+vehículo, el cobertizo abierto y el toldo de análisis se construyen con piezas
+procedurales y modelos GLB optimizados cuando están disponibles.
+
 Los fondos variables del splash, login y selector de misiones son fotografías
 reales del programa espacial y viven en `frontend/public/images/`. Para
 agregar otro fondo basta con copiar allí un archivo (`.jpg`, `.jpeg`, `.png`,
@@ -183,7 +192,10 @@ Todas las rutas (excepto `/health`, `/auth/*`) requieren
 - **Misión 1** es completamente jugable: recursos que decaen por turno,
   4 eventos de decisión con efectos en recursos y muestras, guardado
   automático periódico (autosave a `/progress` e `/inventory`), y un informe
-  final con resultado (éxito/parcial/fallo).
+  final con resultado (éxito/parcial/fallo). La zona de pruebas incluye tres
+  minijuegos breves: calibrar un manómetro, emparejar señales y localizar una
+  traza irregular. La lista previa al lanzamiento se completa marcando cinco
+  controles; se puede reintentar sin penalización.
 - **Misión 2 y 3** aparecen en el carrusel como bloqueadas
   (`lockedByDefault=true`) hasta completar la anterior; su contenido
   jugable queda fuera del alcance de este MVP.
