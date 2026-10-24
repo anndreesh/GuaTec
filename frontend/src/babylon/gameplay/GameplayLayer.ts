@@ -102,6 +102,14 @@ export function createGameplayLayer(
 
   const astronaut = createAstronautCharacter(BABYLONNS, scene);
   astronaut.root.parent = root;
+  // ArcRotateCamera needs a real scene node to follow, rather than receiving
+  // copied world coordinates each frame. This anchor rides with the avatar's
+  // upper body and produces an actual third-person camera pivot.
+  const cameraFollowAnchor = BABYLONNS.MeshBuilder.CreateSphere("player-camera-follow-anchor", { diameter: 0.01 }, scene);
+  cameraFollowAnchor.parent = astronaut.root;
+  cameraFollowAnchor.position.y = 1.12;
+  cameraFollowAnchor.isVisible = false;
+  cameraFollowAnchor.isPickable = false;
   const proceduralAvatarMeshes = astronaut.root.getChildMeshes(false);
   astronaut.root.position = new BABYLONNS.Vector3(
     PLAYER_START.x,
@@ -733,8 +741,7 @@ export function createGameplayLayer(
   // Normal exploration is a close third-person follow view.  The older
   // 48-unit establishing-shot radius made the camera feel pinned to the map
   // rather than carried by the astronaut.
-  const cameraOffsetRadius = 8.8;
-  const cameraFollowHeight = 1.05;
+  const cameraOffsetRadius = 5.6;
   camera.lowerRadiusLimit = 4;
   camera.upperRadiusLimit = 56;
   // Keep the orbit on the upper side of the horizon so the camera can never
@@ -754,12 +761,10 @@ export function createGameplayLayer(
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
 
-  /** Keep the orbit pivot on the astronaut's upper body.  Only the player
-   * controls the orbit angles; world movement never leaves the camera looking
-   * at a fixed point or a fixed Z offset. */
+  /** Lock the orbit pivot to the astronaut's upper body. Only the player
+   * controls the orbit angles; world movement carries the camera with them. */
   function followAstronaut(): void {
-    camera.target.copyFrom(astronaut.root.position);
-    camera.target.y += cameraFollowHeight;
+    camera.lockedTarget = cameraFollowAnchor;
   }
 
   function onKeyDown(ev: KeyboardEvent): void {
@@ -864,6 +869,7 @@ export function createGameplayLayer(
       playLaunch() {
         launchElapsed = 0;
         rocketRoot.position.copyFrom(rocketStart);
+        camera.lockedTarget = null;
         camera.radius = 8.5;
         camera.beta = 1.05;
         launchSmoke.start();
@@ -871,6 +877,7 @@ export function createGameplayLayer(
       },
       setCameraMode(mode) {
         activeCameraMode = mode;
+        camera.lockedTarget = null;
         if (mode === "observation") {
           camera.target.copyFrom(rocketRoot.position);
           camera.alpha = -Math.PI * 0.45;
@@ -891,6 +898,7 @@ export function createGameplayLayer(
       playOpeningCinematic(onDone) {
         openingElapsed = 0;
         openingDone = onDone ?? null;
+        camera.lockedTarget = null;
         camera.radius = 22;
         camera.beta = 1.02;
         camera.alpha = Math.PI * 0.46;
@@ -959,6 +967,7 @@ export function createGameplayLayer(
       window.removeEventListener("keyup", onKeyUp);
       camera.detachControl();
       camera.inputs.clear();
+      camera.lockedTarget = null;
       root.setEnabled(false);
     },
     update(deltaSeconds: number) {
@@ -966,6 +975,7 @@ export function createGameplayLayer(
       elapsed += deltaSeconds;
       if (openingElapsed >= 0) {
         openingElapsed += deltaSeconds;
+        camera.lockedTarget = null;
         camera.alpha = -Math.PI * 0.15 - openingElapsed * 0.18;
         camera.radius = 22 - openingElapsed * 0.9;
         camera.target = new BABYLONNS.Vector3(
@@ -1100,6 +1110,7 @@ export function createGameplayLayer(
 
       const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14 && openingElapsed < 0;
       if (cameraTracksRocket) {
+        camera.lockedTarget = null;
         if (activeCameraMode === "observation") {
           camera.target.copyFrom(rocketRoot.position);
           camera.alpha = -Math.PI * 0.45;
@@ -1131,6 +1142,7 @@ export function createGameplayLayer(
     },
   dispose() {
       this.disable();
+      camera.lockedTarget = null;
       astronaut.dispose();
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();
