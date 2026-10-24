@@ -20,7 +20,8 @@ function formatStoryDate(value: string | null): string | null {
   if (!value) return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(getLanguage() === "en" ? "en-US" : "es-ES", { day: "numeric", month: "long", year: "numeric" }).format(parsed);
+  const locale = { es: "es-ES", en: "en-US", fr: "fr-FR" }[getLanguage()];
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(parsed);
 }
 
 /** Mission carousel: shows the 3 missions with lock state and progress. */
@@ -124,6 +125,14 @@ export class MissionSelectScreen implements Screen {
       activeIndex = (index + stories.length) % stories.length;
       track.innerHTML = "";
       const story = stories[activeIndex];
+      const sourceTitle = story.title ? t(story.title) : "";
+      const titleText = sourceTitle && (sourceTitle !== story.title || getLanguage() === "en")
+        ? sourceTitle
+        : t("Actualización de NASA");
+      const sourceSummary = story.summary ? t(story.summary) : "";
+      const summaryText = sourceSummary && (sourceSummary !== story.summary || getLanguage() === "en")
+        ? sourceSummary
+        : t("Abre la fuente de NASA para consultar los detalles.");
       const images = story.images && story.images.length > 0
         ? story.images
         : story.imageUrl
@@ -135,7 +144,7 @@ export class MissionSelectScreen implements Screen {
         const media = el("div", { className: "nasa-briefing-media" });
         const mainImg = el("img", {
           className: "nasa-briefing-image",
-          attrs: { src: images[0], alt: story.title ?? "Imagen NASA", loading: "lazy" },
+          attrs: { src: images[0], alt: titleText || t("Imagen NASA"), loading: "lazy" },
         }) as HTMLImageElement;
         media.append(story.sourceUrl
           ? el("a", { attrs: { href: story.sourceUrl, target: "_blank", rel: "noreferrer" }, children: [mainImg] })
@@ -161,9 +170,8 @@ export class MissionSelectScreen implements Screen {
       }
 
       const copy = el("div", { className: "nasa-briefing-copy" });
-      const titleText = story.title ?? "Investigación NASA";
       copy.append(
-        el("p", { className: "nasa-kicker", text: `${story.kind} · DATOS NASA EN TIEMPO REAL` }),
+        el("p", { className: "nasa-kicker", text: `${t(story.kind)} · ${t("DATOS NASA EN TIEMPO REAL")}` }),
         story.sourceUrl
           ? el("h3", { className: "nasa-briefing-title", children: [
             el("a", {
@@ -179,7 +187,7 @@ export class MissionSelectScreen implements Screen {
         copy.append(el("p", { className: "nasa-briefing-date", text: `🗓️ Publicado el ${dateLabel}` }));
       }
       copy.append(
-        el("p", { className: "nasa-briefing-description", text: story.summary ?? "Registro científico NASA." }),
+        el("p", { className: "nasa-briefing-description", text: summaryText || t("Abre la fuente de NASA para consultar los detalles.") }),
       );
       if (story.sourceUrl) {
         copy.append(el("a", {
@@ -194,8 +202,8 @@ export class MissionSelectScreen implements Screen {
       });
     };
 
-    const previous = el("button", { className: "nasa-carousel-control", text: "‹", attrs: { type: "button", "aria-label": "Historia anterior" } });
-    const next = el("button", { className: "nasa-carousel-control", text: "›", attrs: { type: "button", "aria-label": "Siguiente historia" } });
+    const previous = el("button", { className: "nasa-carousel-control", text: "‹", attrs: { type: "button", "aria-label": t("Historia anterior") } });
+    const next = el("button", { className: "nasa-carousel-control", text: "›", attrs: { type: "button", "aria-label": t("Siguiente historia") } });
     previous.addEventListener("click", () => renderSlide(activeIndex - 1));
     next.addEventListener("click", () => renderSlide(activeIndex + 1));
     let swipeStart: { x: number; y: number } | null = null;
@@ -227,8 +235,8 @@ export class MissionSelectScreen implements Screen {
       dots,
     );
     card.querySelector(".nasa-carousel-heading")!.append(
-      el("p", { className: "nasa-kicker", text: "CENTRO DE INTELIGENCIA · NASA" }),
-      el("span", { className: "nasa-carousel-counter", text: `${stories.length} reportes disponibles` }),
+      el("p", { className: "nasa-kicker", text: t("CENTRO DE INTELIGENCIA · NASA") }),
+      el("span", { className: "nasa-carousel-counter", text: `${stories.length} ${t("reportes disponibles")}` }),
     );
     renderSlide(0);
     this.nasaCarouselTimer = window.setInterval(() => renderSlide(activeIndex + 1), 9000);
