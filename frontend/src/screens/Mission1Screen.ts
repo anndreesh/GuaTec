@@ -457,14 +457,15 @@ export class Mission1Screen implements Screen {
 
   private updateInteractionPrompt(poi: NearbyPoi | null): void {
     this.mobileInteractButton?.classList.toggle("mobile-interact-button--hidden", !poi);
-    if (this.mobileInteractButton) this.mobileInteractButton.textContent = poi ? `${t("Examinar")} · ${poi.label}` : t("Examinar");
+    const poiLabel = poi ? t(poi.label) : "";
+    if (this.mobileInteractButton) this.mobileInteractButton.textContent = poi ? `${t("Examinar")} · ${poiLabel}` : t("Examinar");
     if (!this.interactionPrompt) return;
     if (!poi) {
       this.interactionPrompt.classList.add("interaction-prompt--hidden");
       return;
     }
     const action = t(poi.prompt ?? "E · EXAMINE OUTDOOR STATION");
-    this.interactionPrompt.textContent = `${action}: ${poi.label}`;
+    this.interactionPrompt.textContent = `${action}: ${poiLabel}`;
     this.interactionPrompt.classList.remove("interaction-prompt--hidden");
   }
 
