@@ -730,7 +730,11 @@ export function createGameplayLayer(
   root.setEnabled(false);
 
   // --- Camera follow setup (reuses the ambient ArcRotateCamera instance) ---
-  const cameraOffsetRadius = 7;
+  // Normal exploration is a close third-person follow view.  The older
+  // 48-unit establishing-shot radius made the camera feel pinned to the map
+  // rather than carried by the astronaut.
+  const cameraOffsetRadius = 8.8;
+  const cameraFollowHeight = 1.05;
   camera.lowerRadiusLimit = 4;
   camera.upperRadiusLimit = 56;
   // Keep the orbit on the upper side of the horizon so the camera can never
@@ -749,6 +753,14 @@ export function createGameplayLayer(
   let touchMoveY = 0;
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
+
+  /** Keep the orbit pivot on the astronaut's upper body.  Only the player
+   * controls the orbit angles; world movement never leaves the camera looking
+   * at a fixed point or a fixed Z offset. */
+  function followAstronaut(): void {
+    camera.target.copyFrom(astronaut.root.position);
+    camera.target.y += cameraFollowHeight;
+  }
 
   function onKeyDown(ev: KeyboardEvent): void {
     const key = ev.key.toLowerCase();
@@ -830,12 +842,10 @@ export function createGameplayLayer(
         openingElapsed = -1;
         launchSmoke.stop();
         launchFlame.stop();
-        camera.alpha = Math.PI / 2;
-        camera.beta = 1.48;
-        camera.radius = 48;
-        camera.target.copyFrom(astronaut.root.position);
-        camera.target.y += 2.8;
-        camera.target.z -= 3.2;
+        camera.alpha = -Math.PI / 2;
+        camera.beta = 1.05;
+        camera.radius = cameraOffsetRadius;
+        followAstronaut();
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
       },
@@ -932,12 +942,10 @@ export function createGameplayLayer(
       camera.inputs.clear();
       camera.inputs.addPointers();
       camera.attachControl(canvas, true);
-      camera.radius = 48;
-      camera.alpha = Math.PI / 2;
-      camera.beta = 1.48;
-      camera.target = astronaut.root.position.clone();
-      camera.target.y += 2.8;
-      camera.target.z -= 3.2;
+      camera.radius = cameraOffsetRadius;
+      camera.alpha = -Math.PI / 2;
+      camera.beta = 1.05;
+      followAstronaut();
     },
     disable() {
       if (!enabled) return;
@@ -967,12 +975,10 @@ export function createGameplayLayer(
         );
         if (openingElapsed >= 7.5) {
           openingElapsed = -1;
-          camera.radius = 48;
-          camera.beta = 1.48;
-          camera.alpha = Math.PI / 2;
-          camera.target.copyFrom(astronaut.root.position);
-          camera.target.y += 2.8;
-          camera.target.z -= 3.2;
+          camera.radius = cameraOffsetRadius;
+          camera.beta = 1.05;
+          camera.alpha = -Math.PI / 2;
+          followAstronaut();
           openingDone?.();
           openingDone = null;
         }
@@ -1113,9 +1119,7 @@ export function createGameplayLayer(
           }
         }
       } else if (openingElapsed < 0) {
-        camera.target.copyFrom(astronaut.root.position);
-        camera.target.y += 2.8;
-        camera.target.z -= 3.2;
+        followAstronaut();
       }
       if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
 
