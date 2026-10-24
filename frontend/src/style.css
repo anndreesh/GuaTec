@@ -1350,6 +1350,12 @@ button.mission-map-location:focus-visible {
 }
 
 @media (pointer: coarse) and (orientation: portrait), (max-width: 900px) and (orientation: portrait) {
+  html[lang="en"] .mobile-game-controls::before {
+    content: "Rotate your device to play in landscape";
+  }
+  html[lang="fr"] .mobile-game-controls::before {
+    content: "Tournez votre appareil pour jouer en mode paysage";
+  }
   .mobile-game-controls::before {
     content: "Gira el dispositivo para jugar en horizontal";
     position: fixed;

@@ -546,6 +546,7 @@ Object.assign(englishExtra, {
 });
 
 Object.assign(translations, {
+  "↻ Restart mission": "↻ Restart mission",
   "LECTURA ANALIZADA · La traza queda archivada en el registro de misión.": "READING ANALYZED · The trace is filed in the mission log.",
   "PROTOTYPE INSPECTION · TRACE THE OSCILLATION": "INSPECCIÓN DEL PROTOTIPO · RASTREA LA OSCILACIÓN",
   "Scan all four readouts, compare their clues, then identify the subsystem that matches the test trace.": "Examina las cuatro lecturas, compara las pistas e identifica el subsistema que coincide con la traza de prueba.",
