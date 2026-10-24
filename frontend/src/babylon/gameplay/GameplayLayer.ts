@@ -1027,12 +1027,12 @@ export function createGameplayLayer(
       moveX -= right.x * touchMoveX - forward.x * touchMoveY;
       moveZ -= right.z * touchMoveX - forward.z * touchMoveY;
       if (keysDown.has("w") || keysDown.has("arrowup")) {
-        moveX += forward.x;
-        moveZ += forward.z;
-      }
-      if (keysDown.has("s") || keysDown.has("arrowdown")) {
         moveX -= forward.x;
         moveZ -= forward.z;
+      }
+      if (keysDown.has("s") || keysDown.has("arrowdown")) {
+        moveX += forward.x;
+        moveZ += forward.z;
       }
       if (keysDown.has("a") || keysDown.has("arrowleft")) {
         moveX += right.x;
