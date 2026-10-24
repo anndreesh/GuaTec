@@ -570,7 +570,7 @@ export function createGameplayLayer(
       const importedRoot = result.meshes.find((mesh) => mesh.name === "__root__") ?? result.meshes[0];
       if (importedRoot) importedRoot.parent = shuttleModelRoot;
       // The GLB is modeled lengthwise along Z. Rotate it upright, then scale
-      // its measured height to a plausible 4.6 m experimental rocket.
+      // its measured height to a large, clearly visible experimental rocket.
       shuttleModelRoot.rotation.x = Math.PI / 2;
       shuttleModelRoot.scaling.setAll(1);
       shuttleModelRoot.position.y = 0;
@@ -592,9 +592,9 @@ export function createGameplayLayer(
       };
       const initialBounds = worldBounds();
       if (modelMeshes.length && initialBounds.maxY > initialBounds.minY) {
-        shuttleModelRoot.scaling.setAll(7.2 / (initialBounds.maxY - initialBounds.minY));
+        const rocketHeight = 8.4;
+        shuttleModelRoot.scaling.setAll(rocketHeight / (initialBounds.maxY - initialBounds.minY));
         const scaledBounds = worldBounds();
-        const groundY = terrain.getHeightAt(0, ROCKET_PLATFORM_Z);
         // Center the lower body over the support plate. The fins and upper
         // hardware can be asymmetric, so centering the full model makes its
         // "belly" visibly miss the stand.
@@ -611,7 +611,10 @@ export function createGameplayLayer(
           ? lowerBodyCentersX[Math.floor(lowerBodyCentersX.length / 2)]!
           : (scaledBounds.minX + scaledBounds.maxX) / 2;
         shuttleModelRoot.position.x += frameRoot.position.x - baseAxisX;
-        shuttleModelRoot.position.y += groundY + 0.12 - scaledBounds.minY;
+        // Rest the rocket's belly on the launch frame's top crossbar instead
+        // of leaving it at ground level below the support structure.
+        const supportTopY = frameRoot.position.y + 4.15 + 0.055 / 2;
+        shuttleModelRoot.position.y += supportTopY - scaledBounds.minY;
         shuttleModelRoot.position.z += ROCKET_PLATFORM_Z - (scaledBounds.minZ + scaledBounds.maxZ) / 2;
       }
       shuttleModelRoot.setEnabled(true);
