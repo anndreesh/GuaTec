@@ -360,6 +360,35 @@ export function createGameplayLayer(
   launchFlame.direction1 = new BABYLONNS.Vector3(-0.25, -2.4, -0.25);
   launchFlame.direction2 = new BABYLONNS.Vector3(0.25, -3.2, 0.25);
 
+  // Emissive tapered plumes stay attached to the nozzle between particle bursts.
+  const outerFlameMat = new BABYLONNS.StandardMaterial("rocket-flame-outer-material", scene);
+  outerFlameMat.emissiveColor = new BABYLONNS.Color3(1, 0.22, 0.025);
+  outerFlameMat.disableLighting = true;
+  outerFlameMat.backFaceCulling = false;
+  outerFlameMat.alpha = 0.78;
+  const innerFlameMat = new BABYLONNS.StandardMaterial("rocket-flame-inner-material", scene);
+  innerFlameMat.emissiveColor = new BABYLONNS.Color3(1, 0.78, 0.22);
+  innerFlameMat.disableLighting = true;
+  innerFlameMat.backFaceCulling = false;
+  const outerFlame = BABYLONNS.MeshBuilder.CreateCylinder("rocket-engine-outer-flame", {
+    height: 2.5, diameterTop: 0, diameterBottom: 0.62, tessellation: 16,
+  }, scene);
+  outerFlame.parent = rocketExhaustEmitter;
+  outerFlame.position.y = -1.3;
+  outerFlame.rotation.z = Math.PI;
+  outerFlame.material = outerFlameMat;
+  outerFlame.isPickable = false;
+  const innerFlame = BABYLONNS.MeshBuilder.CreateCylinder("rocket-engine-inner-flame", {
+    height: 1.55, diameterTop: 0, diameterBottom: 0.34, tessellation: 16,
+  }, scene);
+  innerFlame.parent = rocketExhaustEmitter;
+  innerFlame.position.y = -0.88;
+  innerFlame.rotation.z = Math.PI;
+  innerFlame.material = innerFlameMat;
+  innerFlame.isPickable = false;
+  outerFlame.setEnabled(false);
+  innerFlame.setEnabled(false);
+
   // Ambient morning atmospheric dust/pollen motes catching dawn light
   const ambientDust = new BABYLONNS.ParticleSystem("auburn-morning-dust", 85, scene);
   ambientDust.particleTexture = smokeTexture;
@@ -1168,6 +1197,8 @@ export function createGameplayLayer(
         openingElapsed = -1;
         launchSmoke.stop();
         launchFlame.stop();
+        outerFlame.setEnabled(false);
+        innerFlame.setEnabled(false);
         camera.alpha = -Math.PI / 2;
         camera.beta = 1.05;
         camera.radius = cameraOffsetRadius;
@@ -1195,6 +1226,8 @@ export function createGameplayLayer(
         camera.beta = 1.05;
         launchSmoke.start();
         launchFlame.start();
+        outerFlame.setEnabled(true);
+        innerFlame.setEnabled(true);
       },
       setCameraMode(mode) {
         activeCameraMode = mode;
@@ -1336,14 +1369,21 @@ export function createGameplayLayer(
         // climb vertical until the tail clears the rear gantry and its deck.
         launchSupport.setRelease(launchElapsed / 0.85);
         const flightTime = Math.max(0, launchElapsed - 0.95);
-        const climb = launchPeakAltitude * (1 - Math.exp(-flightTime / 1.8));
-        const drift = Math.max(0, flightTime - 2.6) * 0.3;
+        // Keep climbing beyond the launch frame so the rocket visibly leaves the map.
+        const climb = launchPeakAltitude * 5.5 * (1 - Math.exp(-flightTime / 8.5));
+        const drift = Math.max(0, flightTime - 2.6) * 1.15;
         rocketRoot.position.x = rocketStart.x + drift * 0.1;
         rocketRoot.position.z = rocketStart.z + drift;
         rocketRoot.position.y = rocketStart.y + climb;
-        if (launchElapsed > 4.5) {
+        if (launchElapsed > 9) {
           launchSmoke.stop();
           launchFlame.stop();
+          outerFlame.setEnabled(false);
+          innerFlame.setEnabled(false);
+        } else {
+          const flutter = 0.9 + Math.sin(elapsed * 29) * 0.11 + Math.sin(elapsed * 17) * 0.06;
+          outerFlame.scaling.set(0.72 + flutter * 0.22, flutter, 0.72 + flutter * 0.22);
+          innerFlame.scaling.set(0.76 + flutter * 0.18, 0.8 + flutter * 0.2, 0.76 + flutter * 0.18);
         }
       }
 
@@ -1441,10 +1481,13 @@ export function createGameplayLayer(
         worker.character.update(deltaSeconds);
       }
 
-      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 14 && openingElapsed < 0;
+      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 18 && openingElapsed < 0;
       if (cameraTracksRocket) {
         camera.lockedTarget = null;
-        if (activeCameraMode === "observation") {
+        if (activeCameraMode === "cinematic" && launchElapsed >= 4) {
+          camera.target.set(rocketStart.x, rocketStart.y + 2, rocketStart.z);
+          camera.radius = 12;
+        } else if (activeCameraMode === "observation") {
           camera.target.copyFrom(rocketRoot.position);
           camera.alpha = -Math.PI * 0.45;
           camera.beta = 1.25;
@@ -1465,7 +1508,7 @@ export function createGameplayLayer(
       } else if (openingElapsed < 0) {
         followAstronaut();
       }
-      if (launchElapsed >= 14) camera.radius = cameraOffsetRadius;
+      if (launchElapsed >= 18) camera.radius = cameraOffsetRadius;
 
       updateNearestPoi();
       mapStateCallback?.({
@@ -1480,6 +1523,10 @@ export function createGameplayLayer(
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();
       launchFlame.dispose();
+      outerFlame.dispose();
+      innerFlame.dispose();
+      outerFlameMat.dispose();
+      innerFlameMat.dispose();
       rocketExhaustEmitter.dispose();
       ambientDust.dispose();
       smokeTexture.dispose();

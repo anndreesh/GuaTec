@@ -1459,7 +1459,7 @@ export class Mission1Screen implements Screen {
       this.gameplay?.playLaunch();
       const startedAt = performance.now();
       this.flightTimer = window.setInterval(() => {
-        const seconds = Math.min(14, (performance.now() - startedAt) / 1000);
+        const seconds = Math.min(18, (performance.now() - startedAt) / 1000);
         const poweredAscentTime = Math.min(seconds, 3.5);
         const continuingAscentTime = Math.max(0, seconds - 3.5);
         const altitude = Math.round(
@@ -1472,7 +1472,7 @@ export class Mission1Screen implements Screen {
           : 3.85 + 0.09 * continuingAscentTime);
         const signal = Math.max(24, Math.round(this.state.resources.telemetry - Math.max(0, seconds - 2) * 5));
         updateReadings(altitude, velocity, signal);
-        if (seconds >= 14) {
+        if (seconds >= 18) {
           window.removeEventListener("keydown", onKey);
           if (this.flightTimer) window.clearInterval(this.flightTimer);
           this.flightTimer = undefined;
