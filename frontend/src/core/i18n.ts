@@ -599,6 +599,8 @@ Object.assign(translations, {
 });
 
 Object.assign(frenchTranslations, {
+  "Attempt the flight": "Tenter le vol",
+  "Controles táctiles": "Commandes tactiles",
   "LECTURA ANALIZADA · La traza queda archivada en el registro de misión.": "MESURE ANALYSÉE · La courbe est archivée dans le journal de mission.",
   "PROTOTYPE INSPECTION · TRACE THE OSCILLATION": "INSPECTION DU PROTOTYPE · SUIVEZ L’OSCILLATION",
   "Scan all four readouts, compare their clues, then identify the subsystem that matches the test trace.": "Examinez les quatre mesures, comparez les indices, puis identifiez le sous-système correspondant à la courbe d’essai.",
@@ -1239,6 +1241,92 @@ Object.assign(frenchTranslations, {
   "The 1926 historical flight was brief (41 ft high, 184 ft distance). It demonstrated that liquid-fuel propulsion could produce flight. Mission 02 unlocked.": "Le vol historique de 1926 fut bref (41 pieds de haut et 184 pieds de distance). Il a démontré que la propulsion à ergols liquides pouvait produire un vol. La mission 02 est débloquée.",
   "MISSION 01 COMPLETE": "MISSION 01 TERMINÉE", "MARCH 1926": "MARS 1926", "THE BEGINNING": "LE COMMENCEMENT", "ENTER THE FIELD": "ENTRER SUR LE TERRAIN", "NARRATIVE PROGRESS": "PROGRESSION NARRATIVE", "MISSION OBJECTIVES": "OBJECTIFS DE MISSION", Checkpoint: "Point de contrôle", "Historical records": "Documents historiques",
   "In Auburn, Massachusetts, the first liquid-fuel rocket flight reached approximately 41 feet (12.5 m) and traveled about 184 feet (56 m). Its importance was demonstrating flight, not reaching space. Your team's story and this simulation's outcome are fictional.": "À Auburn, dans le Massachusetts, le premier vol d’une fusée à ergols liquides a atteint environ 41 pieds (12,5 m) et parcouru 184 pieds (56 m). Son importance était de démontrer le vol, pas d’atteindre l’espace. L’histoire de votre équipe et le résultat de cette simulation sont fictifs.",
+});
+
+// Full narrative passages and in-world task feedback used by interactions,
+// saved logs, and minigames. Keep these exact strings translated in all locales.
+Object.assign(spanishFromEnglish, {
+  "PROJECT DIRECTOR · ING. TOMÁS ELDRICH": "DIRECTOR DEL PROYECTO · ING. TOMÁS ELDRICH",
+  "PROPULSION ENGINEER · ANDREW WELLS": "INGENIERO DE PROPULSIÓN · ANDREW WELLS",
+  "STRUCTURAL ENGINEER · ELENA BROOKS": "INGENIERA ESTRUCTURAL · ELENA BROOKS",
+  "DATA TECHNICIAN · MARA REED": "TÉCNICA DE DATOS · MARA REED",
+  "“You're here. Good. Today is an important day.\n\nToday we're going to attempt something people have doubted for years. We are going to see whether our machine can actually fly.\n\nNot because we're going somewhere, or trying to reach space. We're trying to prove one thing: that liquid-fuel propulsion can leave the ground. Welcome to the project.”": "“Llegaste. Bien. Hoy es un día importante.\n\nVamos a intentar algo que la gente ha puesto en duda durante años: comprobar si nuestra máquina puede volar.\n\nNo buscamos ir a ningún lugar ni llegar al espacio. Queremos demostrar algo concreto: que la propulsión de combustible líquido puede elevarse del suelo. Te damos la bienvenida al proyecto.”",
+  "“Understood. Where do we begin?”": "“Entendido. ¿Por dónde empezamos?”",
+  "“Tell me about the vehicle on the stand.”": "“Cuéntame sobre el vehículo en la plataforma.”",
+  "“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”": "“Revisa las lecturas otra vez. Quemamos gasolina con oxígeno líquido. Si el sistema de alimentación se mantiene estable, la cámara de empuje produce un impulso constante. Cada cambio hace el vehículo más resistente, más ligero o más arriesgado. Debemos decidir dónde aceptar el riesgo.”",
+  "“Noted. What are our safety margins?”": "“Anotado. ¿Cuáles son nuestros márgenes de seguridad?”",
+  "“The frame is lightweight steel tubing with brass brackets. We're placing the motor up top to pull the propellant tanks for stability. If we add too much reinforcement, mass climbs quickly. We need the right balance between structural integrity and weight.”": "“El bastidor está hecho de tubos ligeros de acero y soportes de latón. Colocamos el motor arriba para que tire de los tanques de propelente y dé estabilidad. Si añadimos demasiado refuerzo, la masa aumenta rápido. Necesitamos equilibrar la resistencia estructural y el peso.”",
+  "“I'll examine the structural brackets on the prototype.”": "“Revisaré los soportes estructurales del prototipo.”",
+  "“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just a spectacle.”": "“Nuestros instrumentos son sencillos: un registrador de tambor ahumado, manómetros mecánicos y visores ópticos. Si el vuelo dura siquiera diez segundos, obtendremos evidencia valiosa. Sin datos, el experimento sería solo un espectáculo.”",
+  "“We'll make sure the instruments are calibrated.”": "“Nos aseguraremos de que los instrumentos estén calibrados.”",
+  "DIRECTOR — Meet the engineering team around the outdoor stations.": "DIRECTOR — Reúnete con el equipo de ingeniería en las estaciones exteriores.",
+  "DIRECTOR — It's a small experimental motor with liquid oxygen and gasoline.": "DIRECTOR — Es un pequeño motor experimental que usa oxígeno líquido y gasolina.",
+  "ANDREW WELLS — Margins are tight. We check every line and gauge before any pressurized test.": "ANDREW WELLS — Los márgenes son estrechos. Revisamos cada línea y manómetro antes de cualquier prueba a presión.",
+  "ELENA BROOKS — Look at the pipe clamps and thrust ring on the stand.": "ELENA BROOKS — Revisa las abrazaderas de las tuberías y el anillo de empuje en la plataforma.",
+  "MARA REED — The observation table will record the launch trace.": "MARA REED — La mesa de observación registrará la traza del lanzamiento.",
+  "STATUS: UNTESTED PROTOTYPE": "ESTADO: PROTOTIPO SIN PROBAR",
+  "• Upper motor with ceramic-lined chamber\n• Twin propellant feed tubes (gasoline & liquid oxygen)\n• Lower tank assembly with pressure bladder\n• 4.4-meter launch frame with guide cables\n\n“The historical 1926 vehicle was a radical departure from gunpowder rockets: pure liquid propellant feeding into a combustion chamber.”": "• Motor superior con cámara revestida de cerámica\n• Dos conductos de propelente (gasolina y oxígeno líquido)\n• Conjunto de tanques inferior con vejiga de presión\n• Bastidor de lanzamiento de 4,4 metros con cables guía\n\n“El vehículo histórico de 1926 se apartó radicalmente de los cohetes de pólvora: propelente líquido alimentaba directamente una cámara de combustión.”",
+  "Mechanical drum recorder with soot-coated paper and brass stylus. Gauges for nitrogen feed pressure and combustion chamber back-pressure.\n\nCapacity: ~20 seconds of continuous trace. Data quality depends on structural vibration.": "Registrador mecánico de tambor con papel ahumado y estilete de latón. Manómetros para la presión de alimentación de nitrógeno y la contrapresión de la cámara de combustión.\n\nCapacidad: unos 20 segundos de traza continua. La calidad de los datos depende de la vibración estructural.",
+  "This leaves room for both structure and useful measurements.": "Esto permite reforzar la estructura y obtener mediciones útiles.",
+  "The historic 1926 flight was extremely short. Its importance was not its distance. It demonstrated that liquid-fuel propulsion could produce flight.": "El vuelo histórico de 1926 fue muy breve. Su importancia no estuvo en la distancia: demostró que la propulsión de combustible líquido podía producir un vuelo.",
+  "TEST AREA — The simulated pressure trace held steady.": "ÁREA DE PRUEBAS — La traza simulada de presión se mantuvo estable.",
+  "TEST AREA — The recorder, pressure, and vibration channels were matched.": "ÁREA DE PRUEBAS — Se conectaron los canales del registrador, la presión y la vibración.",
+  "TEST AREA — An irregular vibration trace was marked for inspection.": "ÁREA DE PRUEBAS — Se marcó una traza de vibración irregular para inspeccionarla.",
+  "The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.": "El equipo está en un lugar seguro, detrás de la barrera de observación y a 50 metros del bastidor de lanzamiento. Mara Reed puso en marcha el registrador de tambor; Andrew Wells y Elena Brooks siguen la trayectoria de ascenso.",
+  "DIRECTOR: “Ready on your mark.”": "DIRECTOR: “Listos cuando des la señal.”",
+  "Simulated readings for this fictional run. Historical reference flight: about 12.5 m high and 56 m away.": "Lecturas simuladas de este intento ficticio. Referencia histórica: unos 12,5 m de altura y 56 m de recorrido.",
+  "The morning light is flat and pale over the Auburn field. The vehicle stands on the launch frame, and the team is waiting for your call.": "La luz de la mañana es tenue y pálida sobre el campo de Auburn. El vehículo está en el bastidor de lanzamiento y el equipo espera tu señal.",
+});
+
+Object.assign(frenchTranslations, {
+  "PROJECT DIRECTOR · ING. TOMÁS ELDRICH": "DIRECTEUR DU PROJET · ING. TOMÁS ELDRICH",
+  "PROPULSION ENGINEER · ANDREW WELLS": "INGÉNIEUR PROPULSION · ANDREW WELLS",
+  "STRUCTURAL ENGINEER · ELENA BROOKS": "INGÉNIEURE STRUCTURE · ELENA BROOKS",
+  "DATA TECHNICIAN · MARA REED": "TECHNICIENNE DES DONNÉES · MARA REED",
+  "“You're here. Good. Today is an important day.\n\nToday we're going to attempt something people have doubted for years. We are going to see whether our machine can actually fly.\n\nNot because we're going somewhere, or trying to reach space. We're trying to prove one thing: that liquid-fuel propulsion can leave the ground. Welcome to the project.”": "« Vous voilà. Bien. Aujourd’hui est un jour important.\n\nNous allons tenter quelque chose que beaucoup mettent en doute depuis des années : vérifier si notre machine peut vraiment voler.\n\nNous ne cherchons pas à partir quelque part ni à atteindre l’espace. Nous voulons démontrer une chose : la propulsion à ergols liquides peut quitter le sol. Bienvenue dans le projet. »",
+  "“Understood. Where do we begin?”": "« Compris. Par où commençons-nous ? »",
+  "“Tell me about the vehicle on the stand.”": "« Parlez-moi du véhicule sur son support. »",
+  "“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”": "« Vérifiez encore les mesures. Nous brûlons de l’essence avec de l’oxygène liquide. Si l’alimentation reste stable, la chambre de poussée fournit un effort constant. Chaque modification rend le véhicule plus robuste, plus léger ou plus risqué. Nous devons choisir où placer le risque. »",
+  "“Noted. What are our safety margins?”": "« Bien noté. Quelles sont nos marges de sécurité ? »",
+  "“The frame is lightweight steel tubing with brass brackets. We're placing the motor up top to pull the propellant tanks for stability. If we add too much reinforcement, mass climbs quickly. We need the right balance between structural integrity and weight.”": "« Le châssis est constitué de tubes d’acier légers et de supports en laiton. Nous plaçons le moteur en haut pour tirer les réservoirs d’ergols et assurer la stabilité. Trop de renfort ferait vite augmenter la masse. Il faut trouver le bon équilibre entre solidité et poids. »",
+  "“I'll examine the structural brackets on the prototype.”": "« J’examinerai les supports structurels du prototype. »",
+  "“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just a spectacle.”": "« Nos instruments sont simples : un enregistreur à tambour fumé, des manomètres mécaniques et des viseurs optiques. Même si le vol dure dix secondes, nous obtiendrons des données précieuses. Sans données, l’expérience ne serait qu’un spectacle. »",
+  "“We'll make sure the instruments are calibrated.”": "« Nous vérifierons l’étalonnage des instruments. »",
+  "DIRECTOR — Meet the engineering team around the outdoor stations.": "DIRECTEUR — Retrouvez l’équipe d’ingénierie aux stations extérieures.",
+  "DIRECTOR — It's a small experimental motor with liquid oxygen and gasoline.": "DIRECTEUR — C’est un petit moteur expérimental utilisant de l’oxygène liquide et de l’essence.",
+  "ANDREW WELLS — Margins are tight. We check every line and gauge before any pressurized test.": "ANDREW WELLS — Les marges sont faibles. Nous vérifions chaque conduite et chaque manomètre avant tout essai sous pression.",
+  "ELENA BROOKS — Look at the pipe clamps and thrust ring on the stand.": "ELENA BROOKS — Examinez les colliers de conduite et l’anneau de poussée sur le support.",
+  "MARA REED — The observation table will record the launch trace.": "MARA REED — La table d’observation enregistrera la courbe du lancement.",
+  "STATUS: UNTESTED PROTOTYPE": "ÉTAT : PROTOTYPE NON TESTÉ",
+  "• Upper motor with ceramic-lined chamber\n• Twin propellant feed tubes (gasoline & liquid oxygen)\n• Lower tank assembly with pressure bladder\n• 4.4-meter launch frame with guide cables\n\n“The historical 1926 vehicle was a radical departure from gunpowder rockets: pure liquid propellant feeding into a combustion chamber.”": "• Moteur supérieur avec chambre à revêtement céramique\n• Deux conduites d’ergols (essence et oxygène liquide)\n• Réservoirs inférieurs avec vessie de pressurisation\n• Support de lancement de 4,4 mètres avec câbles de guidage\n\n« Le véhicule historique de 1926 rompait avec les fusées à poudre : des ergols liquides alimentaient directement une chambre de combustion. »",
+  "Mechanical drum recorder with soot-coated paper and brass stylus. Gauges for nitrogen feed pressure and combustion chamber back-pressure.\n\nCapacity: ~20 seconds of continuous trace. Data quality depends on structural vibration.": "Enregistreur mécanique à tambour avec papier noirci et stylet en laiton. Manomètres pour la pression d’alimentation en azote et la contre-pression de la chambre de combustion.\n\nCapacité : environ 20 secondes de courbe continue. La qualité des données dépend des vibrations de la structure.",
+  "This leaves room for both structure and useful measurements.": "Cette option permet de renforcer la structure tout en recueillant des mesures utiles.",
+  "The historic 1926 flight was extremely short. Its importance was not its distance. It demonstrated that liquid-fuel propulsion could produce flight.": "Le vol historique de 1926 fut très bref. Son importance ne résidait pas dans la distance : il a démontré qu’une propulsion à ergols liquides pouvait produire un vol.",
+  "TEST AREA — The simulated pressure trace held steady.": "ZONE D’ESSAI — La courbe de pression simulée est restée stable.",
+  "TEST AREA — The recorder, pressure, and vibration channels were matched.": "ZONE D’ESSAI — Les canaux de l’enregistreur, de pression et de vibration ont été associés.",
+  "TEST AREA — An irregular vibration trace was marked for inspection.": "ZONE D’ESSAI — Une courbe de vibration irrégulière a été marquée pour examen.",
+  "The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.": "L’équipe se trouve en sécurité derrière la barrière d’observation, à 50 mètres du support de lancement. Mara Reed fait tourner l’enregistreur à tambour ; Andrew Wells et Elena Brooks suivent la trajectoire ascendante.",
+  "DIRECTOR: “Ready on your mark.”": "DIRECTEUR : « Prêts à votre signal. »",
+  "Simulated readings for this fictional run. Historical reference flight: about 12.5 m high and 56 m away.": "Mesures simulées pour cet essai fictif. Référence historique : environ 12,5 m de hauteur et 56 m de distance.",
+  "The morning light is flat and pale over the Auburn field. The vehicle stands on the launch frame, and the team is waiting for your call.": "La lumière du matin est pâle sur le terrain d’Auburn. Le véhicule est sur le support de lancement et l’équipe attend votre signal.",
+});
+
+Object.assign(translations, {
+  "La marca debe quedar en la banda verde, entre 62 y 74.": "Keep the marker in the green band, between 62 and 74.",
+  "Alinea la marca con la banda verde y prueba el equilibrio.": "Align the marker with the green band and test the balance.",
+  "LECTURA ESTRUCTURAL · COMPARA LAS TRAZAS": "STRUCTURAL READOUT · COMPARE THE TRACES",
+  "Archivar lectura estructural": "Save structural readout",
+  "REGISTRO DE VUELO · RECONSTRUYE EL TAMBOR": "FLIGHT RECORD · RECONSTRUCT THE DRUM",
+  "Auburn, Massachusetts · 16 de marzo de 1926.": "Auburn, Massachusetts · March 16, 1926.",
+});
+
+Object.assign(frenchTranslations, {
+  "La marca debe quedar en la banda verde, entre 62 y 74.": "Le repère doit rester dans la zone verte, entre 62 et 74.",
+  "Alinea la marca con la banda verde y prueba el equilibrio.": "Alignez le repère sur la zone verte et vérifiez l’équilibre.",
+  "LECTURA ESTRUCTURAL · COMPARA LAS TRAZAS": "MESURE STRUCTURELLE · COMPARER LES COURBES",
+  "Archivar lectura estructural": "Archiver la mesure structurelle",
+  "REGISTRO DE VUELO · RECONSTRUYE EL TAMBOR": "REGISTRE DE VOL · RECONSTITUER LE TAMBOUR",
+  "Auburn, Massachusetts · 16 de marzo de 1926.": "Auburn, Massachusetts · 16 mars 1926.",
 });
 
 let currentLanguage: Language =
