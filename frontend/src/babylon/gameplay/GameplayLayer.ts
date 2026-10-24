@@ -1109,6 +1109,7 @@ export function createGameplayLayer(
   let touchMoveY = 0;
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
+  let navigationTargetPoiId: string | null = null;
 
   /** Lock the orbit pivot to the astronaut's upper body. Only the player
    * controls the orbit angles; world movement carries the camera with them. */
@@ -1129,10 +1130,14 @@ export function createGameplayLayer(
       grounded = false;
       ev.preventDefault();
     }
-    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) navigationPath = [];
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+      navigationPath = [];
+      navigationTargetPoiId = null;
+    }
     if (key === "e" && nearestPoi) {
       navigationPath = [];
       interactCallback?.(nearestPoi.poi.id);
+      navigationTargetPoiId = null;
     }
   }
   function onKeyUp(ev: KeyboardEvent): void {
@@ -1147,16 +1152,21 @@ export function createGameplayLayer(
 
   function updateNearestPoi(): void {
     let closest: { poi: MissionPointOfInterest; position: BABYLON.Vector3; distSq: number } | null = null;
+    let navigationTarget: { poi: MissionPointOfInterest; position: BABYLON.Vector3 } | null = null;
     for (const entry of poiMeshes) {
       const dx = entry.position.x - astronaut.root.position.x;
       const dz = entry.position.z - astronaut.root.position.z;
       const distSq = dx * dx + dz * dz;
       if (distSq <= DISCOVERY_RADIUS * DISCOVERY_RADIUS) discoveredPoiIds.add(entry.poi.id);
+      if (entry.poi.id === navigationTargetPoiId && distSq <= INTERACT_RADIUS * INTERACT_RADIUS) {
+        navigationTarget = { poi: entry.poi, position: entry.position };
+      }
       if (distSq <= INTERACT_RADIUS * INTERACT_RADIUS && (!closest || distSq < closest.distSq)) {
         closest = { poi: entry.poi, position: entry.position, distSq };
       }
     }
-    const next = closest ? { poi: closest.poi, position: closest.position } : null;
+    // Keep the selected destination actionable when nearby map markers overlap.
+    const next = navigationTarget ?? (closest ? { poi: closest.poi, position: closest.position } : null);
     const changed = next?.poi.id !== nearestPoi?.poi.id;
     nearestPoi = next;
     if (changed) {
@@ -1215,6 +1225,7 @@ export function createGameplayLayer(
       },
       navigateTo(poiId) {
         const target = poiMeshes.find((entry) => entry.poi.id === poiId);
+        navigationTargetPoiId = target?.poi.id ?? null;
         navigationPath = target ? findWalkPath(astronaut.root.position, target.position) : [];
       },
       playLaunch() {
@@ -1272,7 +1283,10 @@ export function createGameplayLayer(
       setTouchMovement(x, y) {
         touchMoveX = Math.max(-1, Math.min(1, x));
         touchMoveY = Math.max(-1, Math.min(1, y));
-        if (Math.hypot(touchMoveX, touchMoveY) > 0.12) navigationPath = [];
+        if (Math.hypot(touchMoveX, touchMoveY) > 0.12) {
+          navigationPath = [];
+          navigationTargetPoiId = null;
+        }
       },
       setTouchSprint(active) { leftShiftDown = active; },
       jump() {
@@ -1285,6 +1299,7 @@ export function createGameplayLayer(
         if (nearestPoi) {
           navigationPath = [];
           interactCallback?.(nearestPoi.poi.id);
+          navigationTargetPoiId = null;
         }
       },
       getWeather() { return weather.label; },

@@ -803,6 +803,20 @@ Object.assign(spanishFromEnglish, {
   "A warning appears after the first checks. Diagnose it by walking around the prototype, then choose to retest or accept the configuration.": "Aparece una advertencia después de las primeras pruebas. Examina el prototipo para diagnosticarla y decide si repites la prueba o aceptas la configuración.",
   "March 16, 1926. Historical context: about 41 ft / 12.5 m high and 184 ft / 56 m away. Your team and result are fiction.": "16 de marzo de 1926. Contexto histórico: unos 12,5 m de altura y 56 m de recorrido. Tu equipo y el resultado son ficticios.",
   "The importance of the 1926 flight was not distance. It showed that liquid-fuel propulsion could produce flight.": "La importancia del vuelo de 1926 no fue la distancia. Demostró que la propulsión de combustible líquido podía volar.",
+  "PROTOTYPE INSPECTION · TRACE THE OSCILLATION": "INSPECCIÓN DEL PROTOTIPO · RASTREA LA OSCILACIÓN",
+  "Scan all four readouts, compare their clues, then identify the subsystem that matches the test trace.": "Examina las cuatro lecturas, compara las pistas e identifica el subsistema que coincide con la traza de prueba.",
+  "MASS BALANCE": "EQUILIBRIO DE MASAS",
+  "RECORDER LINE": "CIRCUITO DEL REGISTRADOR",
+  "FRAME BRACKETS": "SOPORTES DEL BASTIDOR",
+  "VALVE TIMING": "SINCRONIZACIÓN DE LA VÁLVULA",
+  "The upper assembly dips as the feed line pulses; the counterweight lags behind.": "El conjunto superior se inclina con cada pulso de alimentación; el contrapeso queda rezagado.",
+  "The upper assembly and counterweight stay level through each pressure pulse.": "El conjunto superior y el contrapeso se mantienen nivelados durante cada pulso de presión.",
+  "The stylus skips at the same instant the vibration appears; the pressure needle stays steady.": "El estilete salta justo cuando aparece la vibración; la aguja de presión se mantiene estable.",
+  "The drum keeps time through the pressure swing; its stylus does not skip.": "El tambor mantiene el ritmo durante la oscilación de presión; el estilete no salta.",
+  "The right upper bracket flexes on every oscillation while the left stays rigid.": "El soporte superior derecho se flexiona en cada oscilación mientras el izquierdo permanece rígido.",
+  "Both upper brackets remain aligned when the guide cables take the load.": "Ambos soportes superiores permanecen alineados cuando los cables guía reciben la carga.",
+  "The pressure pulse arrives before the valve indicator returns to its mark.": "El pulso de presión llega antes de que el indicador de la válvula vuelva a su marca.",
+  "The valve indicator returns to its mark before the next pressure pulse.": "El indicador de la válvula vuelve a su marca antes del siguiente pulso de presión.",
   "Field equipment shelter": "Refugio del equipo de campo",
   "Project director": "Director del proyecto",
   "Project area": "Área del proyecto",
@@ -1062,6 +1076,7 @@ Object.assign(translations, {
   "La traza irregular coincide con la vibración detectada.": "The irregular trace matches the detected vibration.",
   "Esa señal no muestra la anomalía. Revisa otra traza.": "That signal does not show the anomaly. Check another trace.",
   "Marca la traza que se aparta del patrón regular.": "Select the trace that departs from the regular pattern.",
+  "Selecciona la traza regular que confirma la estabilidad.": "Select the regular trace that confirms structural stability.",
   "Calibrar el manómetro": "Calibrate the pressure gauge",
   "Conectar las señales": "Connect the signals",
   "Encontrar la traza irregular": "Find the irregular trace",
@@ -1118,6 +1133,7 @@ Object.assign(frenchTranslations, {
   "La traza irregular coincide con la vibración detectada.": "La courbe irrégulière correspond à la vibration détectée.",
   "Esa señal no muestra la anomalía. Revisa otra traza.": "Ce signal ne montre pas l’anomalie. Examinez une autre courbe.",
   "Marca la traza que se aparta del patrón regular.": "Sélectionnez la courbe qui s’écarte du motif régulier.",
+  "Selecciona la traza regular que confirma la estabilidad.": "Sélectionnez la courbe régulière qui confirme la stabilité structurelle.",
   "Calibrar el manómetro": "Calibrer le manomètre",
   "Conectar las señales": "Relier les signaux",
   "Encontrar la traza irregular": "Trouver la courbe irrégulière",
@@ -1312,6 +1328,10 @@ Object.assign(frenchTranslations, {
 });
 
 Object.assign(translations, {
+  "Banco de pruebas exterior y barreras de protección.": "Outdoor test stand and blast shields.",
+  "Completa tres tareas cortas de consola. Puedes repetirlas sin penalización.": "Complete three short console tasks. You can retry them without a penalty.",
+  "ADVERTENCIA · INESTABILIDAD INESPERADA DETECTADA": "WARNING · UNEXPECTED INSTABILITY DETECTED",
+  "ING. ANDREW WELLS: “Eso no estaba ahí antes.”\nING. ELENA BROOKS: “Entonces algo cambió durante el ciclo de presurización.”\nING. TOMÁS ELDRICH: “Encuéntralo.”\n\nUna oscilación mecánica apareció en el registrador de traza. Inspecciona el prototipo de cerca para diagnosticar la causa.": "ING. ANDREW WELLS: “That wasn't there before.”\nING. ELENA BROOKS: “Then something changed during the pressurization cycle.”\nING. TOMÁS ELDRICH: “Find it.”\n\nA mechanical oscillation has appeared in the trace recorder. Inspect the prototype closely to diagnose the cause.",
   "La marca debe quedar en la banda verde, entre 62 y 74.": "Keep the marker in the green band, between 62 and 74.",
   "Alinea la marca con la banda verde y prueba el equilibrio.": "Align the marker with the green band and test the balance.",
   "LECTURA ESTRUCTURAL · COMPARA LAS TRAZAS": "STRUCTURAL READOUT · COMPARE THE TRACES",
@@ -1321,12 +1341,69 @@ Object.assign(translations, {
 });
 
 Object.assign(frenchTranslations, {
+  "Banco de pruebas exterior y barreras de protección.": "Banc d’essai extérieur et écrans de protection.",
+  "Completa tres tareas cortas de consola. Puedes repetirlas sin penalización.": "Effectuez trois courtes tâches sur la console. Vous pouvez réessayer sans pénalité.",
+  "ADVERTENCIA · INESTABILIDAD INESPERADA DETECTADA": "ALERTE · INSTABILITÉ INATTENDUE DÉTECTÉE",
+  "ING. ANDREW WELLS: “Eso no estaba ahí antes.”\nING. ELENA BROOKS: “Entonces algo cambió durante el ciclo de presurización.”\nING. TOMÁS ELDRICH: “Encuéntralo.”\n\nUna oscilación mecánica apareció en el registrador de traza. Inspecciona el prototipo de cerca para diagnosticar la causa.": "ING. ANDREW WELLS : « Ce n’était pas là avant. »\nING. ELENA BROOKS : « Quelque chose a donc changé pendant le cycle de mise en pression. »\nING. TOMÁS ELDRICH : « Trouvez la cause. »\n\nUne oscillation mécanique est apparue sur l’enregistreur. Examinez le prototype de près pour en trouver la cause.",
   "La marca debe quedar en la banda verde, entre 62 y 74.": "Le repère doit rester dans la zone verte, entre 62 et 74.",
   "Alinea la marca con la banda verde y prueba el equilibrio.": "Alignez le repère sur la zone verte et vérifiez l’équilibre.",
   "LECTURA ESTRUCTURAL · COMPARA LAS TRAZAS": "MESURE STRUCTURELLE · COMPARER LES COURBES",
   "Archivar lectura estructural": "Archiver la mesure structurelle",
   "REGISTRO DE VUELO · RECONSTRUYE EL TAMBOR": "REGISTRE DE VOL · RECONSTITUER LE TAMBOUR",
   "Auburn, Massachusetts · 16 de marzo de 1926.": "Auburn, Massachusetts · 16 mars 1926.",
+});
+
+Object.assign(spanishFromEnglish, {
+  "MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”": "MARA REED: “Grabación lista.”\nANDREW WELLS: “Sistema de alimentación presurizado y listo.”\nING. TOMÁS ELDRICH: “Muy bien. Veamos qué sucede. Despejen la plataforma y tomen posición en el área de observación.”",
+  "Review the flight telemetry traces and system performance:": "Revisa las trazas de telemetría y el rendimiento de los sistemas:",
+  "Analyze Propulsion & Chamber Pressure": "Analizar propulsión y presión de cámara",
+  "Analyze Structural Rigidity & Frame Deflection": "Analizar rigidez estructural y flexión del bastidor",
+  "Recover Smoked Drum Flight Record": "Recuperar registro de vuelo del tambor ahumado",
+  "COMPILE FINAL REPORT": "PREPARAR INFORME FINAL",
+  "records reviewed": "registros revisados",
+  "FLIGHT OBSERVATION —": "OBSERVACIÓN DEL VUELO —",
+  "recorded": "registrado",
+  "The vehicle continued climbing throughout the observation window; displayed altitude and velocity are abstract game values.": "El vehículo continuó ascendiendo durante el periodo observado; la altitud y velocidad mostradas son valores abstractos del juego.",
+  "Historical reference: 41 ft / 12.5 m and 184 ft / 56 m.": "Referencia histórica: 41 pies / 12,5 m de altura y 184 pies / 56 m de recorrido.",
+  "ANALYSIS —": "ANÁLISIS —",
+  "Propulsion & Pressure Data": "Datos de propulsión y presión",
+  "Structural & Frame Data": "Datos estructurales y del bastidor",
+  "Smoked Drum Flight Record": "Registro de vuelo del tambor ahumado",
+  "reviewed.": "revisados.",
+});
+
+Object.assign(translations, {
+  "Review the flight telemetry traces and system performance:": "Review the flight telemetry traces and system performance:",
+  "Analyze Propulsion & Chamber Pressure": "Analyze Propulsion & Chamber Pressure",
+  "Analyze Structural Rigidity & Frame Deflection": "Analyze Structural Rigidity & Frame Deflection",
+  "Recover Smoked Drum Flight Record": "Recover Smoked Drum Flight Record",
+  "COMPILE FINAL REPORT": "COMPILE FINAL REPORT",
+  "records reviewed": "records reviewed",
+  "FLIGHT OBSERVATION —": "FLIGHT OBSERVATION —",
+  "ANALYSIS —": "ANALYSIS —",
+  "Propulsion & Pressure Data": "Propulsion & Pressure Data",
+  "Structural & Frame Data": "Structural & Frame Data",
+  "Smoked Drum Flight Record": "Smoked Drum Flight Record",
+  "reviewed.": "reviewed.",
+});
+
+Object.assign(frenchTranslations, {
+  "MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”": "MARA REED : « Enregistreur prêt. »\nANDREW WELLS : « Le circuit d’alimentation est sous pression et prêt. »\nING. TOMÁS ELDRICH : « Très bien. Voyons ce qui se passe. Libérez la plateforme et prenez place dans la zone d’observation. »",
+  "Review the flight telemetry traces and system performance:": "Examinez les courbes de télémétrie et les performances des systèmes :",
+  "Analyze Propulsion & Chamber Pressure": "Analyser la propulsion et la pression de la chambre",
+  "Analyze Structural Rigidity & Frame Deflection": "Analyser la rigidité et la flexion de la structure",
+  "Recover Smoked Drum Flight Record": "Récupérer le registre de vol sur tambour fumé",
+  "COMPILE FINAL REPORT": "COMPILER LE RAPPORT FINAL",
+  "records reviewed": "registres examinés",
+  "FLIGHT OBSERVATION —": "OBSERVATION DU VOL —",
+  "recorded": "enregistré",
+  "The vehicle continued climbing throughout the observation window; displayed altitude and velocity are abstract game values.": "Le véhicule a continué de monter pendant toute la période d’observation ; l’altitude et la vitesse affichées sont des valeurs abstraites du jeu.",
+  "Historical reference: 41 ft / 12.5 m and 184 ft / 56 m.": "Référence historique : 41 pieds / 12,5 m de hauteur et 184 pieds / 56 m de distance.",
+  "ANALYSIS —": "ANALYSE —",
+  "Propulsion & Pressure Data": "Données de propulsion et de pression",
+  "Structural & Frame Data": "Données structurelles et du châssis",
+  "Smoked Drum Flight Record": "Registre de vol sur tambour fumé",
+  "reviewed.": "examinés.",
 });
 
 let currentLanguage: Language =

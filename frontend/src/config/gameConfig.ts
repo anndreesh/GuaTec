@@ -279,7 +279,9 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
     label: "Project area",
     flavorText: "Plans and a field notebook are laid out on an outdoor project table.",
     prompt: "E · EXAMINE PLANS",
-    position: { x: -8, z: -1 },
+    // Put the route marker on the clear side of the table so pathfinding does
+    // not stop beside the director and make the wrong interaction win.
+    position: { x: -8, z: -2.35 },
   },
   {
     id: "meet-propulsion",

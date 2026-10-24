@@ -18,7 +18,7 @@ import { Mission1State } from "@/state/Mission1State";
 import { MAP_OBJECTIVE_TARGET, MISSION_01_OBJECTIVES, mapTargetForObjective, type MissionObjectiveId } from "@/state/Mission01Objectives";
 import { DESIGN_BUDGET, calculateEngineering, type EngineeringProfile } from "@/state/Mission01Engineering";
 import { LAUNCH_DELAY_BUDGET_COST, flightPeakAltitude, flightResultLabel, resolveFlight } from "@/state/Mission01Launch";
-import { MISSION_01_DIALOGUE } from "@/state/Mission01Events";
+import { MISSION_01_DIAGNOSTIC_CAUSES, MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
 import type { MissionSaveState } from "@/types";
 import { t } from "@/core/i18n";
@@ -654,33 +654,7 @@ export class Mission1Screen implements Screen {
     // 4. Prototype inspection / Diagnosis:
     if (poiId === "inspect-prototype") {
       if (this.state.objectives.has("testing") && !this.state.objectives.has("diagnose")) {
-        const expected = this.state.expectedDiagnosis();
-        this.showChoice(
-          "PROTOTYPE INSPECTION · DIAGNOSE INSTABILITY",
-          `WARNING: UNEXPECTED OSCILLATION DETECTED DURING TEST.\n\nYou examine the experimental vehicle closely. The upper combustion frame, tank connectors, and feed pipes reveal subtle vibration signatures.\n\nWhat is the primary cause of the instability?`,
-          [
-            {
-              label: "Mass distribution (top-heavy feed dynamics)",
-              run: () => this.evaluateDiagnosis("Mass distribution", expected),
-            },
-            {
-              label: "Instrumentation (recorder line interference)",
-              run: () => this.evaluateDiagnosis("Instrumentation", expected),
-            },
-            {
-              label: "Structural balance (frame bracket deflection)",
-              run: () => this.evaluateDiagnosis("Structural balance", expected),
-            },
-            {
-              label: "System configuration (pressure valve timing)",
-              run: () => this.evaluateDiagnosis("System configuration", expected),
-            },
-            {
-              label: "Accept the unresolved risk and proceed",
-              run: () => this.acceptDiagnosticRisk(),
-            },
-          ]
-        );
+        this.openDiagnosticTask();
         return;
       }
 
@@ -789,40 +763,144 @@ export class Mission1Screen implements Screen {
     this.showToast(poi.flavorText);
   }
 
-  private evaluateDiagnosis(choice: string, expected: string): void {
-    this.state.inspectedCauses.add(choice);
-    if (choice === expected) {
-      this.state.diagnosis = choice;
-      this.state.completeObjective("diagnose");
-      this.renderObjectives();
-      this.showChoice(
-        "DIAGNOSIS COMPLETE · ISSUE RESOLVED",
-        `“Good eye! ${choice} was indeed introducing the oscillation into the feed line.”\n\nElena Brooks and Andrew Wells adjust the clamps and secure the damper lines. The system pressure stabilizes.\n\nNext objective: Head to the Launch Field to complete the launch checklist.`,
-        [
-          {
-            label: "Proceed to Launch Field",
-            run: () => {
-              this.showToast(t("DIAGNOSIS CONFIRMED · Stability restored. Proceed to Launch Field."));
-            },
-          },
-        ]
+  private openDiagnosticTask(): void {
+    const expected = this.state.expectedDiagnosis();
+    this.showTaskModal(
+      "PROTOTYPE INSPECTION · TRACE THE OSCILLATION",
+      "Scan all four readouts, compare their clues, then identify the subsystem that matches the test trace.",
+      (setReady) => this.buildDiagnosisTask(setReady, expected),
+      () => {
+        this.state.diagnosis = expected;
+        this.state.inspectedCauses.add(expected);
+        this.state.completeObjective("diagnose");
+        this.renderObjectives();
+        this.showToast(t("DIAGNOSIS CONFIRMED · Stability restored. Proceed to Launch Field."));
+      },
+      "Confirmar diagnóstico",
+      { label: "Accept the unresolved risk and proceed", run: () => this.acceptDiagnosticRisk() },
+    );
+  }
+
+  private buildDiagnosisTask(
+    setReady: (ready: boolean, message: string) => void,
+    expected: string,
+  ): HTMLElement {
+    const panel = el("div", { className: "mission-task-console mission-diagnosis-task" });
+    const clues: { id: string; title: string; cause: string; evidence: string }[] = [
+      {
+        id: "mass",
+        title: "MASS BALANCE",
+        cause: "Mass distribution",
+        evidence: expected === "Mass distribution"
+          ? "The upper assembly dips as the feed line pulses; the counterweight lags behind."
+          : "The upper assembly and counterweight stay level through each pressure pulse.",
+      },
+      {
+        id: "recorder",
+        title: "RECORDER LINE",
+        cause: "Instrumentation",
+        evidence: expected === "Instrumentation"
+          ? "The stylus skips at the same instant the vibration appears; the pressure needle stays steady."
+          : "The drum keeps time through the pressure swing; its stylus does not skip.",
+      },
+      {
+        id: "frame",
+        title: "FRAME BRACKETS",
+        cause: "Structural balance",
+        evidence: expected === "Structural balance"
+          ? "The right upper bracket flexes on every oscillation while the left stays rigid."
+          : "Both upper brackets remain aligned when the guide cables take the load.",
+      },
+      {
+        id: "valve",
+        title: "VALVE TIMING",
+        cause: "System configuration",
+        evidence: expected === "System configuration"
+          ? "The pressure pulse arrives before the valve indicator returns to its mark."
+          : "The valve indicator returns to its mark before the next pressure pulse.",
+      },
+    ];
+    const inspected = new Set<string>();
+    let selectedCause = "";
+    const evidenceGrid = el("div", { className: "mission-evidence-grid" });
+    const causeOptions = el("div", { className: "mission-diagnosis-options" });
+    const count = el("p", { className: "mission-diagnosis-count" });
+    const verify = el("button", {
+      className: "btn btn-secondary mission-diagnosis-verify",
+      text: t("Verificar hipótesis"),
+      attrs: { type: "button", disabled: "" },
+    });
+    const update = (): void => {
+      count.textContent = `${inspected.size}/4 ${t("lecturas inspeccionadas")}`;
+      verify.disabled = inspected.size !== clues.length || !selectedCause;
+    };
+
+    for (const clue of clues) {
+      const clueCard = el("article", { className: "mission-evidence-card" });
+      const button = el("button", {
+        className: "mission-evidence-chip",
+        attrs: { type: "button", "aria-expanded": "false" },
+      });
+      const clueReadout = el("p", {
+        className: "mission-evidence-readout",
+        attrs: { role: "status", "aria-live": "polite" },
+      });
+      button.append(
+        el("span", { className: "mission-evidence-lamp", text: "○", attrs: { "aria-hidden": "true" } }),
+        el("span", { text: t(clue.title) }),
       );
-    } else {
-      this.state.diagnosis = null;
-      this.state.resources.telemetry = Math.max(10, this.state.resources.telemetry - 5);
-      this.renderResources();
-      this.showChoice(
-        "DIAGNOSTIC UNCERTAINTY",
-        `“${choice} checked out within tolerance. The oscillation must be coming from another subsystem.”\n\nThe recorder lost some signal while the crew repeated the check. You can inspect another cause or formally accept the unresolved risk.`,
-        [
-          {
-            label: "Inspect prototype again",
-            run: () => this.handleInteract("inspect-prototype"),
-          },
-          { label: "Accept the unresolved risk and proceed", run: () => this.acceptDiagnosticRisk() },
-        ]
-      );
+      button.addEventListener("click", () => {
+        inspected.add(clue.id);
+        button.classList.add("mission-evidence-chip--scanned");
+        button.setAttribute("aria-expanded", "true");
+        button.querySelector(".mission-evidence-lamp")!.textContent = "●";
+        clueReadout.textContent = t(clue.evidence);
+        update();
+        setReady(false, inspected.size === clues.length
+          ? "Elige la causa que explica todas las señales y verifica la hipótesis."
+          : "Lee las cuatro estaciones antes de cerrar el diagnóstico.");
+      });
+      clueCard.append(button, clueReadout);
+      evidenceGrid.append(clueCard);
     }
+
+    for (const cause of MISSION_01_DIAGNOSTIC_CAUSES) {
+      const button = el("button", {
+        className: "mission-diagnosis-choice",
+        text: t(cause),
+        attrs: { type: "button", "aria-pressed": "false" },
+      });
+      button.addEventListener("click", () => {
+        selectedCause = cause;
+        causeOptions.querySelectorAll(".mission-diagnosis-choice").forEach((node) => {
+          node.classList.remove("mission-diagnosis-choice--selected");
+          node.setAttribute("aria-pressed", "false");
+        });
+        button.classList.add("mission-diagnosis-choice--selected");
+        button.setAttribute("aria-pressed", "true");
+        update();
+        setReady(false, inspected.size === clues.length
+          ? "Confirma que la hipótesis coincide con las cuatro lecturas."
+          : "Primero inspecciona las cuatro estaciones.");
+      });
+      causeOptions.append(button);
+    }
+
+    verify.addEventListener("click", () => {
+      if (verify.disabled) return;
+      setReady(selectedCause === expected, selectedCause === expected
+        ? "Las cuatro lecturas confirman la causa. El equipo puede corregir el sistema."
+        : "La hipótesis no explica la traza. Revisa los indicios y prueba otra causa.");
+    });
+    panel.append(
+      el("div", { className: "mission-task-section-heading", text: t("1 · ESCANEA LAS LECTURAS") }),
+      evidenceGrid,
+      count,
+      el("div", { className: "mission-task-section-heading", text: t("2 · ELIGE LA CAUSA") }),
+      causeOptions,
+      verify,
+    );
+    return panel;
   }
 
   private acceptDiagnosticRisk(): void {
@@ -913,6 +991,7 @@ export class Mission1Screen implements Screen {
     });
     controls.append(close);
     card.append(
+      el("p", { className: "mission-task-kicker", text: t("TAREA DE CAMPO · CONSOLA ANALÓGICA") }),
       el("h3", { className: "modal-title", text: t(title) }),
       el("p", { className: "modal-description", text: t(description) }),
       buildTask(setReady),
@@ -1033,7 +1112,10 @@ export class Mission1Screen implements Screen {
     return panel;
   }
 
-  private buildVibrationTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+  private buildVibrationTask(
+    setReady: (ready: boolean, message: string) => void,
+    correctTrace: "noise" | "steady" = "noise",
+  ): HTMLElement {
     const panel = el("div", { className: "mission-task-console mission-wave-task" });
     const traces = [
       { id: "steady", label: "TRAZA A", path: "M8 40 C22 34 30 46 44 40 S66 34 80 40 S102 46 116 40 S138 34 152 40 S174 46 188 40" },
@@ -1052,15 +1134,87 @@ export class Mission1Screen implements Screen {
       button.addEventListener("click", () => {
         choices.querySelectorAll(".mission-wave-choice").forEach((node) => node.classList.remove("mission-wave-choice--selected"));
         button.classList.add("mission-wave-choice--selected");
-        if (trace.id === "noise") {
-          setReady(true, "La traza irregular coincide con la vibración detectada.");
+        if (trace.id === correctTrace) {
+          setReady(true, correctTrace === "noise"
+            ? "La traza irregular coincide con la vibración detectada."
+            : "La traza regular confirma que el bastidor se mantuvo estable.");
         } else {
-          setReady(false, "Esa señal no muestra la anomalía. Revisa otra traza.");
+          setReady(false, correctTrace === "noise"
+            ? "Esa señal no muestra la anomalía. Revisa otra traza."
+            : "Esa curva no confirma la rigidez del bastidor. Revisa otra traza.");
         }
       });
       choices.append(button);
     }
-    panel.append(choices, el("p", { className: "mission-task-hint", text: t("Marca la traza que se aparta del patrón regular.") }));
+    panel.append(choices, el("p", {
+      className: "mission-task-hint",
+      text: t(correctTrace === "noise"
+        ? "Marca la traza que se aparta del patrón regular."
+        : "Selecciona la traza regular que confirma la estabilidad."),
+    }));
+    return panel;
+  }
+
+  private buildFlightRecordTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const panel = el("div", { className: "mission-task-console mission-record-task" });
+    const correctOrder = ["liftoff", "peak", "recovery"];
+    const events = [
+      { id: "liftoff", time: "06:33:00", label: "El vehículo abandona la guía" },
+      { id: "peak", time: "06:33:10", label: "Mara marca el punto más alto" },
+      { id: "recovery", time: "06:33:18", label: "El equipo fija la distancia recorrida" },
+    ];
+    const order = ["peak", "recovery", "liftoff"];
+    const rows = el("div", { className: "mission-record-rows" });
+    const render = (): void => {
+      rows.innerHTML = "";
+      order.forEach((id, index) => {
+        const event = events.find((entry) => entry.id === id)!;
+        const row = el("div", { className: "mission-record-row" });
+        const indexLabel = el("span", { className: "mission-record-index", text: String(index + 1).padStart(2, "0") });
+        const description = el("div", { className: "mission-record-description" });
+        description.append(el("strong", { text: event.time }), el("span", { text: t(event.label) }));
+        const controls = el("div", { className: "mission-record-controls" });
+        const up = el("button", {
+          className: "mission-record-move",
+          text: "↑",
+          attrs: { type: "button", "aria-label": t("Mover arriba") },
+        });
+        const down = el("button", {
+          className: "mission-record-move",
+          text: "↓",
+          attrs: { type: "button", "aria-label": t("Mover abajo") },
+        });
+        up.disabled = index === 0;
+        down.disabled = index === order.length - 1;
+        up.addEventListener("click", () => {
+          if (index === 0) return;
+          [order[index - 1], order[index]] = [order[index]!, order[index - 1]!];
+          render();
+        });
+        down.addEventListener("click", () => {
+          if (index >= order.length - 1) return;
+          [order[index], order[index + 1]] = [order[index + 1]!, order[index]!];
+          render();
+        });
+        controls.append(up, down);
+        row.append(indexLabel, description, controls);
+        rows.append(row);
+      });
+      const isOrdered = order.every((id, index) => id === correctOrder[index]);
+      setReady(isOrdered, isOrdered
+        ? "Secuencia restaurada. Las tres marcas temporales coinciden con el registro del equipo."
+        : "Ordena la salida, la marca de altura y la observación de distancia.");
+    };
+    panel.append(
+      el("div", { className: "mission-record-reel", children: [
+        el("span", { className: "mission-record-reel-light" }),
+        el("strong", { text: t("TAMBOR DE PAPEL AHUMADO") }),
+        el("span", { className: "mission-record-reel-light" }),
+      ] }),
+      rows,
+      el("p", { className: "mission-task-hint", text: t("Ordena las tres observaciones para reconstruir el tramo de vuelo.") }),
+    );
+    render();
     return panel;
   }
 
@@ -1077,43 +1231,156 @@ export class Mission1Screen implements Screen {
   private openEngineering(): void {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
     if (this.state.objectives.has("testing")) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
-    const profile = this.state.engineering;
-    const stats = calculateEngineering(profile);
-    this.showChoice("ENGINEERING · ABSTRACT DESIGN", `Structure: ${profile.structure.toUpperCase()} · Instrumentation: ${profile.instrumentation.toUpperCase()} · Priority: ${profile.priority.toUpperCase()}\n\nMass ${stats.mass}% · Stability ${stats.stability}% · Data ${stats.data}% · Reliability ${stats.reliability}% · Budget use ${stats.cost}%\n\nThese are game values, not construction instructions. Choose a trade-off; a heavy reinforced structure improves margin but uses more budget.`, [
-      { label: "LIGHT structure · lower mass, lower margin", run: () => this.chooseDesign("light") },
-      { label: "BALANCED structure · moderate trade-off", run: () => this.chooseDesign("balanced") },
-      { label: "REINFORCED structure · more stability, higher mass", run: () => this.chooseDesign("reinforced") },
-      { label: "Instrumentation and priority · data, cost and stability", run: () => this.openInstrumentationMenu() },
-    ]);
+
+    let draft: EngineeringProfile = { ...this.state.engineering };
+    this.showTaskModal(
+      "BANCO DE INGENIERÍA · CONFIGURA EL PROTOTIPO",
+      "Elige estructura, instrumentación y prioridad. Revisa el coste y calibra el giroscopio antes de sellar el diseño.",
+      (setReady) => this.buildEngineeringTask(setReady, (next) => { draft = next; }),
+      () => {
+        this.state.setEngineering(draft);
+        draft.budget = Math.max(0, DESIGN_BUDGET - calculateEngineering(draft).cost);
+        this.gameplay?.setDesign(draft.structure, draft.instrumentation);
+        this.state.completeObjective("design");
+        this.renderObjectives();
+        const line = draft.structure === "light"
+          ? MISSION_01_DIALOGUE.engineerLight
+          : draft.structure === "reinforced"
+            ? MISSION_01_DIALOGUE.engineerHeavy
+            : MISSION_01_DIALOGUE.engineerBalanced;
+        this.showToast(`${t("DESIGN LOCKED")} · ${t(line)}`);
+      },
+      "Sellar configuración",
+    );
   }
 
-  private openInstrumentationMenu(): void {
-    const profile = this.state.engineering;
-    this.showChoice("ENGINEERING · INSTRUMENTATION AND PRIORITY", `Instrumentation: ${profile.instrumentation.toUpperCase()} · Priority: ${profile.priority.toUpperCase()}\n\nInstrumentation sets how much data the flight records, at a cost. Priority decides which trade-off the team protects when they conflict.`, [
-      { label: "BASIC instrumentation · lowest cost, limited data", run: () => this.applyEngineeringChoice({ instrumentation: "basic" }) },
-      { label: "BALANCED instrumentation · moderate data and cost", run: () => this.applyEngineeringChoice({ instrumentation: "balanced" }) },
-      { label: "ADVANCED instrumentation · most data, highest cost", run: () => this.applyEngineeringChoice({ instrumentation: "advanced" }) },
-      { label: "PRIORITY COST · cheaper build, less stability", run: () => this.applyEngineeringChoice({ priority: "cost" }) },
-      { label: "PRIORITY STABILITY · steadier vehicle, more cost", run: () => this.applyEngineeringChoice({ priority: "stability" }) },
-      { label: "PRIORITY DATA · better recovery, slightly less stable", run: () => this.applyEngineeringChoice({ priority: "data" }) },
-      { label: "Back to structure", run: () => this.openEngineering() },
-    ]);
-  }
+  private buildEngineeringTask(
+    setReady: (ready: boolean, message: string) => void,
+    onChange: (profile: EngineeringProfile) => void,
+  ): HTMLElement {
+    const panel = el("div", { className: "mission-task-console mission-engineering-task" });
+    let draft: EngineeringProfile = { ...this.state.engineering };
+    let calibrated = false;
+    const groups: { key: "structure" | "instrumentation" | "priority"; title: string; options: { value: string; label: string; detail: string }[] }[] = [
+      { key: "structure", title: "ESTRUCTURA", options: [
+        { value: "light", label: "Ligera", detail: "Menos masa · margen reducido" },
+        { value: "balanced", label: "Equilibrada", detail: "Compromiso medio" },
+        { value: "reinforced", label: "Reforzada", detail: "Más estabilidad · más coste" },
+      ] },
+      { key: "instrumentation", title: "INSTRUMENTACIÓN", options: [
+        { value: "basic", label: "Básica", detail: "Registro limitado" },
+        { value: "balanced", label: "Balanceada", detail: "Lecturas ampliadas" },
+        { value: "advanced", label: "Avanzada", detail: "Más datos · mayor coste" },
+      ] },
+      { key: "priority", title: "PRIORIDAD DEL EQUIPO", options: [
+        { value: "cost", label: "Coste", detail: "Conservar presupuesto" },
+        { value: "stability", label: "Estabilidad", detail: "Proteger la estructura" },
+        { value: "data", label: "Datos", detail: "Recuperar más lecturas" },
+      ] },
+    ];
+    const groupsRoot = el("div", { className: "mission-design-groups" });
+    const values = new Map<string, HTMLElement>();
+    const budgetValue = el("strong", { className: "mission-design-budget-value" });
+    const budgetFill = el("span", { className: "mission-design-budget-fill" });
+    const balance = el("input", {
+      className: "mission-gauge-slider mission-design-balance-slider",
+      attrs: { type: "range", min: "0", max: "100", value: "38", "aria-label": t("Ajuste de equilibrio del giroscopio") },
+    });
+    const balanceValue = el("output", { className: "mission-gauge-value", text: balance.value });
+    const balanceNeedle = el("span", { className: "mission-gauge-needle" });
+    const balanceTrack = el("div", { className: "mission-gauge-track mission-design-balance-track", attrs: { "aria-hidden": "true" } });
+    balanceTrack.append(el("span", { className: "mission-gauge-target" }), balanceNeedle);
+    const calibrate = el("button", { className: "btn btn-secondary mission-task-readout", text: t("Probar equilibrio"), attrs: { type: "button" } });
 
-  private chooseDesign(structure: "light" | "balanced" | "reinforced"): void {
-    const line = structure === "light" ? MISSION_01_DIALOGUE.engineerLight : structure === "reinforced" ? MISSION_01_DIALOGUE.engineerHeavy : MISSION_01_DIALOGUE.engineerBalanced;
-    this.applyEngineeringChoice({ structure }, `${t("DESIGN LOCKED")} · ${t(line)}`);
-  }
+    const render = (): void => {
+      const metrics = calculateEngineering(draft);
+      draft.budget = Math.max(0, DESIGN_BUDGET - metrics.cost);
+      for (const [key, value] of Object.entries({
+        mass: `${metrics.mass}%`, stability: `${metrics.stability}%`, data: `${metrics.data}%`, reliability: `${metrics.reliability}%`,
+      })) values.get(key)!.textContent = value;
+      budgetValue.textContent = `${metrics.cost} / ${DESIGN_BUDGET}`;
+      budgetFill.style.width = `${Math.min(100, metrics.cost / DESIGN_BUDGET * 100)}%`;
+      groupsRoot.querySelectorAll<HTMLButtonElement>(".mission-design-choice").forEach((button) => {
+        const group = button.dataset.group as "structure" | "instrumentation" | "priority";
+        const selectedValue = draft[group];
+        const isSelected = button.dataset.value === selectedValue;
+        button.classList.toggle("mission-design-choice--selected", isSelected);
+        button.setAttribute("aria-pressed", String(isSelected));
+      });
+      balanceValue.textContent = balance.value;
+      balanceNeedle.style.left = `${balance.value}%`;
+      onChange({ ...draft });
+    };
 
-  /** Applies one engineering choice, recalculates the budget and refreshes the 3D model. */
-  private applyEngineeringChoice(patch: Partial<EngineeringProfile>, message?: string): void {
-    this.state.setEngineering(patch);
-    const profile = this.state.engineering;
-    this.gameplay?.setDesign(profile.structure, profile.instrumentation);
-    profile.budget = Math.max(0, DESIGN_BUDGET - calculateEngineering(profile).cost);
-    this.state.completeObjective("design");
-    this.renderObjectives();
-    this.showToast(message ?? t("CONFIGURATION SAVED · Budget recalculated from the new trade-offs."));
+    for (const group of groups) {
+      const section = el("section", { className: "mission-design-group" });
+      section.append(el("h4", { className: "mission-task-section-heading", text: t(group.title) }));
+      const choices = el("div", { className: "mission-design-choices" });
+      for (const option of group.options) {
+        const button = el("button", {
+          className: "mission-design-choice",
+          attrs: { type: "button", "aria-pressed": "false" },
+        });
+        button.dataset.group = group.key;
+        button.dataset.value = option.value;
+        button.append(el("strong", { text: t(option.label) }), el("span", { text: t(option.detail) }));
+        button.addEventListener("click", () => {
+          if (group.key === "structure") draft.structure = option.value as EngineeringProfile["structure"];
+          if (group.key === "instrumentation") draft.instrumentation = option.value as EngineeringProfile["instrumentation"];
+          if (group.key === "priority") draft.priority = option.value as EngineeringProfile["priority"];
+          calibrated = false;
+          render();
+          setReady(false, "La configuración cambió. Vuelve a calibrar el giroscopio para sellarla.");
+        });
+        choices.append(button);
+      }
+      section.append(choices);
+      groupsRoot.append(section);
+    }
+
+    const readouts = el("div", { className: "mission-design-readouts" });
+    for (const [key, label] of [["mass", "MASA"], ["stability", "ESTABILIDAD"], ["data", "DATOS"], ["reliability", "FIABILIDAD"]]) {
+      const item = el("div", { className: "mission-design-readout" });
+      item.append(el("span", { text: t(label) }));
+      const value = el("strong", { text: "—" });
+      values.set(key, value);
+      item.append(value);
+      readouts.append(item);
+    }
+    const budget = el("div", { className: "mission-design-budget" });
+    budget.append(
+      el("div", { className: "mission-design-budget-heading", children: [el("span", { text: t("PRESUPUESTO DE CAMPO") }), budgetValue] }),
+      el("div", { className: "mission-design-budget-track", children: [budgetFill] }),
+    );
+    const balanceReadout = el("div", { className: "mission-gauge-readout", children: [
+      el("span", { text: t("EQUILIBRIO DEL GIROSCOPIO") }), balanceValue, el("span", { text: "%" }),
+    ] });
+    calibrate.addEventListener("click", () => {
+      const reading = Number(balance.value);
+      calibrated = reading >= 62 && reading <= 74;
+      setReady(calibrated, calibrated
+        ? "Giroscopio centrado. Las lecturas de masa, estabilidad y datos quedan dentro del presupuesto."
+        : "La marca debe quedar en la banda verde, entre 62 y 74.");
+    });
+    balance.addEventListener("input", () => {
+      calibrated = false;
+      balanceValue.textContent = balance.value;
+      balanceNeedle.style.left = `${balance.value}%`;
+      setReady(false, "Alinea la marca con la banda verde y prueba el equilibrio.");
+    });
+    panel.append(
+      groupsRoot,
+      readouts,
+      budget,
+      el("div", { className: "mission-task-section-heading", text: t("CALIBRACIÓN FINAL") }),
+      balanceReadout,
+      balanceTrack,
+      balance,
+      calibrate,
+      el("p", { className: "mission-task-hint", text: t("Ajusta el giroscopio hasta dejar la marca entre 62 y 74.") }),
+    );
+    render();
+    return panel;
   }
 
   private openTesting(): void {
@@ -1135,9 +1402,15 @@ export class Mission1Screen implements Screen {
       return;
     }
 
+    const testSummary = [
+      t("Banco de pruebas exterior y barreras de protección."),
+      `${t("Estabilidad")}: ${metrics.stability}% · ${t("Masa")}: ${metrics.mass}% · ${t("Datos")}: ${metrics.data}%`,
+      "",
+      t("Completa tres tareas cortas de consola. Puedes repetirlas sin penalización."),
+    ].join("\n");
     this.showChoice(
       "TEST AREA · SYSTEMS REVIEW",
-      `Outdoor Test Stand & Blast Shields.\nStability rating: ${metrics.stability}% · Mass: ${metrics.mass}% · Data: ${metrics.data}%\n\nComplete three short console tasks. Each one can be retried without a penalty:`,
+      testSummary,
       [
         {
           label: `${systemDone ? "✓" : "1."} ${t("Calibrar el manómetro")}`,
@@ -1211,8 +1484,8 @@ export class Mission1Screen implements Screen {
       this.state.completeObjective("testing");
       this.renderObjectives();
       this.showChoice(
-        "WARNING · UNEXPECTED INSTABILITY DETECTED",
-        `ING. ANDREW WELLS: “That wasn't there before.”\nING. ELENA BROOKS: “Then something changed during the pressurization cycle.”\nING. TOMÁS ELDRICH: “Find it.”\n\nA mechanical oscillation has appeared in the trace recorder. Inspect the prototype closely to diagnose the cause.`,
+        "ADVERTENCIA · INESTABILIDAD INESPERADA DETECTADA",
+        `ING. ANDREW WELLS: “Eso no estaba ahí antes.”\nING. ELENA BROOKS: “Entonces algo cambió durante el ciclo de presurización.”\nING. TOMÁS ELDRICH: “Encuéntralo.”\n\nUna oscilación mecánica apareció en el registrador de traza. Inspecciona el prototipo de cerca para diagnosticar la causa.`,
         [
           {
             label: "Inspect prototype to find the cause",
@@ -1295,8 +1568,8 @@ export class Mission1Screen implements Screen {
         this.renderObjectives();
         this.showChoice(
           "PRE-LAUNCH BRIEFING",
-          `MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`,
-          [{ label: "Head to the Observation Area", run: () => this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch.")) }],
+          t(`MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`),
+          [{ label: t("Head to the Observation Area"), run: () => this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch.")) }],
         );
       },
       "Confirmar lista y seguir",
@@ -1332,10 +1605,10 @@ export class Mission1Screen implements Screen {
     this.renderObjectives();
     this.showChoice(
       "OBSERVATION AREA · TAKE POSITION",
-      `The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.\n\nDIRECTOR: “Ready on your mark.”`,
+      t(`The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.\n\nDIRECTOR: “Ready on your mark.”`),
       [
         {
-          label: "START LAUNCH COUNTDOWN (T-10)",
+          label: t("START LAUNCH COUNTDOWN (T-10)"),
           run: () => {
             this.runLaunchSequence();
           },
@@ -1355,35 +1628,22 @@ export class Mission1Screen implements Screen {
     const analysisCompleteCount = analysisTopics.filter((topic) => this.state.analyzed.has(topic)).length;
     this.showChoice(
       "OUTDOOR ANALYSIS STATION · FLIGHT RECORD",
-      `FLIGHT OUTCOME: ${label}\n\n${t(MISSION_01_DIALOGUE.historicalNote)}\n\nReview the flight telemetry traces and system performance:`,
+      `FLIGHT OUTCOME: ${label}\n\n${t(MISSION_01_DIALOGUE.historicalNote)}\n\n${t("Review the flight telemetry traces and system performance:")}`,
       [
         {
-          label: "Analyze Propulsion & Chamber Pressure",
-          run: () => {
-            this.state.analyzeData("Propulsion & Pressure Data");
-            this.showToast(t("Propulsion trace analyzed: combustion pressure curve confirmed."));
-            this.openAnalysis();
-          },
+          label: `${this.state.analyzed.has(analysisTopics[0]!) ? "✓" : "01"} · ${t("Analyze Propulsion & Chamber Pressure")}`,
+          run: () => this.runAnalysisTask(analysisTopics[0]!),
         },
         {
-          label: "Analyze Structural Rigidity & Frame Deflection",
-          run: () => {
-            this.state.analyzeData("Structural & Frame Data");
-            this.showToast(t("Structural trace analyzed: frame stability verified against guide cables."));
-            this.openAnalysis();
-          },
+          label: `${this.state.analyzed.has(analysisTopics[1]!) ? "✓" : "02"} · ${t("Analyze Structural Rigidity & Frame Deflection")}`,
+          run: () => this.runAnalysisTask(analysisTopics[1]!),
         },
         {
-          label: "Recover Smoked Drum Flight Record",
-          run: () => {
-            this.state.analyzeData("Smoked Drum Flight Record");
-            this.state.collectRecord("1926 Smoked Paper Flight Trace");
-            this.showToast(t("Historical record recovered and archived in mission log."));
-            this.openAnalysis();
-          },
+          label: `${this.state.analyzed.has(analysisTopics[2]!) ? "✓" : "03"} · ${t("Recover Smoked Drum Flight Record")}`,
+          run: () => this.runAnalysisTask(analysisTopics[2]!),
         },
         {
-          label: `COMPILE FINAL REPORT · ${analysisCompleteCount}/3 records reviewed`,
+          label: `${t("COMPILE FINAL REPORT")} · ${analysisCompleteCount}/3 ${t("records reviewed")}`,
           run: () => {
             if (!this.state.completeObjective("analysis")) {
               this.showToast(t("Review the propulsion trace, structural trace, and smoked drum record before compiling the report."));
@@ -1396,6 +1656,48 @@ export class Mission1Screen implements Screen {
           },
         },
       ]
+    );
+  }
+
+  private runAnalysisTask(topic: string): void {
+    if (this.state.analyzed.has(topic)) {
+      this.showToast(t("Este registro ya fue revisado. Puedes continuar con otro canal."));
+      this.openAnalysis();
+      return;
+    }
+    const task = topic === "Propulsion & Pressure Data"
+      ? {
+        title: "LECTURA DE PROPULSIÓN · CALIBRA EL PICO",
+        description: "Ajusta el manómetro hasta que el pulso coincida con la banda marcada en el registro.",
+        build: (setReady: (ready: boolean, message: string) => void) => this.buildPressureCalibrationTask(setReady),
+        confirm: "Archivar curva de presión",
+      }
+      : topic === "Structural & Frame Data"
+        ? {
+          title: "LECTURA ESTRUCTURAL · COMPARA LAS TRAZAS",
+          description: "Busca la única curva regular que confirma que el bastidor se mantuvo dentro de tolerancia durante el vuelo.",
+          build: (setReady: (ready: boolean, message: string) => void) => this.buildVibrationTask(setReady, "steady"),
+          confirm: "Archivar lectura estructural",
+        }
+        : {
+          title: "REGISTRO DE VUELO · RECONSTRUYE EL TAMBOR",
+          description: "Las marcas del papel quedaron fuera de orden. Restáuralas para confirmar cuándo salió el vehículo, dónde llegó y qué distancia observó el equipo.",
+          build: (setReady: (ready: boolean, message: string) => void) => this.buildFlightRecordTask(setReady),
+          confirm: "Archivar registro histórico",
+        };
+    this.showTaskModal(
+      task.title,
+      task.description,
+      task.build,
+      () => {
+        this.state.analyzeData(topic);
+        if (topic === "Smoked Drum Flight Record") this.state.collectRecord("1926 Smoked Paper Flight Trace");
+        this.showToast(topic === "Smoked Drum Flight Record"
+          ? t("Historical record recovered and archived in mission log.")
+          : t("LECTURA ANALIZADA · La traza queda archivada en el registro de misión."));
+        this.openAnalysis();
+      },
+      task.confirm,
     );
   }
 

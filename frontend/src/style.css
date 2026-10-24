@@ -1895,3 +1895,144 @@ button.mission-map-location:focus-visible {
     transition: none;
   }
 }
+
+/* Mission 01 field-task consoles: analog hardware language with game-like feedback. */
+.mission-task-card:has(.mission-engineering-task) { width: min(820px, 100%); }
+
+.mission-task-kicker {
+  margin: 0 0 8px;
+  color: #f3b777;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.mission-task-section-heading {
+  margin: 16px 0 8px;
+  color: #d69b67;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .15em;
+}
+
+.mission-engineering-task { display: grid; gap: 2px; }
+.mission-design-groups { display: grid; gap: 12px; }
+.mission-design-group { min-width: 0; }
+.mission-design-group .mission-task-section-heading { margin-top: 8px; }
+.mission-design-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+
+.mission-design-choice {
+  display: grid;
+  min-width: 0;
+  min-height: 62px;
+  gap: 4px;
+  align-content: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(202, 190, 157, .25);
+  border-radius: 8px;
+  background: linear-gradient(155deg, rgba(28, 38, 43, .92), rgba(10, 16, 22, .92));
+  color: #e9e4d7;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.mission-design-choice strong { font-size: .82rem; }
+.mission-design-choice span { color: #9ba9a3; font-size: .7rem; line-height: 1.3; }
+.mission-design-choice:hover { border-color: rgba(241, 177, 111, .72); transform: translateY(-1px); }
+.mission-design-choice--selected { border-color: #f2b36f; background: linear-gradient(145deg, rgba(105, 72, 42, .56), rgba(35, 31, 25, .92)); box-shadow: inset 3px 0 #f0a45c, 0 0 14px rgba(240, 164, 92, .1); }
+
+.mission-design-readouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+.mission-design-readout {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(197, 205, 183, .16);
+  border-radius: 7px;
+  background: rgba(6, 12, 17, .72);
+}
+.mission-design-readout span { color: #8f9d99; font-size: .6rem; letter-spacing: .13em; }
+.mission-design-readout strong { color: #e6edd8; font: 700 1rem/1.1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mission-design-budget { margin-top: 12px; }
+.mission-design-budget-heading { display: flex; justify-content: space-between; margin-bottom: 6px; color: #aeb6aa; font-size: .68rem; letter-spacing: .1em; }
+.mission-design-budget-heading strong { color: #f0c48e; font-variant-numeric: tabular-nums; }
+.mission-design-budget-track { height: 7px; overflow: hidden; border: 1px solid rgba(211, 197, 162, .22); border-radius: 5px; background: rgba(3, 7, 11, .8); }
+.mission-design-budget-fill { display: block; height: 100%; background: linear-gradient(90deg, #84b57e, #e6b46d 75%, #dc6e54); transition: width .2s ease; }
+.mission-design-balance-track { margin-top: 5px; }
+
+.mission-diagnosis-task { display: grid; gap: 5px; }
+.mission-evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.mission-evidence-card { display: grid; min-width: 0; align-content: start; }
+.mission-evidence-chip {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid rgba(204, 193, 157, .27);
+  border-radius: 7px;
+  background: rgba(13, 20, 26, .9);
+  color: #e5dfce;
+  cursor: pointer;
+  font: inherit;
+  font-size: .73rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-align: left;
+}
+.mission-evidence-chip:hover { border-color: #e7a968; }
+.mission-evidence-chip--scanned { border-color: rgba(144, 207, 154, .58); background: rgba(41, 68, 48, .38); color: #c8edc1; }
+.mission-evidence-lamp { color: #edae6b; font-size: 1rem; }
+.mission-evidence-chip--scanned .mission-evidence-lamp { color: #9fdfa0; text-shadow: 0 0 10px rgba(159, 223, 160, .6); }
+.mission-evidence-readout { min-height: 2.6em; margin: 0; padding: 9px 11px; border: 1px solid rgba(204, 193, 157, .15); border-top: 0; border-radius: 0 0 7px 7px; background: rgba(3, 8, 13, .65); color: #c9d3c9; font-size: .78rem; line-height: 1.45; }
+.mission-evidence-readout:empty { display: none; }
+.mission-diagnosis-count { margin: 5px 0; color: #c3b18f; font-size: .72rem; text-align: right; }
+.mission-diagnosis-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.mission-diagnosis-choice {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(204, 193, 157, .25);
+  border-radius: 7px;
+  background: rgba(13, 20, 26, .88);
+  color: #dedfce;
+  cursor: pointer;
+  font: inherit;
+  font-size: .77rem;
+  text-align: left;
+}
+.mission-diagnosis-choice:hover,
+.mission-diagnosis-choice--selected { border-color: #e6aa6b; background: rgba(98, 68, 39, .46); color: #ffe0b5; }
+.mission-diagnosis-verify { justify-content: center; }
+
+.mission-record-reel { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; color: #d0a16c; font-size: .66rem; letter-spacing: .12em; }
+.mission-record-reel-light { width: 7px; height: 7px; border-radius: 50%; background: #8ed093; box-shadow: 0 0 10px rgba(142, 208, 147, .62); }
+.mission-record-rows { display: grid; gap: 7px; }
+.mission-record-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 56px; padding: 8px 9px; border: 1px solid rgba(204, 193, 157, .25); border-radius: 7px; background: rgba(9, 15, 20, .84); }
+.mission-record-index { color: #dc9f63; font: 700 .8rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mission-record-description { display: grid; gap: 3px; }
+.mission-record-description strong { color: #bbc5b9; font: 700 .67rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+.mission-record-description span { color: #e3e1d5; font-size: .82rem; }
+.mission-record-controls { display: flex; gap: 4px; }
+.mission-record-move { width: 32px; height: 32px; border: 1px solid rgba(204, 193, 157, .25); border-radius: 6px; background: rgba(30, 40, 42, .9); color: #f0c38c; cursor: pointer; font: 700 1rem/1 sans-serif; }
+.mission-record-move:hover:not(:disabled) { border-color: #e6aa6b; background: rgba(101, 70, 39, .5); }
+.mission-record-move:disabled { opacity: .32; cursor: default; }
+
+@media (max-width: 640px) {
+  .mission-design-choices { gap: 5px; }
+  .mission-design-choice { min-height: 48px; padding: 7px 6px; text-align: center; }
+  .mission-design-choice strong { font-size: .7rem; }
+  .mission-design-choice span { display: none; }
+  .mission-design-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mission-evidence-grid,
+  .mission-diagnosis-options { grid-template-columns: 1fr; }
+  .mission-record-row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 6px; }
+  .mission-record-description span { font-size: .74rem; }
+  .mission-record-move { width: 29px; height: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-design-choice,
+  .mission-design-budget-fill { transition: none; }
+}
