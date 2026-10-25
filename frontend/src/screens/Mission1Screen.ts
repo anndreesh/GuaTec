@@ -563,7 +563,14 @@ export class Mission1Screen implements Screen {
       this.mapLocations.style.height = "";
       return;
     }
-    const height = Math.ceil(this.mapDataColumn.getBoundingClientRect().height);
+    const styles = window.getComputedStyle(this.mapDataColumn);
+    const gap = Number.parseFloat(styles.rowGap || styles.gap) || 0;
+    const height = Math.ceil(
+      Array.from(this.mapDataColumn.children).reduce(
+        (total, child) => total + (child as HTMLElement).getBoundingClientRect().height,
+        0,
+      ) + Math.max(0, this.mapDataColumn.children.length - 1) * gap,
+    );
     if (height > 0) {
       const value = `${height}px`;
       this.mapGrid.style.height = value;

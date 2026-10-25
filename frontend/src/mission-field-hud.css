@@ -105,6 +105,7 @@
  gap:8px;
  grid-template-rows:auto auto;
  align-content:start;
+ align-self:start;
  min-width:0;
 }
 .mission-map-grid {
