@@ -1,0 +1,66 @@
+/* Field instruments: the active objective remains visible with the log folded. */
+.field-hud { position:fixed; top:20px; left:20px; width:min(340px,calc(100vw - 40px)); z-index:5; padding:14px 16px; color:#e6eee9; background:linear-gradient(120deg,rgba(20,32,34,.96),rgba(12,22,25,.9)); border-left:3px solid #dfb16b; border-top:1px solid #667773; box-shadow:0 8px 30px #0004; pointer-events:auto; }
+.field-hud-top { display:flex; justify-content:space-between; color:#acbcb6; font-size:.65rem; letter-spacing:.16em; margin-bottom:9px; }
+.field-hud-progress { color:#e8bc76; font-variant-numeric:tabular-nums; }
+.field-hud-objective { display:block; font-size:1rem; line-height:1.35; }
+.field-hud-next { margin:7px 0 10px; font-size:.73rem; color:#9caeaa; line-height:1.4; }
+.field-hud-checkpoint { font-size:.68rem; color:#bfc9b3; }
+.field-hud-tools { display:flex; gap:8px; margin-top:12px; border-top:1px solid #ffffff18; padding-top:10px; }
+.field-hud-tools select,.field-hud-tools button { padding:5px 8px; color:#d1ded6; border:1px solid #8ba09755; background:#17272b; border-radius:3px; font:inherit; font-size:.7rem; min-height:30px; }
+.field-hud-tools :focus-visible,.field-minimap:focus-visible { outline:2px solid #f0c17a; outline-offset:3px; }
+.field-minimap { position:fixed; right:24px; bottom:24px; width:148px; padding:0; overflow:hidden; border:1px solid #a6b6a166; background:#101c20; box-shadow:0 8px 28px #0005; }
+.field-minimap canvas { display:block; width:100%; height:auto; }
+.field-minimap > span { position:absolute; top:6px; left:8px; color:#dfbc85; font-size:.6rem; letter-spacing:.1em; }
+.mission1-screen:not(.mission1-screen--minimized) { position:fixed; left:20px; top:220px; width:min(390px,calc(100vw - 40px)); max-height:calc(100dvh - 250px); overflow:auto; padding:16px; z-index:6; }
+.mission1-screen .mission1-header .screen-title { font-size:1.05rem; }
+.mission-task-card { max-height:calc(100dvh - 36px); overflow:auto; }
+.modal-card:focus { outline:none; }
+.interaction-prompt { max-width:min(520px,calc(100vw - 40px)); text-align:center; }
+@media (max-width:700px) {
+ .field-hud { top:max(8px,env(safe-area-inset-top)); left:8px; width:min(280px,calc(100vw - 88px)); padding:10px 11px; }
+ .field-hud-objective { font-size:.8rem; }
+ .field-hud-top { font-size:.55rem; margin-bottom:5px; }
+ .field-hud-next { font-size:.64rem; margin:5px 0; }
+ .field-hud-tools { margin-top:7px; padding-top:6px; }
+ .field-hud-tools select,.field-hud-tools button { min-height:34px; font-size:.64rem; }
+ .field-minimap { width:86px; right:8px; bottom:160px; }
+ .flight-metrics { display:none; }
+ .mission1-screen:not(.mission1-screen--minimized) { top:190px; left:8px; width:calc(100vw - 16px); max-height:calc(100dvh - 300px); }
+ .mission1-screen--minimized { left:8px; bottom:8px; padding:8px; max-width:calc(100vw - 16px); }
+ .mission1-screen--minimized .screen-title { display:none; }
+ .mission-panel-restore { bottom:10px; left:10px; padding:6px 10px; font-size:.7rem; }
+ .gameplay-toast { max-width:calc(100vw - 24px); top:auto; bottom:112px; }
+ .mission-task-card { max-height:calc(100dvh - 16px); }
+}
+@media (max-height:600px) and (min-width:701px) {
+ .field-hud { width:270px; top:8px; left:8px; padding:9px 12px; }
+ .field-hud-next { display:none; }
+ .field-minimap { width:104px; bottom:12px; right:12px; }
+ .mission1-screen:not(.mission1-screen--minimized) { top:164px; max-height:calc(100dvh - 184px); }
+}
+@media (min-width:701px) {
+ .flight-metrics { top:76px; }
+ .mission-map-button { top:auto; bottom:186px; right:24px; }
+}
+.mission1-screen--minimized { display:none; }
+/* The root's generic pointer rule must not turn the touch wrapper into a screen-sized hit target. */
+#ui-root > .mobile-game-controls { pointer-events:none; }
+.mission-input-paused .mission-map-button,
+.mission-input-paused .field-minimap,
+.mission-input-paused .mission-panel-restore,
+.mission-input-paused .mobile-game-controls { visibility:hidden; }
+.mission-input-paused .language-menu { z-index:9; }
+@media (pointer:coarse), (max-width:900px) {
+ .field-hud { z-index:9; }
+ .mission-panel-restore { bottom:174px; }
+ .mission-map-button { top:16px; bottom:auto; right:88px; }
+ .mobile-interact-button { max-width:min(210px,40vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
+.mission-input-paused #ui-root { z-index:30; }
+@media (max-width:700px) and (orientation:portrait) { .field-minimap { bottom:200px; } }
+@media (max-width:900px) and (orientation:landscape) {
+ .field-minimap { width:72px; top:16px; left:calc(50% - 36px); right:auto; bottom:auto; }
+}
+@media (max-width:700px) and (orientation:landscape) {
+ .field-minimap { top:76px; left:auto; right:16px; }
+}

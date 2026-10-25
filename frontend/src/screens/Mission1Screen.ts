@@ -21,16 +21,16 @@ import { LAUNCH_DELAY_BUDGET_COST, flightPeakAltitude, flightResultLabel, resolv
 import { MISSION_01_DIAGNOSTIC_CAUSES, MISSION_01_DIALOGUE } from "@/state/Mission01Events";
 import type { Screen } from "@/screens/Screen";
 import type { MissionSaveState } from "@/types";
-import { t } from "@/core/i18n";
+import { getLanguage, t } from "@/core/i18n";
 import { missionAudio } from "@/core/MissionAudio";
+import { mountEngineeringTask, type EngineeringTaskKind } from "@/screens/EngineeringMinigames";
+import "@/mission-field-hud.css";
 
 const MISSION_SLUG = MISSION_SLUGS.mission1;
-const CHECKLIST_LABELS: Record<string, string> = {
-  "inspect-vehicle": "Inspect vehicle",
-  "check-instruments": "Check instruments",
-  "review-conditions": "Review conditions",
-  "confirm-observation": "Confirm observation area",
-  "confirm-telemetry": "Confirm telemetry",
+const REQUIRED_POI_OBJECTIVES: Partial<Record<string, MissionObjectiveId>> = {
+  "director-greeting": "lab", "meet-propulsion": "discover", "meet-structural": "discover", "meet-data": "discover",
+  "inspect-prototype": "meet-team", "engine-selection": "prototype", "pressure-test": "design",
+  "launch-window": "diagnose", "telemetry-fluctuation": "prepare", "analysis-station": "flight",
 };
 
 /** The playable Mission 1 loop: a third-person Earth test-range scene
@@ -44,10 +44,39 @@ export class Mission1Screen implements Screen {
   private toastTimer: number | undefined;
   private launchTimer: number | undefined;
   private flightTimer: number | undefined;
-  private paused = false;
+  private launchKeyHandler: ((event: KeyboardEvent) => void) | null = null;
+  private isPaused = false;
+  private get paused(): boolean { return this.isPaused; }
+  private set paused(value: boolean) {
+    this.isPaused = value;
+    document.body.classList.toggle("mission-input-paused", value);
+    this.gameplay?.setInputSuspended(value);
+    if (value && document.pointerLockElement) document.exitPointerLock();
+  }
+  private activeTaskDispose: (() => void) | null = null;
+  private fieldHud: HTMLElement | null = null;
+  private minimap: HTMLCanvasElement | null = null;
+  private lastMinimapAt = 0;
+  private openingTimer: number | undefined;
+  private modalFocus: HTMLElement | null = null;
+  private readonly onModalKey = (event: KeyboardEvent) => {
+    if (!this.modalRoot || this.modalRoot.classList.contains("modal-overlay--hidden")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.modalRoot.querySelector<HTMLButtonElement>("[data-modal-dismiss]")?.click();
+    }
+    if (event.key === "Tab") {
+      const controls = [...this.modalRoot.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')];
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!this.modalRoot.contains(document.activeElement) || document.activeElement === this.modalRoot.querySelector(".modal-card")) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
+  };
   private ended = false;
   private restarting = false;
   private readonly pendingAutosaves = new Set<Promise<void>>();
+  private saveQueue: Promise<void> = Promise.resolve();
 
   private resourceBars = new Map<string, HTMLElement>();
   private logPanel: HTMLElement | null = null;
@@ -56,6 +85,7 @@ export class Mission1Screen implements Screen {
   private phaseStepper: HTMLElement | null = null;
   private objectivePanel: HTMLElement | null = null;
   private interactionPrompt: HTMLElement | null = null;
+  private nearbyPoi: NearbyPoi | null = null;
   private mobileInteractButton: HTMLButtonElement | null = null;
   private toast: HTMLElement | null = null;
   private gameplay: GameplayHandle | null = null;
@@ -183,9 +213,11 @@ export class Mission1Screen implements Screen {
 
     this.flightMetrics = el("aside", { className: "flight-metrics", attrs: { "aria-label": t("Instrumentos de vuelo") } });
     container.append(this.flightMetrics);
+    this.createFieldHud(container);
     this.createMissionMap(container);
     this.createMobileControls(container);
     window.addEventListener("keydown", this.onMapKey);
+    window.addEventListener("keydown", this.onModalKey);
 
     this.renderResources();
     this.renderLog();
@@ -194,6 +226,7 @@ export class Mission1Screen implements Screen {
     this.renderFlightMetrics();
     this.updateTickLabel(tickLabel);
     this.wireGameplayLayer(!savedState);
+    this.togglePanel(false);
 
     if (!savedState) {
       this.showOpeningSequence(container);
@@ -240,6 +273,8 @@ export class Mission1Screen implements Screen {
     if (resetWorld) this.gameplay.reset();
     this.gameplay.setDesign(this.state.engineering.structure, this.state.engineering.instrumentation);
     this.gameplay.setMissionProgress(this.state.progressPercent() / 100);
+    this.gameplay.setInputSuspended(this.paused);
+    this.restoreEngineeringFeedback();
   }
 
   private createMobileControls(container: HTMLElement): void {
@@ -298,6 +333,7 @@ export class Mission1Screen implements Screen {
     });
     stick.addEventListener("pointerup", releaseStick);
     stick.addEventListener("pointercancel", releaseStick);
+    stick.addEventListener("lostpointercapture", releaseStick);
   }
 
   private createMissionMap(container: HTMLElement): void {
@@ -338,6 +374,7 @@ export class Mission1Screen implements Screen {
 
   private toggleMap(force?: boolean): void {
     if (!this.mapOverlay) return;
+    if (this.paused) return;
     const open = force ?? this.mapOverlay.classList.contains("mission-map-overlay--hidden");
     this.mapOverlay.classList.toggle("mission-map-overlay--hidden", !open);
     if (open) this.renderMapObjective();
@@ -345,6 +382,7 @@ export class Mission1Screen implements Screen {
 
   private updateMissionMap(state: GameplayMapState): void {
     this.mapState = state;
+    this.drawMinimap();
     if (!this.mapPlayer) return;
     const signature = state.points.map((point) => `${point.id}:${point.discovered === false ? 0 : 1}`).join("|");
     if (this.mapGrid && signature !== this.mapSignature) {
@@ -395,6 +433,85 @@ export class Mission1Screen implements Screen {
     const pendingId = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id))?.id ?? "complete";
     if (pendingId !== this.renderedMapObjectiveId) this.renderMapObjective();
     else this.updateMapDistance();
+  }
+
+  private fieldText(es: string, en: string, fr: string): string {
+    return { es, en, fr }[getLanguage()];
+  }
+
+  private createFieldHud(container: HTMLElement): void {
+    const hud = el("aside", { className: "field-hud", attrs: { "aria-label": this.fieldText("Estado de misión", "Mission status", "État de mission") } });
+    this.fieldHud = hud;
+    const top = el("div", { className: "field-hud-top" });
+    top.append(el("span", { text: "AUBURN / 1926" }), el("span", { className: "field-hud-progress" }));
+    const objective = el("strong", { className: "field-hud-objective" });
+    const next = el("p", { className: "field-hud-next" });
+    const checkpoint = el("span", { className: "field-hud-checkpoint" });
+    const map = el("button", { className: "field-minimap", attrs: { type: "button", "aria-label": t("Abrir mapa de misión") } });
+    this.minimap = el("canvas", { attrs: { width: "180", height: "180", "aria-hidden": "true" } });
+    map.append(this.minimap, el("span", { text: "N ↑ · M" }));
+    map.addEventListener("click", () => this.toggleMap());
+    const quality = el("select", { attrs: { "aria-label": this.fieldText("Calidad gráfica", "Graphics quality", "Qualité graphique") } });
+    quality.append(el("option", { text: this.fieldText("Equilibrado", "Balanced", "Équilibré"), attrs: { value: "balanced" } }), el("option", { text: this.fieldText("Alto", "High", "Élevé"), attrs: { value: "high" } }));
+    let initialQuality: "high" | "balanced" = "balanced";
+    try { if (localStorage.getItem("guatec-graphics-quality") === "high") initialQuality = "high"; } catch { /* storage optional */ }
+    quality.value = initialQuality;
+    const applyQuality = (): void => {
+      const profile = quality.value === "high" ? "high" : "balanced";
+      this.gameplay?.setQuality(profile);
+      try { localStorage.setItem("guatec-graphics-quality", profile); } catch { /* storage optional */ }
+    };
+    quality.addEventListener("change", applyQuality);
+    const sound = el("button", { className: "field-hud-sound", attrs: { type: "button", "aria-pressed": String(missionAudio.isMuted()) }, text: missionAudio.isMuted() ? this.fieldText("Silencio", "Muted", "Muet") : this.fieldText("Sonido ✓", "Sound ✓", "Son ✓") });
+    sound.addEventListener("click", () => {
+      const muted = sound.getAttribute("aria-pressed") !== "true";
+      sound.setAttribute("aria-pressed", String(muted));
+      missionAudio.setMuted(muted);
+      sound.textContent = muted ? this.fieldText("Silencio", "Muted", "Muet") : this.fieldText("Sonido ✓", "Sound ✓", "Son ✓");
+    });
+    const tools = el("div", { className: "field-hud-tools" });
+    tools.append(quality, sound);
+    hud.append(top, objective, next, checkpoint, map, tools);
+    container.append(hud);
+    // Gameplay is wired immediately after mounting the HUD.
+    queueMicrotask(applyQuality);
+  }
+
+  private renderFieldHud(): void {
+    if (!this.fieldHud) return;
+    const pendingIndex = MISSION_01_OBJECTIVES.findIndex((entry) => !this.state.objectives.has(entry.id));
+    const pending = MISSION_01_OBJECTIVES[pendingIndex];
+    this.fieldHud.querySelector(".field-hud-objective")!.textContent = t(pending?.label ?? "Mission complete");
+    this.fieldHud.querySelector(".field-hud-progress")!.textContent = `${Math.round(this.state.progressPercent())}%`;
+    const next = MISSION_01_OBJECTIVES[pendingIndex + 1];
+    this.fieldHud.querySelector(".field-hud-next")!.textContent = next && pending
+      ? `${this.fieldText("Después", "Next", "Ensuite")} · ${t(next.label)}`
+      : pending ? this.fieldText("Última actividad · compila el informe", "Final activity · compile the report", "Dernière activité · rédigez le rapport") : t("Mission complete");
+    this.fieldHud.querySelector(".field-hud-checkpoint")!.textContent = `◇ ${t(this.state.checkpoint)}`;
+    this.drawMinimap();
+  }
+
+  private drawMinimap(): void {
+    if (!this.minimap || !this.mapState || performance.now() - this.lastMinimapAt < 100) return;
+    this.lastMinimapAt = performance.now();
+    const ctx = this.minimap.getContext("2d");
+    if (!ctx) return;
+    const point = (x: number, z: number) => [Math.max(5, Math.min(175, (x + 34) / 68 * 180)), Math.max(5, Math.min(175, (34 - z) / 68 * 180))];
+    ctx.fillStyle = "#101c20"; ctx.fillRect(0, 0, 180, 180);
+    ctx.strokeStyle = "#293739"; ctx.lineWidth = 1;
+    for (let i = 18; i < 180; i += 18) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 180); ctx.moveTo(0, i); ctx.lineTo(180, i); ctx.stroke(); }
+    const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
+    for (const entry of this.mapState.points) {
+      const [x, y] = point(entry.x, entry.z);
+      const active = entry.id === targetId;
+      ctx.fillStyle = active ? "#edbe70" : entry.discovered === false ? "#455355" : "#8da6a4";
+      ctx.beginPath(); ctx.arc(x!, y!, active ? 5 : 2.5, 0, Math.PI * 2); ctx.fill();
+      if (active) { ctx.strokeStyle = "#edbe70"; ctx.beginPath(); ctx.arc(x!, y!, 9, 0, Math.PI * 2); ctx.stroke(); }
+    }
+    const [x, y] = point(this.mapState.player.x, this.mapState.player.z);
+    ctx.save(); ctx.translate(x!, y!); ctx.rotate(this.mapState.player.direction);
+    ctx.fillStyle = "#e6f7ec"; ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill(); ctx.restore();
   }
 
   private renderMapObjective(): void {
@@ -456,6 +573,7 @@ export class Mission1Screen implements Screen {
   }
 
   private updateInteractionPrompt(poi: NearbyPoi | null): void {
+    this.nearbyPoi = poi;
     this.mobileInteractButton?.classList.toggle("mobile-interact-button--hidden", !poi);
     const poiLabel = poi ? t(poi.label) : "";
     if (this.mobileInteractButton) this.mobileInteractButton.textContent = poi ? `${t("Examinar")} · ${poiLabel}` : t("Examinar");
@@ -465,7 +583,12 @@ export class Mission1Screen implements Screen {
       return;
     }
     const action = t(poi.prompt ?? "E · EXAMINE OUTDOOR STATION");
-    this.interactionPrompt.textContent = `${action}: ${poiLabel}`;
+    const prerequisite = REQUIRED_POI_OBJECTIVES[poi.id];
+    const locked = prerequisite && !this.state.objectives.has(prerequisite);
+    this.interactionPrompt.textContent = locked
+      ? `◇ ${poiLabel} · ${this.fieldText("Completa primero el objetivo actual", "Complete the current objective first", "Terminez d’abord l’objectif actuel")}`
+      : `${action}: ${poiLabel}`;
+    this.interactionPrompt.dataset.locked = String(!!locked);
     this.interactionPrompt.classList.remove("interaction-prompt--hidden");
   }
 
@@ -529,24 +652,13 @@ export class Mission1Screen implements Screen {
 
   /** World interactions advance mission objectives and persist meaningful choices. */
   private handleInteract(poiId: string): void {
+    if (this.paused || this.ended) return;
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
 
     // Story locations stay explorable, but their mission actions only unlock
     // after the required checkpoint has been completed.
-    const requiredObjectives: Partial<Record<string, MissionObjectiveId>> = {
-      "director-greeting": "lab",
-      "meet-propulsion": "discover",
-      "meet-structural": "discover",
-      "meet-data": "discover",
-      "inspect-prototype": "meet-team",
-      "engine-selection": "prototype",
-      "pressure-test": "design",
-      "launch-window": "diagnose",
-      "telemetry-fluctuation": "prepare",
-      "analysis-station": "flight",
-    };
-    const requiredId = requiredObjectives[poiId];
+    const requiredId = REQUIRED_POI_OBJECTIVES[poiId];
     const required = requiredId ? MISSION_01_OBJECTIVES.find((objective) => objective.id === requiredId) : null;
     if (required && !this.state.objectives.has(required.id)) {
       this.showToast(`CHECKPOINT LOCKED · Complete first: ${t(required.label)}.`);
@@ -561,9 +673,6 @@ export class Mission1Screen implements Screen {
 
     // 2. Project Director:
     if (poiId === "director-greeting") {
-      this.state.completeObjective("discover");
-      this.state.collectRecord("Director's experiment briefing");
-      this.renderObjectives();
       this.showChoice(
         "PROJECT DIRECTOR · ING. TOMÁS ELDRICH",
         `“You're here. Good. Today is an important day.\n\nToday we're going to attempt something people have doubted for years. We are going to see whether our machine can actually fly.\n\nNot because we're going somewhere, or trying to reach space. We're trying to prove one thing: that liquid-fuel propulsion can leave the ground. Welcome to the project.”`,
@@ -574,6 +683,8 @@ export class Mission1Screen implements Screen {
               this.state.addLogEntry("DIRECTOR — Meet the engineering team around the outdoor stations.");
               // The engineering lead's radio briefing was defined but never shown; it plays here.
               this.showEngineeringLeadDialogue(() => {
+                this.state.completeObjective("discover");
+                this.state.collectRecord("Director's experiment briefing");
                 this.showToast(t("OBJECTIVE UPDATED · Meet the team across the project area."));
               });
             },
@@ -582,7 +693,11 @@ export class Mission1Screen implements Screen {
             label: "“Tell me about the vehicle on the stand.”",
             run: () => {
               this.state.addLogEntry("DIRECTOR — It's a small experimental motor with liquid oxygen and gasoline.");
-              this.showToast(t("DIRECTOR: Review the notes on the project desk and inspect the frame."));
+              this.showEngineeringLeadDialogue(() => {
+                this.state.completeObjective("discover");
+                this.state.collectRecord("Director's experiment briefing");
+                this.showToast(t("DIRECTOR: Review the notes on the project desk and inspect the frame."));
+              });
             },
           },
         ]
@@ -592,9 +707,6 @@ export class Mission1Screen implements Screen {
 
     // 3. Meet Team Members:
     if (poiId === "meet-propulsion") {
-      this.state.meetNpc("meet-propulsion");
-      if (this.state.teamMet()) this.state.completeObjective("meet-team");
-      this.renderObjectives();
       this.showChoice(
         "PROPULSION ENGINEER · ANDREW WELLS",
         `“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”`,
@@ -602,6 +714,8 @@ export class Mission1Screen implements Screen {
           {
             label: "“Noted. What are our safety margins?”",
             run: () => {
+              this.state.meetNpc("meet-propulsion");
+              if (this.state.teamMet()) this.state.completeObjective("meet-team");
               this.state.addLogEntry("ANDREW WELLS — Margins are tight. We check every line and gauge before any pressurized test.");
               this.showToast(t("Propulsion notes recorded. Inspect the prototype and meet the team."));
             },
@@ -612,9 +726,6 @@ export class Mission1Screen implements Screen {
     }
 
     if (poiId === "meet-structural") {
-      this.state.meetNpc("meet-structural");
-      if (this.state.teamMet()) this.state.completeObjective("meet-team");
-      this.renderObjectives();
       this.showChoice(
         "STRUCTURAL ENGINEER · ELENA BROOKS",
         `“The frame is lightweight steel tubing with brass brackets. We're placing the motor up top to pull the propellant tanks for stability. If we add too much reinforcement, mass climbs quickly. We need the right balance between structural integrity and weight.”`,
@@ -622,6 +733,8 @@ export class Mission1Screen implements Screen {
           {
             label: "“I'll examine the structural brackets on the prototype.”",
             run: () => {
+              this.state.meetNpc("meet-structural");
+              if (this.state.teamMet()) this.state.completeObjective("meet-team");
               this.state.addLogEntry("ELENA BROOKS — Look at the pipe clamps and thrust ring on the stand.");
               this.showToast(t("Structural notes recorded. Inspect the vehicle on the stand."));
             },
@@ -632,9 +745,6 @@ export class Mission1Screen implements Screen {
     }
 
     if (poiId === "meet-data") {
-      this.state.meetNpc("meet-data");
-      if (this.state.teamMet()) this.state.completeObjective("meet-team");
-      this.renderObjectives();
       this.showChoice(
         "DATA TECHNICIAN · MARA REED",
         `“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just a spectacle.”`,
@@ -642,6 +752,8 @@ export class Mission1Screen implements Screen {
           {
             label: "“We'll make sure the instruments are calibrated.”",
             run: () => {
+              this.state.meetNpc("meet-data");
+              if (this.state.teamMet()) this.state.completeObjective("meet-team");
               this.state.addLogEntry("MARA REED — The observation table will record the launch trace.");
               this.showToast(t("Data instrumentation verified."));
             },
@@ -663,9 +775,6 @@ export class Mission1Screen implements Screen {
         return;
       }
 
-      this.state.completeObjective("prototype");
-      this.state.collectRecord("Prototype inspection sketch");
-      this.renderObjectives();
       this.showChoice(
         "EXPERIMENTAL VEHICLE · DETAILED INSPECTION",
         `STATUS: UNTESTED PROTOTYPE\n\n• Upper motor with ceramic-lined chamber\n• Twin propellant feed tubes (gasoline & liquid oxygen)\n• Lower tank assembly with pressure bladder\n• 4.4-meter launch frame with guide cables\n\n“The historical 1926 vehicle was a radical departure from gunpowder rockets: pure liquid propellant feeding into a combustion chamber.”`,
@@ -673,6 +782,8 @@ export class Mission1Screen implements Screen {
           {
             label: "Log prototype observation",
             run: () => {
+              this.state.completeObjective("prototype");
+              this.state.collectRecord("Prototype inspection sketch");
               this.showToast(t("Prototype inspected. Next: configure vehicle at the engineering bench."));
             },
           },
@@ -719,13 +830,14 @@ export class Mission1Screen implements Screen {
 
     // 6. Project area:
     if (poiId === "project-area") {
-      this.state.completeObjective("lab");
-      this.state.collectRecord("The project — outdoor field notebook");
-      this.renderObjectives();
       this.showChoice(
         "PROJECT AREA · OUTDOOR FIELD DESK",
         `${poi.flavorText}\n\nThe field notes point you to the project director for the briefing.`,
-        [{ label: "Continue to the project director", run: () => this.showToast(t("NEXT CHECKPOINT · Speak with the project director.")) }],
+        [{ label: "Continue to the project director", run: () => {
+          this.state.completeObjective("lab");
+          this.state.collectRecord("The project — outdoor field notebook");
+          this.showToast(t("NEXT CHECKPOINT · Speak with the project director."));
+        } }],
       );
       return;
     }
@@ -764,6 +876,16 @@ export class Mission1Screen implements Screen {
   }
 
   private openDiagnosticTask(): void {
+    if (!this.state.engineeringTasks.has("diagnosis")) {
+      this.showTaskModal(
+        this.fieldText("DIAGNÓSTICO · MÓDULO DE PRÁCTICA", "DIAGNOSIS · TRAINING MODULE", "DIAGNOSTIC · MODULE PÉDAGOGIQUE"),
+        this.fieldText("Localiza y sustituye el módulo ficticio defectuoso. Después, compara las lecturas mecánicas reales de la misión.", "Locate and replace the fictional faulty module. Then compare the mission’s mechanical readings.", "Localisez et remplacez le module fictif défectueux. Comparez ensuite les relevés mécaniques de la mission."),
+        (setReady) => this.buildInstrumentTask("diagnosis", setReady),
+        () => { if (this.state.completeEngineeringTask("diagnosis")) this.openDiagnosticTask(); },
+        this.fieldText("Registrar reparación", "Record repair", "Enregistrer la réparation"),
+      );
+      return;
+    }
     const expected = this.state.expectedDiagnosis();
     this.showTaskModal(
       "PROTOTYPE INSPECTION · TRACE THE OSCILLATION",
@@ -915,19 +1037,21 @@ export class Mission1Screen implements Screen {
     );
   }
 
-  private showChoice(title: string, description: string, options: { label: string; run: () => void }[]): void {
+  private showChoice(title: string, description: string, options: { label: string; run: () => void; disabled?: boolean }[]): void {
     if (!this.modalRoot) return;
+    this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.modalFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
     this.modalRoot.innerHTML = "";
-    const card = el("div", { className: "modal-card" });
+    const card = el("div", { className: "modal-card", attrs: { role: "dialog", "aria-modal": "true", "aria-label": t(title), tabindex: "-1" } });
     card.append(el("h3", { className: "modal-title", text: t(title) }), el("p", { className: "modal-description", text: t(description) }));
     const wrap = el("div", { className: "modal-options" });
     for (const option of options) {
       const button = el("button", { className: "btn btn-secondary", text: t(option.label), attrs: { type: "button" } });
+      button.disabled = !!option.disabled;
       button.addEventListener("click", () => {
-        this.modalRoot?.classList.add("modal-overlay--hidden");
-        this.paused = false;
+        this.closeModal();
         this.state.decisionsMade += 1;
         option.run();
         this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
@@ -936,9 +1060,41 @@ export class Mission1Screen implements Screen {
       wrap.append(button);
     }
 
-    const close = el("button", { className: "btn btn-ghost", text: t("Close"), attrs: { type: "button" } });
-    close.addEventListener("click", () => { this.modalRoot?.classList.add("modal-overlay--hidden"); this.paused = false; });
+    const close = el("button", { className: "btn btn-ghost", text: t("Close"), attrs: { type: "button", "data-modal-dismiss": "" } });
+    close.addEventListener("click", () => this.closeModal());
     wrap.append(close); card.append(wrap); this.modalRoot.append(card);
+    card.focus();
+  }
+
+  private closeModal(): void {
+    this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.restoreEngineeringFeedback();
+    this.modalRoot?.classList.add("modal-overlay--hidden");
+    this.paused = false;
+    this.modalFocus?.focus();
+    this.modalFocus = null;
+  }
+
+  private restoreEngineeringFeedback(): void {
+    for (const task of ["propulsion", "circuits", "antenna", "diagnosis", "launch"] as const) {
+      const earned = this.state.engineeringTasks.has(task);
+      this.gameplay?.setEngineeringFeedback(task === "diagnosis" ? "diagnostic" : task, earned ? 1 : 0,
+        task === "antenna" ? (earned ? 0.42 : 0.12) : task === "propulsion" ? (earned ? 0.6 : 0.2) : undefined);
+    }
+  }
+
+  private buildInstrumentTask(kind: EngineeringTaskKind, setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const host = el("div");
+    this.activeTaskDispose = mountEngineeringTask(kind, host, {
+      onValidated: () => {
+        setReady(true, this.fieldText("Validación correcta. Registra el resultado para guardar el checkpoint.", "Validation passed. Record the result to save your checkpoint.", "Validation réussie. Enregistrez le résultat pour sauvegarder."));
+        this.gameplay?.setEngineeringFeedback(kind === "diagnosis" ? "diagnostic" : kind, 1);
+      },
+      onFeedback: (type) => missionAudio.feedback(type),
+      onProgress: (task, progress, value) => this.gameplay?.setEngineeringFeedback(task === "diagnosis" ? "diagnostic" : task, progress / 100, value === undefined ? undefined : value / 100),
+      onSignal: (orientation, _frequency, strength) => this.gameplay?.setEngineeringFeedback("antenna", strength / 100, orientation / 100),
+    });
+    return host;
   }
 
   /** A compact, retryable task panel used by the field tests and launch prep. */
@@ -951,10 +1107,12 @@ export class Mission1Screen implements Screen {
     secondaryAction?: { label: string; run: () => void },
   ): void {
     if (!this.modalRoot) return;
+    this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.modalFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
     this.modalRoot.innerHTML = "";
-    const card = el("div", { className: "modal-card mission-task-card" });
+    const card = el("div", { className: "modal-card mission-task-card", attrs: { role: "dialog", "aria-modal": "true", "aria-label": t(title), tabindex: "-1" } });
     const status = el("p", { className: "mission-task-status", attrs: { role: "status", "aria-live": "polite" } });
     const complete = el("button", { className: "btn btn-primary", text: t(confirmLabel), attrs: { type: "button", disabled: "" } });
     const controls = el("div", { className: "mission-task-actions" });
@@ -962,11 +1120,11 @@ export class Mission1Screen implements Screen {
       complete.disabled = !ready;
       status.textContent = t(message);
       status.classList.toggle("mission-task-status--ready", ready);
+      if (ready) complete.focus({ preventScroll: true });
     };
     complete.addEventListener("click", () => {
       if (complete.disabled) return;
-      this.modalRoot?.classList.add("modal-overlay--hidden");
-      this.paused = false;
+      this.closeModal();
       this.state.decisionsMade += 1;
       onComplete();
       this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
@@ -976,18 +1134,16 @@ export class Mission1Screen implements Screen {
     if (secondaryAction) {
       const secondary = el("button", { className: "btn btn-secondary", text: t(secondaryAction.label), attrs: { type: "button" } });
       secondary.addEventListener("click", () => {
-        this.modalRoot?.classList.add("modal-overlay--hidden");
-        this.paused = false;
+        this.closeModal();
         secondaryAction.run();
         this.renderResources(); this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
         void this.autosave();
       });
       controls.append(secondary);
     }
-    const close = el("button", { className: "btn btn-ghost", text: t("Cerrar tarea"), attrs: { type: "button" } });
+    const close = el("button", { className: "btn btn-ghost", text: t("Cerrar tarea"), attrs: { type: "button", "data-modal-dismiss": "" } });
     close.addEventListener("click", () => {
-      this.modalRoot?.classList.add("modal-overlay--hidden");
-      this.paused = false;
+      this.closeModal();
     });
     controls.append(close);
     card.append(
@@ -999,6 +1155,7 @@ export class Mission1Screen implements Screen {
       controls,
     );
     this.modalRoot.append(card);
+    card.focus();
     setReady(false, "Sigue la indicación. Puedes volver a intentarlo sin penalización.");
   }
 
@@ -1036,79 +1193,6 @@ export class Mission1Screen implements Screen {
       read,
       el("p", { className: "mission-task-hint", text: t("Objetivo: deja la aguja entre 62 y 74.") }),
     );
-    return panel;
-  }
-
-  private buildSignalRoutingTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
-    const pairs = [
-      { source: "Alimentación", target: "Presión" },
-      { source: "Registrador", target: "Marcas de tiempo" },
-      { source: "Estructura", target: "Vibración" },
-    ];
-    const targets = ["Vibración", "Presión", "Marcas de tiempo"];
-    const panel = el("div", { className: "mission-task-console mission-wire-task" });
-    const progress = el("p", { className: "mission-wire-progress", text: "0/3" });
-    const columns = el("div", { className: "mission-wire-columns" });
-    const sourceColumn = el("div", { className: "mission-wire-column" });
-    const targetColumn = el("div", { className: "mission-wire-column" });
-    const matched = new Set<string>();
-    let selected: string | null = null;
-    const sourceButtons = new Map<string, HTMLButtonElement>();
-    const updateProgress = (message: string): void => {
-      progress.textContent = matched.size + "/3";
-      setReady(matched.size === pairs.length, message);
-    };
-    const chooseTarget = (target: string, button: HTMLButtonElement): void => {
-      if (!selected) {
-        updateProgress("Primero elige una fuente de señal.");
-        return;
-      }
-      const pair = pairs.find((item) => item.source === selected);
-      if (pair?.target === target) {
-        matched.add(selected);
-        button.disabled = true;
-        sourceButtons.get(selected)?.setAttribute("disabled", "");
-        sourceButtons.get(selected)?.classList.add("mission-wire-port--matched");
-        button.classList.add("mission-wire-port--matched");
-        selected = null;
-        updateProgress(matched.size === pairs.length ? "Las tres señales llegan al instrumento correcto." : "Conexión correcta. Busca la siguiente pareja.");
-      } else {
-        selected = null;
-        sourceButtons.forEach((sourceButton) => {
-          sourceButton.classList.remove("mission-wire-port--selected");
-          sourceButton.setAttribute("aria-pressed", "false");
-        });
-        updateProgress("Esa conexión no coincide. Intenta con otro puerto.");
-      }
-    };
-    for (const pair of pairs) {
-      const button = el("button", { className: "mission-wire-port", text: pair.source, attrs: { type: "button", "aria-pressed": "false" } });
-      button.addEventListener("click", () => {
-        if (matched.has(pair.source)) return;
-        selected = pair.source;
-        sourceButtons.forEach((sourceButton) => {
-          sourceButton.classList.remove("mission-wire-port--selected");
-          sourceButton.setAttribute("aria-pressed", "false");
-        });
-        button.classList.add("mission-wire-port--selected");
-        button.setAttribute("aria-pressed", "true");
-        updateProgress("Ahora selecciona el registro que corresponde a esta fuente.");
-      });
-      sourceButtons.set(pair.source, button);
-      sourceColumn.append(button);
-    }
-    for (const target of targets) {
-      const button = el("button", { className: "mission-wire-port", text: target, attrs: { type: "button" } });
-      button.addEventListener("click", () => chooseTarget(target, button));
-      targetColumn.append(button);
-    }
-    columns.append(sourceColumn, targetColumn);
-    panel.append(
-      el("div", { className: "mission-wire-headings", children: [el("span", { text: t("FUENTES") }), el("span", { text: t("REGISTROS") })] }),
-      columns,
-      progress,
-    );
-    updateProgress("Empareja cada fuente con su registro.");
     return panel;
   }
 
@@ -1230,7 +1314,7 @@ export class Mission1Screen implements Screen {
 
   private openEngineering(): void {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
-    if (this.state.objectives.has("testing")) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
+    if (this.state.testsRun.size > 0) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
 
     let draft: EngineeringProfile = { ...this.state.engineering };
     this.showTaskModal(
@@ -1238,8 +1322,8 @@ export class Mission1Screen implements Screen {
       "Elige estructura, instrumentación y prioridad. Revisa el coste y calibra el giroscopio antes de sellar el diseño.",
       (setReady) => this.buildEngineeringTask(setReady, (next) => { draft = next; }),
       () => {
-        this.state.setEngineering(draft);
         draft.budget = Math.max(0, DESIGN_BUDGET - calculateEngineering(draft).cost);
+        this.state.setEngineering(draft);
         this.gameplay?.setDesign(draft.structure, draft.instrumentation);
         this.state.completeObjective("design");
         this.renderObjectives();
@@ -1391,6 +1475,7 @@ export class Mission1Screen implements Screen {
     const metrics = calculateEngineering(this.state.engineering);
     const systemDone = this.state.testsRun.has("system");
     const instDone = this.state.testsRun.has("instrumentation");
+    const antennaDone = this.state.testsRun.has("communications");
     const stabDone = this.state.testsRun.has("stability");
 
     if (this.state.testsComplete()) {
@@ -1406,23 +1491,30 @@ export class Mission1Screen implements Screen {
       t("Banco de pruebas exterior y barreras de protección."),
       `${t("Estabilidad")}: ${metrics.stability}% · ${t("Masa")}: ${metrics.mass}% · ${t("Datos")}: ${metrics.data}%`,
       "",
-      t("Completa tres tareas cortas de consola. Puedes repetirlas sin penalización."),
+      this.fieldText("Completa las tareas en orden: propulsión, circuitos, antena y traza. Puedes reintentar sin penalización.", "Complete in order: propulsion, circuits, antenna and trace. Retry without penalty.", "Suivez cet ordre : propulsion, circuits, antenne et trace. Réessayez sans pénalité."),
     ].join("\n");
     this.showChoice(
       "TEST AREA · SYSTEMS REVIEW",
       testSummary,
       [
         {
-          label: `${systemDone ? "✓" : "1."} ${t("Calibrar el manómetro")}`,
+          label: `${systemDone ? "✓" : "1."} ${this.fieldText("Preparar propulsión simulada", "Prepare simulated propulsion", "Préparer la propulsion simulée")}`,
           run: () => this.runPressureTest(),
         },
         {
           label: `${instDone ? "✓" : "2."} ${t("Conectar las señales")}`,
-          run: () => this.runInstrumentationTest(),
+          disabled: !systemDone,
+          run: () => systemDone ? this.runInstrumentationTest() : this.showToast(this.fieldText("Completa primero la propulsión.", "Complete propulsion first.", "Terminez d’abord la propulsion.")),
         },
         {
-          label: `${stabDone ? "✓" : "3."} ${t("Encontrar la traza irregular")}`,
-          run: () => this.runStabilityTest(),
+          label: `${antennaDone ? "✓" : "3."} ${this.fieldText("Calibrar antena de simulación", "Calibrate simulation antenna", "Calibrer l’antenne de simulation")}`,
+          disabled: !instDone,
+          run: () => instDone ? this.runAntennaTest() : this.showToast(this.fieldText("Conecta primero los circuitos.", "Connect the circuits first.", "Connectez d’abord les circuits.")),
+        },
+        {
+          label: `${stabDone ? "✓" : "4."} ${t("Encontrar la traza irregular")}`,
+          disabled: !antennaDone,
+          run: () => antennaDone ? this.runStabilityTest() : this.showToast(this.fieldText("Calibra primero la antena.", "Calibrate the antenna first.", "Calibrez d’abord l’antenne.")),
         },
       ]
     );
@@ -1431,11 +1523,11 @@ export class Mission1Screen implements Screen {
   private runPressureTest(): void {
     if (this.state.testsRun.has("system")) { this.showToast(t("PRUEBA DE PRESIÓN COMPLETADA · Lectura estable.")); return; }
     this.showTaskModal(
-      "PRUEBA DE PRESIÓN · CALIBRACIÓN",
-      "Ajusta la aguja del panel simulado hasta la banda verde y registra la lectura.",
-      (setReady) => this.buildPressureCalibrationTask(setReady),
+      this.fieldText("PROPULSIÓN · SIMULADOR DE BANCO", "PROPULSION · BENCH SIMULATION", "PROPULSION · SIMULATION SUR BANC"),
+      this.fieldText("Ajusta los dos indicadores ficticios y valida la secuencia de ensayo. Los valores son unidades de juego.", "Tune both fictional indicators and validate the test sequence. Values are gameplay units.", "Réglez les deux indicateurs fictifs et validez la séquence. Les valeurs sont des unités de jeu."),
+      (setReady) => this.buildInstrumentTask("propulsion", setReady),
       () => {
-        this.state.runTest("system");
+        if (!this.state.completeEngineeringTask("propulsion") || !this.state.runTest("system")) return;
         this.state.addLogEntry("TEST AREA — The simulated pressure trace held steady.");
         this.showToast(t("PRUEBA DE PRESIÓN COMPLETADA · Lectura estable."));
         this.checkTestProgress();
@@ -1450,15 +1542,31 @@ export class Mission1Screen implements Screen {
     this.showTaskModal(
       "PRUEBA DE INSTRUMENTACIÓN · CONECTA LOS REGISTROS",
       "Une cada fuente de señal con el instrumento que la registra. Si no coincide, prueba otro puerto.",
-      (setReady) => this.buildSignalRoutingTask(setReady),
+      (setReady) => this.buildInstrumentTask("circuits", setReady),
       () => {
-        this.state.runTest("instrumentation");
+        if (!this.state.completeEngineeringTask("circuits") || !this.state.runTest("instrumentation")) return;
         this.state.addLogEntry("TEST AREA — The recorder, pressure, and vibration channels were matched.");
         this.showToast(t("CANALES CONECTADOS · El registrador recibe las señales."));
         this.checkTestProgress();
         if (!this.state.testsComplete()) this.openTesting();
       },
       "Guardar conexiones",
+    );
+  }
+
+  private runAntennaTest(): void {
+    if (this.state.testsRun.has("communications")) return;
+    if (!this.state.testsRun.has("instrumentation")) return;
+    this.showTaskModal(
+      this.fieldText("COMUNICACIONES · ANTENA DIDÁCTICA", "COMMUNICATIONS · TRAINING ANTENNA", "COMMUNICATIONS · ANTENNE PÉDAGOGIQUE"),
+      this.fieldText("Alinea orientación y frecuencia del módulo interpretativo. Es una simulación educativa añadida al campo histórico, no una reconstrucción del equipo de 1926.", "Align orientation and frequency of the interpretive module. This educational simulation supplements the historical field; it does not reconstruct 1926 equipment.", "Alignez orientation et fréquence du module pédagogique. Cette simulation complète le terrain historique sans reconstituer l’équipement de 1926."),
+      (setReady) => this.buildInstrumentTask("antenna", setReady),
+      () => {
+        if (!this.state.completeEngineeringTask("antenna") || !this.state.runTest("communications")) return;
+        this.checkTestProgress();
+        if (!this.state.testsComplete()) this.openTesting();
+      },
+      this.fieldText("Registrar enlace", "Record link", "Enregistrer la liaison"),
     );
   }
 
@@ -1513,63 +1621,32 @@ export class Mission1Screen implements Screen {
       );
       return;
     }
-    const weather = this.gameplay?.getWeather() ?? "CLOUDY";
-    const cl = this.state.checklist;
-
+    if (this.state.objectives.has("prepare")) {
+      this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch."));
+      return;
+    }
     const checklistItems = [
-      { id: "inspect-vehicle", label: "Inspeccionar el vehículo" },
-      { id: "check-instruments", label: "Revisar los instrumentos de observación" },
-      { id: "review-conditions", label: "Revisar las condiciones meteorológicas" },
-      { id: "confirm-observation", label: "Confirmar la zona de observación" },
-      { id: "confirm-telemetry", label: "Confirmar el registrador de telemetría" },
+      { id: "inspect-vehicle" }, { id: "check-instruments" }, { id: "review-conditions" },
+      { id: "confirm-observation" }, { id: "confirm-telemetry" },
     ];
-    const selected = new Set(cl);
     this.showTaskModal(
-      "CAMPO DE LANZAMIENTO · LISTA PREVIA",
-      `Auburn, Massachusetts · 16 de marzo de 1926.\nMarca cada control para despejar la plataforma.`,
-      (setReady) => {
-        const panel = el("div", { className: "mission-task-console mission-checklist-task" });
-        const count = el("p", { className: "mission-checklist-count" });
-        const rows = el("div", { className: "mission-checklist-rows" });
-        const refresh = (): void => {
-          count.textContent = selected.size + "/" + checklistItems.length + " " + t("controles confirmados");
-          setReady(selected.size === checklistItems.length, selected.size === checklistItems.length
-            ? "Lista completa. El equipo está listo para continuar."
-            : "Marca los cinco controles para despejar la plataforma.");
-        };
-        for (const item of checklistItems) {
-          const button = el("button", {
-            className: "mission-checklist-row" + (selected.has(item.id) ? " mission-checklist-row--checked" : ""),
-            attrs: { type: "button", "aria-pressed": String(selected.has(item.id)) },
-          });
-          const mark = el("span", { className: "mission-checklist-mark", text: selected.has(item.id) ? "✓" : "□" });
-          button.append(mark, el("span", { text: t(item.label) + (item.id === "review-conditions" ? " · " + t(weather) : "") }));
-          button.addEventListener("click", () => {
-            if (selected.has(item.id)) selected.delete(item.id);
-            else selected.add(item.id);
-            const checked = selected.has(item.id);
-            button.classList.toggle("mission-checklist-row--checked", checked);
-            button.setAttribute("aria-pressed", String(checked));
-            mark.textContent = checked ? "✓" : "□";
-            refresh();
-          });
-          rows.append(button);
-        }
-        panel.append(rows, count);
-        refresh();
-        return panel;
-      },
+      this.fieldText("LANZAMIENTO · SECUENCIA DE VERIFICACIÓN", "LAUNCH · VERIFICATION SEQUENCE", "LANCEMENT · SÉQUENCE DE VÉRIFICATION"),
+      this.fieldText("Verifica cada etapa en orden. El enclavamiento exige observar los indicadores antes de avanzar. Simulación narrativa con valores ficticios.", "Verify each stage in order. The interlock requires observing the indicators before advancing. Narrative simulation with fictional readings.", "Vérifiez chaque étape dans l’ordre. Observez les indicateurs pour déverrouiller l’étape suivante. Simulation narrative aux valeurs fictives."),
+      (setReady) => this.buildInstrumentTask("launch", setReady),
       () => {
+        if (!this.state.completeEngineeringTask("launch")) return;
         for (const item of checklistItems) this.state.markChecklist(item.id);
         this.state.engineering.launchDecision = "proceed";
-        this.state.completeObjective("prepare");
         this.state.flightResult = resolveFlight(this.state.engineering, this.state.resources.telemetry);
         this.gameplay?.setPeakAltitude(flightPeakAltitude(this.state.flightResult));
         this.renderObjectives();
         this.showChoice(
           "PRE-LAUNCH BRIEFING",
           t(`MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`),
-          [{ label: t("Head to the Observation Area"), run: () => this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch.")) }],
+          [{ label: t("Head to the Observation Area"), run: () => {
+            this.state.completeObjective("prepare");
+            this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch."));
+          } }],
         );
       },
       "Confirmar lista y seguir",
@@ -1601,8 +1678,6 @@ export class Mission1Screen implements Screen {
       return;
     }
 
-    this.state.completeObjective("observation");
-    this.renderObjectives();
     this.showChoice(
       "OBSERVATION AREA · TAKE POSITION",
       t(`The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.\n\nDIRECTOR: “Ready on your mark.”`),
@@ -1610,6 +1685,8 @@ export class Mission1Screen implements Screen {
         {
           label: t("START LAUNCH COUNTDOWN (T-10)"),
           run: () => {
+            this.state.completeObjective("observation");
+            this.renderObjectives();
             this.runLaunchSequence();
           },
         },
@@ -1729,6 +1806,7 @@ export class Mission1Screen implements Screen {
       if (e.key === "3") this.gameplay?.setCameraMode("telemetry");
     };
     window.addEventListener("keydown", onKey);
+    this.launchKeyHandler = onKey;
 
     const readings = el("div", { className: "mission-launch-readings" });
     card.append(heading, countdown, status, cameraRow, readings);
@@ -1777,6 +1855,7 @@ export class Mission1Screen implements Screen {
         updateReadings(altitude, velocity, signal);
         if (seconds >= 18) {
           window.removeEventListener("keydown", onKey);
+          this.launchKeyHandler = null;
           if (this.flightTimer) window.clearInterval(this.flightTimer);
           this.flightTimer = undefined;
           this.modalRoot?.classList.add("modal-overlay--hidden");
@@ -1862,13 +1941,14 @@ export class Mission1Screen implements Screen {
     );
     card.append(list);
     const dismiss = el("button", { className: "btn btn-primary btn-large", text: t("Comenzar"), attrs: { type: "button" } });
-    dismiss.addEventListener("click", () => overlay.remove());
+    dismiss.addEventListener("click", () => { overlay.remove(); this.paused = false; });
     card.append(dismiss);
     overlay.append(card);
     container.append(overlay);
   }
 
   private showOpeningSequence(container: HTMLElement): void {
+    this.paused = true;
     const overlay = el("div", { className: "modal-overlay mission-opening-overlay" });
     const card = el("div", { className: "modal-card tutorial-card mission-opening-card" });
     const prompt = el("p", { className: "mission-opening-prompt mission-opening-prompt--hidden", text: t("El campo espera.") });
@@ -1893,7 +1973,7 @@ export class Mission1Screen implements Screen {
     card.append(start);
     overlay.append(card);
     container.append(overlay);
-    window.setTimeout(() => {
+    this.openingTimer = window.setTimeout(() => {
       prompt.classList.remove("mission-opening-prompt--hidden");
       start.classList.remove("mission-opening-start--hidden");
     }, 2400);
@@ -2081,13 +2161,19 @@ export class Mission1Screen implements Screen {
     }
     this.objectivePanel.append(list, el("p", { className: "phase-description", text: `${t("Checkpoint")}: ${t(this.state.checkpoint)} · ${t("Historical records")}: ${this.state.records.size}` }));
     this.renderMapObjective();
+    this.renderFieldHud();
+    this.restoreEngineeringFeedback();
     this.renderPhase();
+    this.updateInteractionPrompt(this.nearbyPoi);
     this.gameplay?.setMissionProgress(this.state.progressPercent() / 100);
   }
 
   private autosave(): Promise<void> {
     if (this.ended || this.restarting) return Promise.resolve();
-    const pending = this.persistCurrentState();
+    const snapshot = structuredClone(this.state.toSaveState());
+    const progress = this.state.persistenceProgressPercent();
+    const pending = this.saveQueue.then(() => this.persistCurrentState(snapshot, progress));
+    this.saveQueue = pending.catch(() => {});
     this.pendingAutosaves.add(pending);
     void pending.then(
       () => this.pendingAutosaves.delete(pending),
@@ -2096,15 +2182,16 @@ export class Mission1Screen implements Screen {
     return pending;
   }
 
-  private async persistCurrentState(): Promise<void> {
-    if (this.ended || this.restarting) return;
+  private async persistCurrentState(snapshot: MissionSaveState, progress: number): Promise<void> {
+    // Accepted writes drain before mission completion; restart supersedes them.
+    if (this.restarting) return;
     try {
-      await progressApi.autosave(MISSION_SLUG, this.state.toSaveState(), this.state.persistenceProgressPercent());
+      await progressApi.autosave(MISSION_SLUG, snapshot, progress);
       await inventoryApi.sync(
         RESOURCE_DEFINITIONS.map((def) => ({
           itemKey: def.key,
           label: def.label,
-          quantity: this.state.resources[def.key],
+          quantity: snapshot.resources[def.key],
           unit: def.unit,
           updatedAt: null,
         })),
@@ -2122,6 +2209,7 @@ export class Mission1Screen implements Screen {
     const report = this.state.buildReport();
     void (async () => {
       try {
+        await Promise.allSettled([...this.pendingAutosaves]);
         await progressApi.complete(MISSION_SLUG, report);
         await statisticsApi.record({
           missionSlug: MISSION_SLUG,
@@ -2143,6 +2231,8 @@ export class Mission1Screen implements Screen {
     if (this.toastTimer) window.clearTimeout(this.toastTimer);
     if (this.launchTimer) window.clearInterval(this.launchTimer);
     if (this.flightTimer) window.clearInterval(this.flightTimer);
+    if (this.launchKeyHandler) window.removeEventListener("keydown", this.launchKeyHandler);
+    this.launchKeyHandler = null;
   }
 
   private togglePanel(forceOpen?: boolean): void {
@@ -2171,9 +2261,17 @@ export class Mission1Screen implements Screen {
 
   unmount(): void {
     this.stopTimers();
+    this.activeTaskDispose?.();
+    this.activeTaskDispose = null;
+    if (this.openingTimer) window.clearTimeout(this.openingTimer);
+    this.paused = false;
+    this.gameplay?.onInteract(() => {});
+    this.gameplay?.onNearestPoiChange(() => {});
+    this.gameplay?.onMapStateChange(() => {});
     missionAudio.stopWind();
     window.removeEventListener("keydown", this.onPanelToggleKey);
     window.removeEventListener("keydown", this.onMapKey);
+    window.removeEventListener("keydown", this.onModalKey);
     this.restorePanelButton = null;
     this.missionPanel = null;
     this.flightMetrics = null;

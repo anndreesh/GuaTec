@@ -10,6 +10,7 @@ type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
 let context: AudioContext | null = null;
 let windSource: AudioBufferSourceNode | null = null;
 let windGain: GainNode | null = null;
+let muted = false;
 
 function ensureContext(): AudioContext | null {
   try {
@@ -47,7 +48,7 @@ export const missionAudio = {
       filter.type = "lowpass";
       filter.frequency.value = 500;
       const gain = ctx.createGain();
-      gain.gain.value = level;
+      gain.gain.value = muted ? 0 : level;
       source.connect(filter).connect(gain).connect(ctx.destination);
       source.start();
       windSource = source;
@@ -62,7 +63,7 @@ export const missionAudio = {
   setWindLevel(level: number): void {
     if (!context || !windGain) return;
     try {
-      windGain.gain.setTargetAtTime(level, context.currentTime, 0.6);
+      windGain.gain.setTargetAtTime(muted ? 0 : level, context.currentTime, 0.6);
     } catch {
       /* audio is optional */
     }
@@ -74,12 +75,15 @@ export const missionAudio = {
     } catch {
       /* already stopped */
     }
+    windSource?.disconnect();
+    windGain?.disconnect();
     windSource = null;
     windGain = null;
   },
 
   /** Short countdown tone; higher pitch for the final seconds. */
   beep(frequency: number): void {
+    if (muted) return;
     const ctx = ensureContext();
     if (!ctx) return;
     try {
@@ -93,6 +97,7 @@ export const missionAudio = {
       oscillator.connect(gain).connect(ctx.destination);
       oscillator.start();
       oscillator.stop(ctx.currentTime + 0.2);
+      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     } catch {
       /* audio is optional */
     }
@@ -100,6 +105,7 @@ export const missionAudio = {
 
   /** Roar of the engine: a noise burst whose filter closes as the vehicle climbs away. */
   ignition(): void {
+    if (muted) return;
     const ctx = ensureContext();
     if (!ctx) return;
     try {
@@ -116,8 +122,20 @@ export const missionAudio = {
       source.connect(filter).connect(gain).connect(ctx.destination);
       source.start();
       source.stop(ctx.currentTime + 3);
+      source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
     } catch {
       /* audio is optional */
     }
+  },
+
+  setMuted(value: boolean): void {
+    muted = value;
+    if (context && windGain) windGain.gain.setTargetAtTime(value ? 0 : 0.12, context.currentTime, 0.08);
+  },
+
+  isMuted(): boolean { return muted; },
+
+  feedback(type: "input" | "error" | "success"): void {
+    this.beep(type === "error" ? 160 : type === "success" ? 880 : 430);
   },
 };

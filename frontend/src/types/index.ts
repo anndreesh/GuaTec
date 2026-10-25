@@ -100,6 +100,8 @@ export interface MissionSaveState {
     inspectedCauses?: string[];
     diagnosis?: string | null;
     riskAccepted?: boolean;
+    engineeringTasks?: string[];
+    taskVersion?: number;
   };
 }
 

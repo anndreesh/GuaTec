@@ -20,6 +20,9 @@ import { MISSION_01_OBJECTIVES } from "@/state/Mission01Objectives";
 import { resolveFlight, type FlightResult } from "@/state/Mission01Launch";
 import { MISSION_01_STAGES } from "@/state/Mission01Events";
 
+export type MissionEngineeringTask = "propulsion" | "circuits" | "antenna" | "diagnosis" | "launch";
+const TEST_ORDER = ["system", "instrumentation", "communications", "stability"] as const;
+
 /**
  * Pure gameplay state/logic for Mission 1, kept independent from the DOM so
  * it can be unit-tested and so `Mission1Screen` only has to deal with
@@ -45,6 +48,7 @@ export class Mission1State {
   diagnosis: string | null = null;
   riskAccepted = false;
   extraTestRequired = false;
+  engineeringTasks = new Set<MissionEngineeringTask>();
 
   constructor(saved?: MissionSaveState) {
     this.resources = Object.fromEntries(
@@ -73,6 +77,20 @@ export class Mission1State {
         this.inspectedCauses = new Set(stringArray(extra.inspectedCauses));
         this.diagnosis = extra.diagnosis ?? null;
         this.riskAccepted = extra.riskAccepted ?? false;
+        this.engineeringTasks = new Set(stringArray(extra.engineeringTasks).filter((id): id is MissionEngineeringTask =>
+          ["propulsion", "circuits", "antenna", "diagnosis", "launch"].includes(id)));
+        // Preserve earned checkpoints from the older three-test mission. New or
+        // unfinished test sessions must solve the additional communications task.
+        if (!extra.taskVersion) {
+          if (this.testsRun.has("system")) this.engineeringTasks.add("propulsion");
+          if (this.testsRun.has("instrumentation")) this.engineeringTasks.add("circuits");
+          if ((Array.isArray(extra.objectives) ? extra.objectives : []).includes("testing")) {
+            this.testsRun.add("communications");
+            this.engineeringTasks.add("antenna");
+          }
+          if ((Array.isArray(extra.objectives) ? extra.objectives : []).includes("diagnose")) this.engineeringTasks.add("diagnosis");
+          if ((Array.isArray(extra.objectives) ? extra.objectives : []).includes("prepare")) this.engineeringTasks.add("launch");
+        }
         this.objectives = this.validateSavedObjectives(Array.isArray(extra.objectives) ? extra.objectives as MissionObjectiveId[] : []);
         this.checkpoint = this.checkpointForObjectives();
       }
@@ -133,8 +151,8 @@ export class Mission1State {
     if (id === "meet-team" && !this.teamMet()) return false;
     if (id === "prototype" && !this.objectives.has("meet-team")) return false;
     if (id === "testing" && !this.testsComplete()) return false;
-    if (id === "diagnose" && !this.diagnosis && !this.riskAccepted) return false;
-    if (id === "prepare" && (!this.checklistComplete() || this.engineering.launchDecision !== "proceed")) return false;
+    if (id === "diagnose" && ((!this.diagnosis && !this.riskAccepted) || !this.engineeringTasks.has("diagnosis"))) return false;
+    if (id === "prepare" && (!this.engineeringTasks.has("launch") || !this.checklistComplete() || this.engineering.launchDecision !== "proceed")) return false;
     if (id === "observation" && this.engineering.launchDecision !== "proceed") return false;
     if (id === "flight" && (!this.flightResult || this.engineering.launchDecision !== "proceed")) return false;
     if (id === "analysis" && (!this.analyzed.has("Propulsion & Pressure Data") ||
@@ -186,12 +204,30 @@ export class Mission1State {
 
   runTest(id: string): boolean {
     if (this.testsRun.has(id)) return false;
+    const index = TEST_ORDER.findIndex((entry) => entry === id);
+    if (!this.objectives.has("design") || index < 0 || TEST_ORDER.slice(0, index).some((entry) => !this.testsRun.has(entry))) return false;
+    const task = { system: "propulsion", instrumentation: "circuits", communications: "antenna" }[id] as MissionEngineeringTask | undefined;
+    if (task && !this.engineeringTasks.has(task)) return false;
     this.testsRun.add(id);
     return true;
   }
 
   testsComplete(): boolean {
-    return ["system", "instrumentation", "stability"].every((id) => this.testsRun.has(id));
+    return TEST_ORDER.every((id) => this.testsRun.has(id)) &&
+      (["propulsion", "circuits", "antenna"] as const).every((id) => this.engineeringTasks.has(id));
+  }
+
+  /** Called only by a task's validated completion callback, never by proximity. */
+  completeEngineeringTask(id: MissionEngineeringTask): boolean {
+    if (this.engineeringTasks.has(id)) return true;
+    if (!this.objectives.has("design")) return false;
+    if (id === "circuits" && !this.testsRun.has("system")) return false;
+    if (id === "antenna" && !this.testsRun.has("instrumentation")) return false;
+    if (id === "diagnosis" && !this.objectives.has("testing")) return false;
+    if (id === "launch" && !this.objectives.has("diagnose")) return false;
+    this.engineeringTasks.add(id);
+    this.addLogEntry(`ENGINEERING VALIDATED — ${id}`);
+    return true;
   }
 
   markChecklist(id: string): boolean {
@@ -274,6 +310,7 @@ export class Mission1State {
         analyzed: [...this.analyzed], flightResult: this.flightResult,
         metNpcs: [...this.metNpcs], testsRun: [...this.testsRun], checklist: [...this.checklist],
         inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis, riskAccepted: this.riskAccepted,
+        engineeringTasks: [...this.engineeringTasks], taskVersion: 1,
       },
     };
   }
@@ -321,8 +358,8 @@ export class Mission1State {
       if (item.id === "meet-team" && !this.teamMet()) break;
       if (item.id === "prototype" && !valid.has("meet-team")) break;
       if (item.id === "testing" && !this.testsComplete()) break;
-      if (item.id === "diagnose" && !this.diagnosis && !this.riskAccepted) break;
-      if (item.id === "prepare" && (!this.checklistComplete() || this.engineering.launchDecision !== "proceed")) break;
+      if (item.id === "diagnose" && ((!this.diagnosis && !this.riskAccepted) || !this.engineeringTasks.has("diagnosis"))) break;
+      if (item.id === "prepare" && (!this.engineeringTasks.has("launch") || !this.checklistComplete() || this.engineering.launchDecision !== "proceed")) break;
       if (item.id === "observation" && this.engineering.launchDecision !== "proceed") break;
       if (item.id === "flight" && (!this.flightResult || this.engineering.launchDecision !== "proceed")) break;
       if (item.id === "analysis" && (!this.analyzed.has("Propulsion & Pressure Data") ||

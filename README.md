@@ -192,10 +192,7 @@ Todas las rutas (excepto `/health`, `/auth/*`) requieren
 - **Misión 1** es completamente jugable: recursos que decaen por turno,
   4 eventos de decisión con efectos en recursos y muestras, guardado
   automático periódico (autosave a `/progress` e `/inventory`), y un informe
-  final con resultado (éxito/parcial/fallo). La zona de pruebas incluye tres
-  minijuegos breves: calibrar un manómetro, emparejar señales y localizar una
-  traza irregular. La lista previa al lanzamiento se completa marcando cinco
-  controles; se puede reintentar sin penalización.
+  final con resultado (éxito/parcial/fallo). La zona de pruebas exige propulsión ficticia, circuitos, calibración de antena y lectura de una traza, en ese orden. El diagnóstico incluye comparar módulos y deslizar un recambio; la preparación de lanzamiento exige una secuencia de relés y una pulsación sostenida. Los errores permiten reintento y cerrar una tarea no otorga progreso.
 - **Misión 2 y 3** aparecen en el carrusel como bloqueadas
   (`lockedByDefault=true`) hasta completar la anterior; su contenido
   jugable queda fuera del alcance de este MVP.
@@ -349,3 +346,30 @@ estaciones. Se conserva el refugio abierto de equipo, el marco de lanzamiento,
 los instrumentos y el vehículo con materiales envejecidos. La procedencia está en
 `frontend/src/config/assetRegistry.ts`. Las texturas y el HDRI se cargan
 desde archivos locales; no se descargan props al iniciar el juego.
+
+
+## Misión 01: tareas de ingeniería y calidad gráfica
+
+La ampliación conserva Babylon.js, la narrativa de Auburn y los modelos existentes. Las consolas de antena y electrónica son módulos didácticos ficticios, identificados como simulaciones; no reconstruyen instrumentos de 1926 ni describen procedimientos reales de propulsión.
+
+| Actividad | Interacción y validación |
+| --- | --- |
+| Propulsión | Acoplar el simulador, equilibrar dos indicadores y registrar la respuesta |
+| Circuitos | Arrastrar cuatro cables o seleccionar terminales con Tab y Enter |
+| Antena | Ajustar orientación y sintonía; confirmar dentro de ambas tolerancias |
+| Diagnóstico | Comparar tres módulos, aislar el defectuoso e insertar el recambio; después se conserva el diagnóstico mecánico narrativo |
+| Lanzamiento | Activar relés en orden y mantener el sello durante 1,2 s; después continúan briefing, cuenta regresiva y vuelo |
+
+El HUD compacto muestra objetivo, próxima actividad, checkpoint y minimapa. El mapa completo, diario, recursos y controles anteriores siguen disponibles. Los perfiles Equilibrado y Alto ajustan resolución, sombras y polvo; el sonido se puede silenciar. Los diálogos y tareas suspenden movimiento y órbita y restauran los controles al cerrar. Los resultados validados se guardan con la progresión; las partidas antiguas conservan sus checkpoints ganados.
+
+Verificación reproducible:
+
+```bash
+npm --prefix frontend test
+node frontend/tests/mission01-character.test.mjs
+npm --prefix frontend run build
+```
+
+`frontend/scripts/qa-mission.cjs` recorre la build compilada mediante navegador real: invitado, diálogos, tareas, errores, cancelación, lanzamiento, análisis e informe. Requiere Playwright suministrado por el entorno de QA; no añade dependencias de ejecución al juego. Configuración: `QA_BASE_URL` (por defecto `http://127.0.0.1:4173`), `QA_OUTPUT_DIR`, `PLAYWRIGHT_MODULE` y, si hace falta, `CHROMIUM_EXECUTABLE`. Crea una cuenta invitada de prueba y guarda capturas/resultados en el directorio indicado. No incorpora atajos de prueba en la build.
+
+La medición disponible usa Chrome headless en Apple M5 con 16 GB. El avatar existente ronda los 77 MB y la escena supera los presupuestos orientativos de llamadas de dibujo y texturas; 60 FPS en ese equipo no garantizan el mismo rendimiento en teléfonos. Evidencia y limitaciones: `artifacts/final-evidence.md`.
