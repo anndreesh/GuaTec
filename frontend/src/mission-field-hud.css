@@ -64,3 +64,10 @@
 @media (max-width:700px) and (orientation:landscape) {
  .field-minimap { top:76px; left:auto; right:16px; }
 }
+/* Keep centering during entry; the shared rise animation overwrites translateX. */
+.interaction-prompt { width:max-content; animation:field-prompt-in .25s ease; }
+@keyframes field-prompt-in {
+ from { opacity:0; transform:translate(-50%,8px); }
+ to { opacity:1; transform:translate(-50%,0); }
+}
+@media (prefers-reduced-motion:reduce) { .interaction-prompt { animation:none; } }

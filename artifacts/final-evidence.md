@@ -31,7 +31,9 @@ Captures/JSON are outside the repository at `/Users/andres/.codex/visualizations
 - `circuits-validated.png`, `antenna-validated.png`, `diagnosis-validated.png`, `launch-validated.png`, `launch-flight.png`, `mission-report.png`.
 - `local-qa-results.json`: restored checkpoint, resource counters, analysis/report pass.
 - `release-world-desktop.png`, `release-world-landscape.png`, `release-circuits-mobile.png`, `release-jump.png`, `release-qa-results.json`: compiled-build input/layout/profile verification.
-- `final-progression/`: reusable compiled-game harness output, generated when run with the README configuration.
+- `final-progression/`: passing reusable compiled-game harness output through the report.
+- `motion/walk-*.png`, `motion/stopped.png`, `motion/run-*.png`: unpaused real-input locomotion sequence; inspected for moving limbs, start/stop transitions and gross rig collapse. No exact foot-slip measurement or cross-device animation guarantee.
+- `interaction-prompt-centered.png`: prompt animation retains horizontal centering; measured center x=600 at viewport width1200.
 
 Screenshots are verification captures, not deterministic pixel-diff baselines: weather/crew/particles remain variable. The browser harness asserts progression and input behavior; the state and NullEngine suites protect correctness/resource lifetime. Earlier `*-failure.png` files record failures found and fixed during implementation, not passing evidence.
 
