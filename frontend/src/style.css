@@ -2101,3 +2101,41 @@ button.mission-map-location:focus-visible {
   .mission-design-choice,
   .mission-design-budget-fill { transition: none; }
 }
+
+.error-screen {
+  position: relative;
+  display: grid;
+  width: min(560px, calc(100vw - 32px));
+  min-height: min(430px, calc(100vh - 64px));
+  place-content: center;
+  gap: 18px;
+  margin: 32px auto;
+  padding: clamp(28px, 6vw, 72px);
+  overflow: hidden;
+  border: 1px solid rgba(230, 177, 108, .38);
+  background: linear-gradient(145deg, rgba(11, 19, 27, .96), rgba(17, 24, 29, .84));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .38), inset 0 0 0 1px rgba(255, 255, 255, .04);
+  color: #e9e2d1;
+}
+
+.error-screen::before {
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(154, 186, 173, .16);
+  content: "";
+  pointer-events: none;
+}
+
+.error-screen__code,
+.error-screen__title,
+.error-screen__message,
+.error-screen__action { position: relative; z-index: 1; }
+.error-screen__code { margin: 0; color: #eca965; font: 700 .75rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .24em; }
+.error-screen__title { max-width: 12ch; margin: 0; color: #f5e7c8; font: 700 clamp(2.1rem, 7vw, 4.4rem)/.94 Georgia, "Times New Roman", serif; letter-spacing: -.045em; }
+.error-screen__message { max-width: 40ch; margin: 0; color: #b9c5bd; font-size: .98rem; line-height: 1.7; }
+.error-screen__action { justify-self: start; margin-top: 10px; }
+
+@media (max-width: 640px) {
+  .error-screen { min-height: calc(100vh - 32px); margin: 16px; }
+  .error-screen__title { max-width: 10ch; }
+}

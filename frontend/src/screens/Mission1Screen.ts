@@ -1802,11 +1802,11 @@ export class Mission1Screen implements Screen {
     const status = el("p", { className: "modal-description mission-launch-status", text: t("The team is clear of the stand. The recorder is running. Use buttons or keys 1/2/3 to switch camera view.") });
 
     const cameraRow = el("div", { className: "mission-launch-camera-row" });
-    const btnCine = el("button", { className: "btn btn-secondary", text: "1 · CINEMATIC", attrs: { type: "button" } });
+    const btnCine = el("button", { className: "btn btn-secondary", text: t("1 · CINEMATIC"), attrs: { type: "button" } });
     btnCine.addEventListener("click", () => this.gameplay?.setCameraMode("cinematic"));
-    const btnObs = el("button", { className: "btn btn-secondary", text: "2 · OBSERVATION", attrs: { type: "button" } });
+    const btnObs = el("button", { className: "btn btn-secondary", text: t("2 · OBSERVATION"), attrs: { type: "button" } });
     btnObs.addEventListener("click", () => this.gameplay?.setCameraMode("observation"));
-    const btnTelem = el("button", { className: "btn btn-secondary", text: "3 · TELEMETRY", attrs: { type: "button" } });
+    const btnTelem = el("button", { className: "btn btn-secondary", text: t("3 · TELEMETRY"), attrs: { type: "button" } });
     btnTelem.addEventListener("click", () => this.gameplay?.setCameraMode("telemetry"));
     cameraRow.append(btnCine, btnObs, btnTelem);
 

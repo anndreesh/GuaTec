@@ -232,7 +232,7 @@ export class AuthScreen implements Screen {
       const body = (err as { body?: { message?: string } }).body;
       if (body?.message) return body.message;
     }
-    return "No se pudo completar la autenticación. Intenta de nuevo.";
+    return t("No se pudo completar la autenticación. Intenta de nuevo.");
   }
 
   unmount(): void {

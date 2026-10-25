@@ -528,6 +528,12 @@ const spanishExtra: Record<string, string> = {
 };
 
 Object.assign(englishExtra, {
+  "No se pudo completar la autenticación. Intenta de nuevo.": "Could not complete authentication. Try again.",
+  "La misión encontró una anomalía": "The mission encountered an anomaly",
+  "El sistema no pudo completar esta maniobra. Vuelve al centro de misión e inténtalo de nuevo.": "The system could not complete this maneuver. Return to mission control and try again.",
+  "La coordenada no existe": "The coordinate does not exist",
+  "Esta ruta quedó fuera del mapa de GuaTec. Regresa al centro de misión para continuar la expedición.": "This route is outside the GuaTec map. Return to mission control to continue the expedition.",
+  "Volver al centro de misión": "Return to mission control",
   "ALL LOCATIONS": "ALL LOCATIONS", "DISTANCE": "DISTANCE", "Close": "Close", "Saltar": "Jump", "Correr": "Run", "Examinar": "Examine",
   "Controles táctiles": "Touch controls", "Joystick de movimiento": "Movement joystick", "Resultado del vuelo": "Flight result", "Resultado": "Result", "Recovered data": "Recovered data",
   "Configuración de ingeniería": "Engineering configuration", "Structure": "Structure", "Instrumentation": "Instrumentation", "Priority": "Priority", "Testing decision": "Testing decision", "Not recorded": "Not recorded", "Launch decision": "Launch decision", "Mission log · historical records": "Mission log · historical records", "Historical reference · March 16, 1926": "Historical reference · March 16, 1926",
@@ -754,6 +760,12 @@ Object.assign(frenchTranslations, {
 });
 
 const frenchRemaining: Record<string, string> = {
+  "No se pudo completar la autenticación. Intenta de nuevo.": "Impossible de terminer l’authentification. Réessayez.",
+  "La misión encontró una anomalía": "La mission a rencontré une anomalie",
+  "El sistema no pudo completar esta maniobra. Vuelve al centro de misión e inténtalo de nuevo.": "Le système n’a pas pu terminer cette manœuvre. Retournez au centre de mission et réessayez.",
+  "La coordenada no existe": "La coordonnée n’existe pas",
+  "Esta ruta quedó fuera del mapa de GuaTec. Regresa al centro de misión para continuar la expedición.": "Cette route est hors de la carte de GuaTec. Retournez au centre de mission pour continuer l’expédition.",
+  "Volver al centro de misión": "Retour au centre de mission",
   "ALL LOCATIONS": "TOUS LES LIEUX", "DISTANCE": "DISTANCE", "Close": "Fermer", "Saltar": "Sauter", "Correr": "Courir", "Examinar": "Examiner",
   "OBJECTIVE UPDATED · Meet the team across the project area.": "OBJECTIF MIS À JOUR · Rencontrez l’équipe dans la zone du projet.", "DIRECTOR: Review the notes on the project desk and inspect the frame.": "DIRECTEUR : Consultez les notes sur le bureau du projet et examinez la structure.",
   "Propulsion notes recorded. Inspect the prototype and meet the team.": "Notes de propulsion enregistrées. Examinez le prototype et rencontrez l’équipe.", "Structural notes recorded. Inspect the vehicle on the stand.": "Notes structurelles enregistrées. Examinez le véhicule sur son support.", "Data instrumentation verified.": "Instrumentation de mesure vérifiée.",

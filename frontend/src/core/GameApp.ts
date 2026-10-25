@@ -235,6 +235,13 @@ export class GameApp {
     await this.setScreen(new ReportScreen(this, missionSlug));
   }
 
+  async showError(kind: "not-found" | "runtime" = "not-found"): Promise<void> {
+    this.activeView = "splash";
+    this.setBackdropMode("starfield");
+    const { ErrorScreen } = await import("@/screens/ErrorScreen");
+    await this.setScreen(new ErrorScreen(this, kind));
+  }
+
   async refreshCurrentUser(): Promise<void> {
     this.currentUser = await userApi.me();
   }
