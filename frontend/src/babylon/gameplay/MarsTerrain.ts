@@ -31,7 +31,20 @@ export function createMarsTerrain(
     subdivisions: 1,
   }, scene);
   const groundMat = new BABYLONNS.StandardMaterial("static-mars-ground-material", scene);
-  groundMat.diffuseColor = BABYLONNS.Color3.FromHexString("#6f573f");
+  // Use the project's real farm-soil albedo so the field reads as earth,
+  // while keeping the expensive normal/ARM maps disabled.
+  const dirtTexture = new BABYLONNS.Texture(
+    "/assets/polyhaven/textures/farm_soil/textures/farm_soil_diff_1k.jpg",
+    scene,
+    false,
+    false,
+    BABYLONNS.Texture.BILINEAR_SAMPLINGMODE,
+  );
+  dirtTexture.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  dirtTexture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  dirtTexture.uScale = 7;
+  dirtTexture.vScale = 7;
+  groundMat.diffuseTexture = dirtTexture;
   groundMat.specularColor = BABYLONNS.Color3.Black();
   ground.material = groundMat;
   ground.checkCollisions = false;
@@ -43,6 +56,7 @@ export function createMarsTerrain(
     getHeightAt: terrainHeight,
     dispose() {
       ground.dispose();
+      dirtTexture.dispose();
       groundMat.dispose();
     },
   };
