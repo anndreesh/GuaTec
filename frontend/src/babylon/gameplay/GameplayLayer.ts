@@ -101,6 +101,8 @@ export function createGameplayLayer(
 
   const terrain = createMarsTerrain(BABYLONNS, scene);
   terrain.ground.parent = root;
+  // The floor never changes after creation; avoid per-frame transform work.
+  terrain.ground.freezeWorldMatrix();
   scene.fogMode = BABYLONNS.Scene.FOGMODE_EXP2;
   const weatherOptions: Array<{ label: AuburnWeather; fogDensity: number }> = [
     { label: "CLEAR", fogDensity: 0.0022 },
@@ -1286,7 +1288,7 @@ export function createGameplayLayer(
         camera.alpha = -Math.PI / 2;
         camera.beta = 1.05;
         camera.radius = cameraOffsetRadius;
-        camera.checkCollisions = true;
+        camera.checkCollisions = false;
         followAstronaut();
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
@@ -1391,9 +1393,10 @@ export function createGameplayLayer(
       grounded = true;
       root.setEnabled(true);
       activeAvatarAnimation?.play(true);
-      scene.collisionsEnabled = true;
-      camera.checkCollisions = true;
-      camera.collisionRadius = new BABYLONNS.Vector3(0.28, 0.28, 0.28);
+      // Movement uses the explicit obstacle resolver below. Disable Babylon's
+      // broad collision pass so the static floor and camera cannot fight it.
+      scene.collisionsEnabled = false;
+      camera.checkCollisions = false;
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup", onKeyUp);
       window.addEventListener("blur", onBlur);
@@ -1613,7 +1616,7 @@ export function createGameplayLayer(
       } else if (openingElapsed < 0) {
         followAstronaut();
       }
-      if (launchElapsed >= 18) { camera.radius = cameraOffsetRadius; camera.checkCollisions = true; }
+      if (launchElapsed >= 18) { camera.radius = cameraOffsetRadius; camera.checkCollisions = false; }
 
       updateNearestPoi();
       mapStateCallback?.({
