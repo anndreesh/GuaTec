@@ -95,6 +95,7 @@ export class Mission1Screen implements Screen {
   private mapOverlay: HTMLElement | null = null;
   private mapGrid: HTMLElement | null = null;
   private mapLocations: HTMLElement | null = null;
+  private mapDataColumn: HTMLElement | null = null;
   private mapPlayer: HTMLElement | null = null;
   private mapRoute: HTMLElement | null = null;
   private mapDistance: HTMLElement | null = null;
@@ -116,6 +117,7 @@ export class Mission1Screen implements Screen {
     }
     if (event.key.toLowerCase() === "m") this.toggleMap();
   };
+  private readonly onMapResize = () => this.syncMapColumnHeights();
   private readonly onPanelToggleKey = (event: KeyboardEvent) => {
     if (event.key.toLowerCase() === "h" && !this.isTypingTarget(event.target)) {
       this.togglePanel();
@@ -218,6 +220,7 @@ export class Mission1Screen implements Screen {
     this.createMissionMap(container);
     this.createMobileControls(container);
     window.addEventListener("keydown", this.onMapKey);
+    window.addEventListener("resize", this.onMapResize);
     window.addEventListener("keydown", this.onModalKey);
 
     this.renderResources();
@@ -370,6 +373,7 @@ export class Mission1Screen implements Screen {
     this.mapLocations = el("nav", { className: "mission-map-locations", attrs: { "aria-label": t("ALL LOCATIONS") } });
     const details = el("aside", { className: "mission-map-objective" });
     const dataColumn = el("div", { className: "mission-map-data-column" });
+    this.mapDataColumn = dataColumn;
     if (this.flightMetrics) {
       this.flightMetrics.classList.add("flight-metrics--map");
       dataColumn.append(this.flightMetrics);
@@ -548,7 +552,23 @@ export class Mission1Screen implements Screen {
       objective.append(walkButton);
     }
     this.updateMapDistance();
+    this.syncMapColumnHeights();
     this.mapRoute?.classList.toggle("mission-map-route--hidden", !this.routeVisible || !target || !this.mapState);
+  }
+
+  private syncMapColumnHeights(): void {
+    if (!this.mapGrid || !this.mapLocations || !this.mapDataColumn) return;
+    if (window.matchMedia("(max-width: 720px)").matches) {
+      this.mapGrid.style.height = "";
+      this.mapLocations.style.height = "";
+      return;
+    }
+    const height = Math.ceil(this.mapDataColumn.getBoundingClientRect().height);
+    if (height > 0) {
+      const value = `${height}px`;
+      this.mapGrid.style.height = value;
+      this.mapLocations.style.height = value;
+    }
   }
 
   private updateMapDistance(): void {
@@ -2283,6 +2303,7 @@ export class Mission1Screen implements Screen {
     missionAudio.stopWind();
     window.removeEventListener("keydown", this.onPanelToggleKey);
     window.removeEventListener("keydown", this.onMapKey);
+    window.removeEventListener("resize", this.onMapResize);
     window.removeEventListener("keydown", this.onModalKey);
     if (this.languageMenu && this.languageMenuParent) this.languageMenuParent.append(this.languageMenu);
     this.languageMenu = null;
@@ -2290,6 +2311,7 @@ export class Mission1Screen implements Screen {
     this.restorePanelButton = null;
     this.missionPanel = null;
     this.flightMetrics = null;
+    this.mapDataColumn = null;
     this.mobileInteractButton = null;
   }
 }
