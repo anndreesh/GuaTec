@@ -66,6 +66,10 @@
 }
 
 /* The map is the pause surface for navigation and secondary controls. */
+.mission-map-header {
+ position:relative;
+ z-index:20;
+}
 .mission-map-controls {
  display:flex;
  align-items:center;
@@ -84,7 +88,7 @@
  position:relative;
  top:auto;
  right:auto;
- z-index:auto;
+ z-index:30;
 }
 .mission-map-controls .language-menu-trigger {
  min-width:52px;
@@ -92,6 +96,7 @@
 }
 .mission-map-controls .language-menu-list {
  right:0;
+ z-index:40;
 }
 .mission-map-data-column {
  grid-column:3;
