@@ -36,6 +36,8 @@ Las skills llamadas `threejs-*` sirven como guía de arquitectura, rendimiento y
 | Cinemática de lanzamiento | `threejs-animation`, `threejs-scene`, `threejs-postprocessing` | Timeline controlado, cámaras, transición negra, audio y retorno seguro. |
 | Audio y ambientación | `threejs-audio-generator`, `threejs-audio` | Viento, radio, mecanismos, cuenta regresiva y lanzamiento. |
 | HUD y pantallas de resultado | `frontend-design`, `threejs-game-ui-designer` | Interfaz clara, responsive, con éxito, error, pausa y reintento. |
+| Mejora estética y dirección visual | `frontend-design`, `threejs-materials`, `threejs-lighting`, `threejs-postprocessing` | Escenas, HUD, color, luz y feedback visual coherentes. |
+| Traducción y revisión de diálogos | `frontend-design`, `threejs-game-ui-designer` | Textos completos, naturales y consistentes en español, inglés y francés. |
 | Optimización para equipos modestos | `threejs-performance`, `threejs-assets`, `threejs-qa-release` | Presupuesto de FPS, draw calls, texturas, partículas y memoria. |
 | QA de interacción y regresiones | `threejs-testing`, `threejs-debug-profiler`, `threejs-qa-release` | Pruebas de flujo, cámara, touch, build y evidencia visual. |
 | Nueva textura o ilustración bitmap | `imagegen` | Solo cuando no exista un asset reutilizable y se necesite un bitmap. |
@@ -179,6 +181,107 @@ Cada estación debe tener tres niveles de lectura:
 - A media distancia: piezas y actividad visibles.
 - Cerca: interacción, texto corto y minijuego.
 
+## Mejora estética general
+
+La estética debe avanzar junto con la jugabilidad. No basta con añadir más
+objetos: cada zona debe tener una identidad visual y una jerarquía clara.
+
+### Dirección visual
+
+- Mantener una estética de campo experimental de 1926: madera, metal pintado,
+  lona, tierra, etiquetas, herramientas grandes y desgaste controlado.
+- Usar una paleta por función: tierra y ocres para el entorno, azul/gris para
+  instrumentación, naranja para alertas y verde para estados confirmados.
+- Dar a cada estación una silueta visible desde lejos y un color de acento
+  distinto para que el jugador la identifique sin leer un menú.
+- Evitar paneles flotantes que cubran al personaje o el objeto que se está
+  inspeccionando.
+- Mantener el HUD con el mismo lenguaje visual: bordes, tipografía, iconos,
+  estados de foco, error y éxito.
+
+### Calidad de las estructuras
+
+Para cada nueva estructura revisar:
+
+1. Silueta y proporción a distancia.
+2. Materiales diferenciados entre madera, metal, vidrio, lona y papel.
+3. Bordes con iluminación suficiente, sin exagerar el brillo.
+4. Detalles funcionales visibles: pernos, cables, diales, placas, bisagras o
+   marcas de uso.
+5. Variación moderada de color y desgaste, sin ruido visual que dificulte leer
+   la interacción.
+6. LOD o simplificación cuando el objeto se aleja de la cámara.
+
+### Animación y feedback estético
+
+- Las piezas deben moverse solo durante una interacción concreta y volver a un
+  estado estable al terminar.
+- Usar pequeños cambios de luz, sonido, partículas o color para confirmar una
+  acción; no llenar el escenario de efectos permanentes.
+- Mantener el suelo estático y evitar efectos que parezcan parpadeo, z-fighting
+  o movimiento accidental de la textura.
+- Revisar la escena en perfil `balanced` y con `prefers-reduced-motion`.
+
+## Traducción y mejora de diálogos
+
+Los diálogos, objetivos, botones, mensajes de error y resultados deben estar
+traducidos de forma completa y natural. No dejar frases en español dentro de
+una pantalla inglesa ni textos de prueba en una misión publicada.
+
+### Archivos de referencia
+
+- `frontend/src/core/i18n.ts`: idiomas activos, resolución de textos y fallback.
+- `frontend/src/state/Mission01Events.ts`: eventos, radio y mensajes de misión.
+- `frontend/src/screens/EngineeringTaskCopy.ts`: instrucciones y estados de
+  minijuegos.
+- `frontend/src/screens/Mission1Screen.ts`: objetivos, diálogos, botones y
+  textos contextuales.
+- `frontend/src/mission-field-hud.css` y `frontend/src/style.css`: revisar que
+  el texto traducido no desborde el HUD.
+
+### Proceso obligatorio
+
+1. Extraer el texto fuente a una clave estable; no duplicar frases literales
+   dentro de la lógica.
+2. Escribir primero el significado funcional y el tono de la escena.
+3. Traducir a español, inglés y francés manteniendo nombres de variables,
+   unidades, teclas y nombres propios.
+4. Revisar que la traducción suene natural, no literal.
+5. Mantener consistentes estos términos: objetivo, estación, lanzamiento,
+   telemetría, estabilidad, datos, reintentar, continuar y retrasar.
+6. Comprobar plural, género, puntuación, mayúsculas y longitud del texto.
+7. Probar cada idioma en el HUD, diálogos, minijuegos, transición negra e
+   informe final.
+8. Verificar que cambiar el idioma no reinicie el estado de la misión ni borre
+   el progreso.
+
+### Reglas de escritura
+
+- Los diálogos deben ser breves y humanos; una intervención debe aportar una
+  observación, una decisión o una reacción.
+- No repetir la misma instrucción en radio, HUD y modal si una sola indicación
+  es suficiente.
+- Mantener el tono histórico sin convertir cada texto en una explicación
+  técnica larga.
+- Las instrucciones de juego deben usar verbos claros: “Alinea”, “Inspecciona”,
+  “Registra”, “Conecta”, “Revisa” y “Continúa”.
+- Los errores deben explicar cómo recuperarse: “La lectura es inestable.
+  Ajusta el dial y vuelve a registrar”.
+- La transición de lanzamiento debe tener textos traducidos, por ejemplo:
+  `OBSERVACIÓN DEL VUELO`, `Registrando la última pasada de telemetría...` y
+  sus equivalentes en inglés y francés.
+
+### Checklist de traducción
+
+- [ ] Todos los textos nuevos usan claves del sistema de i18n.
+- [ ] Español, inglés y francés tienen las mismas claves.
+- [ ] No hay textos de fallback visibles durante el flujo normal.
+- [ ] Los nombres de personajes y lugares no cambian accidentalmente.
+- [ ] Los diálogos reaccionan al resultado del minijuego y no solo muestran una
+  traducción estática.
+- [ ] Ningún texto desborda botones, HUD, tarjetas o pantallas móviles.
+- [ ] Las capturas de QA se revisan en los tres idiomas.
+
 ## Cinemática de transición del lanzamiento
 
 ### Resultado deseado
@@ -318,6 +421,15 @@ Cada commit debe pasar `npm run typecheck`, `npm run build`, `npm test` y `git d
 - [ ] Los objetos repetidos usan instancing o geometría compartida.
 - [ ] Visuales, interacción y colisiones están separados.
 - [ ] Las estructuras funcionan en perfil `balanced`.
+- [ ] La dirección visual usa una paleta y materiales coherentes por estación.
+- [ ] El HUD, las alertas y los estados de los minijuegos tienen feedback visual consistente.
+
+### Traducciones
+
+- [ ] Diálogos, objetivos, botones, errores y resultados están traducidos.
+- [ ] Español, inglés y francés fueron revisados en la misión completa.
+- [ ] No hay desbordes ni frases cortadas en pantallas pequeñas.
+- [ ] Cambiar idioma conserva el progreso y el estado del minijuego.
 
 ### Lanzamiento
 
