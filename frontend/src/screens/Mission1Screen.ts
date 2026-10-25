@@ -196,7 +196,7 @@ export class Mission1Screen implements Screen {
       text: t("☰ Abrir panel"),
       attrs: { type: "button", "aria-label": t("Abrir panel de misión") },
     });
-    this.restorePanelButton.addEventListener("click", () => this.togglePanel(false));
+    this.restorePanelButton.addEventListener("click", () => this.togglePanel(true));
     container.append(this.restorePanelButton);
     window.addEventListener("keydown", this.onPanelToggleKey);
 
