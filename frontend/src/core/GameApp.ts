@@ -116,7 +116,6 @@ export class GameApp {
 
     const pendingOAuthEmail = AuthStore.getPendingOAuthEmail();
     if (pendingOAuthEmail) {
-      AuthStore.clearPendingOAuthEmail();
       await this.showAuth();
       return;
     }
