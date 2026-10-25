@@ -585,12 +585,6 @@ body {
   letter-spacing: 1px;
   color: var(--text-muted);
 }
-.mission-card-lock {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  font-size: 1.2rem;
-}
 .mission-card-note {
   font-size: 0.75rem;
   color: var(--text-muted);

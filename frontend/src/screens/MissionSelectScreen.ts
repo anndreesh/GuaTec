@@ -79,11 +79,9 @@ export class MissionSelectScreen implements Screen {
         card.append(bar);
       }
 
-      if (locked) {
-        card.append(el("div", { className: "mission-card-lock", text: "🔒" }));
-      } else if (mission.slug === MISSION_SLUGS.mission1) {
+      if (!locked && mission.slug === MISSION_SLUGS.mission1) {
         card.addEventListener("click", () => void this.app.showMission1());
-      } else {
+      } else if (!locked) {
         card.append(el("p", { className: "mission-card-note", text: t("Disponible próximamente en esta demo.") }));
       }
 
