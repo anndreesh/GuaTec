@@ -38,12 +38,15 @@ export function createMarsTerrain(
     scene,
     false,
     false,
-    BABYLONNS.Texture.BILINEAR_SAMPLINGMODE,
+    BABYLONNS.Texture.TRILINEAR_SAMPLINGMODE,
   );
   dirtTexture.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
   dirtTexture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
-  dirtTexture.uScale = 7;
-  dirtTexture.vScale = 7;
+  // Lower repetition plus moderate anisotropy prevents the soil grain from
+  // shimmering when the third-person camera changes angle.
+  dirtTexture.uScale = 4;
+  dirtTexture.vScale = 4;
+  dirtTexture.anisotropicFilteringLevel = 4;
   groundMat.diffuseTexture = dirtTexture;
   groundMat.specularColor = BABYLONNS.Color3.Black();
   ground.material = groundMat;
