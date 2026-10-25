@@ -3,6 +3,7 @@ import type { MissionPointOfInterest } from "@/config/gameConfig";
 import { createAstronautCharacter, type BabylonNamespace } from "@/babylon/gameplay/AstronautCharacter";
 import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 import { createLaunchSupport } from "./LaunchSupport";
+import { createEngineeringInstruments, type EngineeringFeedbackKind } from "./EngineeringInstruments";
 import { createWorkshopAssets, type WorkshopAsset } from "./WorkshopAssets";
 
 export interface NearbyPoi {
@@ -37,6 +38,10 @@ export interface GameplayHandle {
   interact(): void;
   getWeather(): AuburnWeather;
   setCameraMode(mode: "cinematic" | "observation" | "telemetry"): void;
+  setEngineeringFeedback(kind: EngineeringFeedbackKind, progress: number, value?: number): void;
+  setInputSuspended(suspended: boolean): void;
+  setQuality(profile: "high" | "balanced"): void;
+  getDiagnostics(): { fps: number; frameMs: number; drawCalls: number; activeMeshes: number; vertices: number; materials: number; textures: number; quality: "high" | "balanced" };
 }
 
 export interface GameplayLayerController {
@@ -85,6 +90,11 @@ export function createGameplayLayer(
   shadowGenerator: BABYLON.ShadowGenerator,
 ): GameplayLayerController {
   const root = new BABYLONNS.TransformNode("gameplay-root", scene);
+  const instrumentation = new BABYLONNS.SceneInstrumentation(scene);
+  let disposed = false;
+  let inputSuspended = false;
+  let quality: "high" | "balanced" = "high";
+  let pressureFeedback = 0;
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
   createAuburnStars(BABYLONNS, scene, root);
@@ -118,6 +128,16 @@ export function createGameplayLayer(
     terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z),
     PLAYER_START.z,
   );
+  const contactTexture = new BABYLONNS.DynamicTexture("player-soft-ground-contact", { width: 64, height: 64 }, scene, true);
+  const contactContext = contactTexture.getContext() as unknown as CanvasRenderingContext2D;
+  const contactGradient = contactContext.createRadialGradient(32, 32, 3, 32, 32, 31);
+  contactGradient.addColorStop(0, "rgba(0,0,0,0.5)"); contactGradient.addColorStop(1, "rgba(0,0,0,0)");
+  contactContext.fillStyle = contactGradient; contactContext.fillRect(0, 0, 64, 64); contactTexture.hasAlpha = true; contactTexture.update();
+  const contactMaterial = new BABYLONNS.StandardMaterial("player-ground-contact-material", scene);
+  contactMaterial.diffuseTexture = contactTexture; contactMaterial.opacityTexture = contactTexture;
+  contactMaterial.disableLighting = true; contactMaterial.emissiveColor = BABYLONNS.Color3.Black();
+  const playerContact = BABYLONNS.MeshBuilder.CreateGround("player-contact-shadow", { width: 0.95, height: 0.72 }, scene);
+  playerContact.material = contactMaterial; playerContact.parent = root; playerContact.isPickable = false;
   let avatarAnimationGroups: BABYLON.AnimationGroup[] = [];
   let activeAvatarAnimation: BABYLON.AnimationGroup | null = null;
   const playAvatarAnimation = (walking: boolean, running: boolean, jumping = false): void => {
@@ -134,6 +154,7 @@ export function createGameplayLayer(
     try {
       await import("@babylonjs/loaders/glTF");
       const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "mercenary_astronaut_optimized.glb", scene);
+      if (disposed) { result.animationGroups.forEach(group => group.dispose()); result.skeletons.forEach(skeleton => skeleton.dispose()); result.meshes.forEach(mesh => mesh.dispose(false, true)); return; }
       const avatarRoot = new BABYLONNS.TransformNode("mercenary-avatar-model", scene);
       avatarRoot.parent = astronaut.root;
       for (const mesh of result.meshes) {
@@ -153,8 +174,9 @@ export function createGameplayLayer(
       avatarRoot.position.z += astronaut.root.position.z - (bounds.min.z + bounds.max.z) / 2;
       proceduralAvatarMeshes.forEach((mesh) => mesh.setEnabled(false));
       avatarAnimationGroups = result.animationGroups;
-      avatarAnimationGroups.forEach((group) => group.stop());
+      avatarAnimationGroups.forEach((group) => { group.stop(); group.enableBlending = true; group.blendingSpeed = 0.08; });
       playAvatarAnimation(false, false);
+      if (!enabled) activeAvatarAnimation?.pause();
       console.info("[Mission 01] Mercenary astronaut loaded; idle, walk, and run animations ready.", { height, center: [bounds.min.x, bounds.min.y, bounds.min.z] });
     } catch (error) {
       console.warn("[Mission 01] Could not load mercenary astronaut; procedural engineer remains active.", error);
@@ -321,7 +343,14 @@ export function createGameplayLayer(
   rocketExhaustEmitter.position.y = 0.15;
   rocketExhaustEmitter.visibility = 0;
   rocketExhaustEmitter.isPickable = false;
-  const smokeTexture = new BABYLONNS.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL3AAAAAElFTkSuQmCC", scene);
+  // Shared soft sprite avoids the hard square edges of the previous one-pixel image.
+  const smokeTexture = new BABYLONNS.DynamicTexture("soft-atmospheric-particle", { width: 128, height: 128 }, scene, true);
+  const smokeContext = smokeTexture.getContext() as unknown as CanvasRenderingContext2D;
+  const smokeGradient = smokeContext.createRadialGradient(64, 64, 3, 64, 64, 63);
+  smokeGradient.addColorStop(0, "rgba(255,255,255,0.9)");
+  smokeGradient.addColorStop(0.35, "rgba(255,255,255,0.55)");
+  smokeGradient.addColorStop(1, "rgba(255,255,255,0)");
+  smokeContext.fillStyle = smokeGradient; smokeContext.fillRect(0, 0, 128, 128); smokeTexture.update();
   const launchSmoke = new BABYLONNS.ParticleSystem("1926-launch-smoke", 220, scene);
   launchSmoke.particleTexture = smokeTexture;
   launchSmoke.emitter = rocketExhaustEmitter;
@@ -579,7 +608,8 @@ export function createGameplayLayer(
   const launchSupport = createLaunchSupport(BABYLONNS, scene, root, groundPadRoot.position, {
     steel: propMat, dark: darkMetalMat, paint: markerMat, pad: saddleLeatherMat, hardware: brassMat, foundation: launchPadMat,
   }, shadowGenerator);
-  const collisionObstacles = [launchSupport.footprint];
+  const instruments = createEngineeringInstruments(BABYLONNS, scene, root, terrain.getHeightAt(-6, 10.6));
+  const collisionObstacles = [launchSupport.footprint, { minX: -6.55, maxX: -5.45, minZ: 10.05, maxZ: 11.15 }];
 
   function resolveObjectCollisions(position: BABYLON.Vector3): { x: boolean; z: boolean } {
     let blockedX = false;
@@ -710,6 +740,7 @@ export function createGameplayLayer(
         "space_shuttle_nasa_optimized.glb",
         scene,
       );
+      if (disposed) { result.animationGroups.forEach(group => group.dispose()); result.skeletons.forEach(skeleton => skeleton.dispose()); result.meshes.forEach(mesh => mesh.dispose(false, true)); return; }
       const importedRoot = result.meshes.find((mesh) => mesh.name === "__root__") ?? result.meshes[0];
       if (importedRoot) importedRoot.parent = shuttleModelRoot;
       // The GLB is modeled lengthwise along Z. Rotate it upright, then scale
@@ -1078,7 +1109,7 @@ export function createGameplayLayer(
   ].map((worker) => {
     const character = createAstronautCharacter(BABYLONNS, scene, { role: worker.role });
     character.root.parent = root;
-    character.root.scaling.setAll(0.78);
+    character.root.scaling.setAll(0.98);
     character.root.position = new BABYLONNS.Vector3(worker.x, terrain.getHeightAt(worker.x, worker.z), worker.z);
     character.setMovementState(true, false);
     return { ...worker, character };
@@ -1118,6 +1149,7 @@ export function createGameplayLayer(
   }
 
   function onKeyDown(ev: KeyboardEvent): void {
+    if (inputSuspended || openingElapsed >= 0) return;
     const key = ev.key.toLowerCase();
     keysDown.add(key);
     if (launchElapsed >= 0 && ["1", "2", "3"].includes(key)) {
@@ -1145,6 +1177,15 @@ export function createGameplayLayer(
     if (ev.code === "ShiftLeft") leftShiftDown = false;
   }
 
+  const onBlur = () => { keysDown.clear(); leftShiftDown = false; touchMoveX = 0; touchMoveY = 0; velocity.set(0, 0, 0); navigationPath = []; navigationTargetPoiId = null; };
+
+  const focusMaterial = new BABYLONNS.StandardMaterial("nearby-activity-ground-highlight", scene);
+  focusMaterial.diffuseColor = BABYLONNS.Color3.Black(); focusMaterial.emissiveColor = BABYLONNS.Color3.FromHexString("#b6c7ad");
+  focusMaterial.disableLighting = true; focusMaterial.alpha = 0.4;
+  const focusRing = BABYLONNS.MeshBuilder.CreateTorus("nearby-activity-focus-ring", { diameter: 1.1, thickness: 0.025, tessellation: 40 }, scene);
+  focusRing.parent = root; focusRing.material = focusMaterial; focusRing.isPickable = false; focusRing.setEnabled(false);
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   let nearestPoi: { poi: MissionPointOfInterest; position: BABYLON.Vector3 } | null = null;
   let nearestPoiCallback: ((poi: NearbyPoi | null) => void) | null = null;
   let interactCallback: ((poiId: string) => void) | null = null;
@@ -1169,6 +1210,11 @@ export function createGameplayLayer(
     const next = navigationTarget ?? (closest ? { poi: closest.poi, position: closest.position } : null);
     const changed = next?.poi.id !== nearestPoi?.poi.id;
     nearestPoi = next;
+    focusRing.setEnabled(!!next && !inputSuspended);
+    if (next) {
+      focusRing.position.set(next.position.x, terrain.getHeightAt(next.position.x, next.position.z) + 0.045, next.position.z);
+      focusMaterial.alpha = reducedMotion ? 0.34 : 0.3 + Math.sin(elapsed * 2.3) * 0.1;
+    }
     if (changed) {
       nearestPoiCallback?.(next ? { id: next.poi.id, label: next.poi.label, prompt: next.poi.prompt } : null);
     }
@@ -1176,6 +1222,30 @@ export function createGameplayLayer(
 
   return {
     handle: {
+      setEngineeringFeedback(kind, progress, value) {
+        instruments.setFeedback(kind, progress, value);
+        if (kind === "propulsion") pressureFeedback = Math.max(0, Math.min(1, value ?? progress));
+      },
+      setInputSuspended(suspended) {
+        inputSuspended = suspended;
+        keysDown.clear(); touchMoveX = 0; touchMoveY = 0; leftShiftDown = false;
+        velocity.set(0, 0, 0); navigationPath = []; navigationTargetPoiId = null;
+        if (suspended) camera.detachControl();
+        else if (enabled) camera.attachControl(canvas, true);
+      },
+      setQuality(profile) {
+        quality = profile;
+        const dprCap = profile === "high" ? 1.5 : 1;
+        scene.getEngine().setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, dprCap));
+        shadowGenerator.mapSize = profile === "high" ? 2048 : 1024;
+        shadowGenerator.blurKernel = profile === "high" ? 16 : 8;
+        ambientDust.emitRate = profile === "high" ? 2 : 0.7;
+        scene.getEngine().resize();
+      },
+      getDiagnostics() {
+        const engine = scene.getEngine();
+        return { fps: engine.getFps(), frameMs: engine.getDeltaTime(), drawCalls: instrumentation.drawCallsCounter.current, activeMeshes: scene.getActiveMeshes().length, vertices: scene.getActiveMeshes().data.slice(0, scene.getActiveMeshes().length).reduce((count, mesh) => count + mesh.getTotalVertices(), 0), materials: scene.materials.length, textures: scene.textures.length, quality };
+      },
       onNearestPoiChange(cb) {
         nearestPoiCallback = cb;
       },
@@ -1190,6 +1260,10 @@ export function createGameplayLayer(
         interactCallback = cb;
       },
       reset() {
+        inputSuspended = false;
+        keysDown.clear();
+        for (const kind of ["circuits", "antenna", "propulsion", "diagnostic", "launch"] as const) instruments.setFeedback(kind, 0);
+        pressureFeedback = 0;
         discoveredPoiIds.clear();
         astronaut.root.position.set(PLAYER_START.x, terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z), PLAYER_START.z);
         astronaut.root.rotation.set(0, 0, 0);
@@ -1281,6 +1355,7 @@ export function createGameplayLayer(
         );
       },
       setTouchMovement(x, y) {
+        if (inputSuspended) return;
         touchMoveX = Math.max(-1, Math.min(1, x));
         touchMoveY = Math.max(-1, Math.min(1, y));
         if (Math.hypot(touchMoveX, touchMoveY) > 0.12) {
@@ -1288,15 +1363,15 @@ export function createGameplayLayer(
           navigationTargetPoiId = null;
         }
       },
-      setTouchSprint(active) { leftShiftDown = active; },
+      setTouchSprint(active) { leftShiftDown = !inputSuspended && active; },
       jump() {
-        if (grounded && enabled) {
+        if (grounded && enabled && !inputSuspended) {
           verticalVelocity = JUMP_SPEED;
           grounded = false;
         }
       },
       interact() {
-        if (nearestPoi) {
+        if (nearestPoi && !inputSuspended) {
           navigationPath = [];
           interactCallback?.(nearestPoi.poi.id);
           navigationTargetPoiId = null;
@@ -1311,11 +1386,13 @@ export function createGameplayLayer(
       verticalVelocity = 0;
       grounded = true;
       root.setEnabled(true);
+      activeAvatarAnimation?.play(true);
       scene.collisionsEnabled = true;
       camera.checkCollisions = true;
       camera.collisionRadius = new BABYLONNS.Vector3(0.28, 0.28, 0.28);
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup", onKeyUp);
+      window.addEventListener("blur", onBlur);
       // The ambient backdrop keeps `camera.inputs` empty (no user control);
       // add mouse-drag orbiting only while the gameplay layer is active, and
       // strip it again on `disable()` to restore the ambient behavior.
@@ -1330,6 +1407,7 @@ export function createGameplayLayer(
     disable() {
       if (!enabled) return;
       enabled = false;
+      activeAvatarAnimation?.pause();
       keysDown.clear();
       leftShiftDown = false;
       touchMoveX = 0;
@@ -1337,6 +1415,7 @@ export function createGameplayLayer(
       velocity.set(0, 0, 0);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
       camera.detachControl();
       camera.checkCollisions = false;
       camera.inputs.clear();
@@ -1345,7 +1424,12 @@ export function createGameplayLayer(
     },
     update(deltaSeconds: number) {
       if (!enabled) return;
+      deltaSeconds = Math.max(0, Math.min(deltaSeconds, 1 / 30));
       elapsed += deltaSeconds;
+      instruments.update(deltaSeconds);
+      const contactY = terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z);
+      playerContact.position.set(astronaut.root.position.x, contactY + 0.012, astronaut.root.position.z);
+      playerContact.visibility = Math.max(0, 1 - Math.max(0, astronaut.root.position.y - contactY) / 2);
       if (openingElapsed >= 0) {
         openingElapsed += deltaSeconds;
         camera.lockedTarget = null;
@@ -1376,7 +1460,7 @@ export function createGameplayLayer(
         }
         return;
       }
-      gaugeNeedles.forEach((needle, index) => { needle.rotation.z = -0.43 + Math.sin(elapsed * 1.4 + index) * 0.025; });
+      gaugeNeedles.forEach((needle, index) => { needle.rotation.z = -0.43 + pressureFeedback * 1.5 + Math.sin(elapsed * 1.4 + index) * 0.025; });
       cupHead.rotation.y += deltaSeconds * (weather.label === "WINDY" ? 9 : 4.5);
       if (launchElapsed >= 0) {
         launchElapsed += deltaSeconds;
@@ -1430,6 +1514,7 @@ export function createGameplayLayer(
         moveZ -= right.z;
       }
 
+      if (inputSuspended) { moveX = 0; moveZ = 0; }
       let movementStrength = Math.min(1, Math.hypot(moveX, moveZ));
       if (navigationPath.length > 0) {
         const waypoint = navigationPath[0]!;
@@ -1449,10 +1534,10 @@ export function createGameplayLayer(
         const speed = (leftShiftDown ? RUN_SPEED : MOVE_SPEED) * movementStrength;
         const targetX = moveX * speed;
         const targetZ = moveZ * speed;
-        velocity.x += (targetX - velocity.x) * Math.min(1, MOVE_ACCELERATION * deltaSeconds);
-        velocity.z += (targetZ - velocity.z) * Math.min(1, MOVE_ACCELERATION * deltaSeconds);
+        velocity.x += (targetX - velocity.x) * (1 - Math.exp(-MOVE_ACCELERATION * deltaSeconds));
+        velocity.z += (targetZ - velocity.z) * (1 - Math.exp(-MOVE_ACCELERATION * deltaSeconds));
       } else {
-        const damping = Math.max(0, 1 - MOVE_BRAKING * deltaSeconds);
+        const damping = Math.exp(-MOVE_BRAKING * deltaSeconds);
         velocity.x *= damping;
         velocity.z *= damping;
       }
@@ -1515,7 +1600,7 @@ export function createGameplayLayer(
         } else {
           camera.target.copyFrom(rocketRoot.position);
           camera.target.y += 1.8;
-          if (launchElapsed < 2.5) {
+          if (launchElapsed < 2.5 && !reducedMotion) {
             camera.target.x += (Math.random() - 0.5) * 0.04;
             camera.target.y += (Math.random() - 0.5) * 0.04;
           }
@@ -1531,9 +1616,15 @@ export function createGameplayLayer(
         points: getMapPoints(),
       });
     },
-  dispose() {
+    dispose() {
+      instrumentation.dispose();
+      disposed = true;
       this.disable();
+      instruments.dispose();
+      focusRing.dispose(); focusMaterial.dispose();
+      playerContact.dispose(); contactMaterial.dispose(); contactTexture.dispose();
       camera.lockedTarget = null;
+      avatarAnimationGroups.forEach(group => group.dispose());
       astronaut.dispose();
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();
@@ -1747,7 +1838,21 @@ function createWeatheredMaterial(
   texture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
   const material = new BABYLONNS.PBRMaterial(name, scene);
   material.albedoTexture = texture;
+  const packed = new BABYLONNS.DynamicTexture(`${name}-linear-arm`, { width: 128, height: 128 }, scene, true);
+  const packedContext = packed.getContext() as unknown as CanvasRenderingContext2D;
+  const roughness = style === "metal" ? 177 : style === "wood" ? 235 : 245;
+  const metallic = style === "metal" ? 165 : 0;
+  for (let y = 0; y < 128; y++) {
+    const variation = Math.round(Math.sin(y * 1.73) * (style === "metal" ? 20 : 6));
+    packedContext.fillStyle = `rgb(255,${roughness + variation},${metallic})`;
+    packedContext.fillRect(0, y, 128, 1);
+  }
+  packed.update(); packed.gammaSpace = false;
+  material.metallicTexture = packed;
+  material.useRoughnessFromMetallicTextureAlpha = false;
+  material.useRoughnessFromMetallicTextureGreen = true;
+  material.useMetallnessFromMetallicTextureBlue = true;
   material.roughness = style === "metal" ? 0.75 : 0.94;
-  material.metallic = style === "metal" ? 0.38 : 0;
+  material.metallic = style === "metal" ? 1 : 0;
   return material;
 }

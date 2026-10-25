@@ -57,7 +57,10 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
   sun.intensity = 1.35;
   const shadowGenerator = new BABYLON.ShadowGenerator(2048, sun);
   shadowGenerator.useBlurExponentialShadowMap = true;
-  shadowGenerator.blurKernel = 24;
+  shadowGenerator.blurKernel = 16;
+  shadowGenerator.bias = 0.0004;
+  shadowGenerator.normalBias = 0.018;
+  sun.shadowMinZ = 0.1; sun.shadowMaxZ = 125;
 
   const planet = BABYLON.MeshBuilder.CreateSphere("planet", { diameter: 6, segments: 32 }, scene);
   const planetMaterial = new BABYLON.StandardMaterial("planetMat", scene);
@@ -157,9 +160,14 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           sun.diffuse = BABYLON.Color3.FromHexString("#bed0f4");
           sun.specular = BABYLON.Color3.FromHexString("#c9d8ff");
           scene.imageProcessingConfiguration.toneMappingEnabled = true;
+          scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
           scene.imageProcessingConfiguration.exposure = 1.08;
           scene.imageProcessingConfiguration.contrast = 1.06;
-          ensureGameplayLayer().enable();
+          const layer = ensureGameplayLayer();
+          layer.enable();
+          let savedQuality: "high" | "balanced" = "high";
+          try { if (localStorage.getItem("guatec-graphics-quality") === "balanced") savedQuality = "balanced"; } catch { /* storage can be unavailable */ }
+          layer.handle.setQuality(savedQuality);
           scene.meshes.forEach((mesh) => {
             let node: Node | null = mesh;
             let belongsToGameplay = false;
@@ -171,7 +179,12 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
               }
               node = node.parent;
             }
-            if (belongsToGameplay && !castsSceneBlockingShadow && mesh.name !== "auburn-sky-dome" && !mesh.name.startsWith("auburn-star-")) {
+            const excludedFromShadow = mesh.name === "mars-ground" || mesh.name === "auburn-distant-ground"
+              || mesh.name === "auburn-sky-dome" || mesh.name === "player-contact-shadow" || mesh.name === "nearby-activity-focus-ring"
+              || mesh.name.startsWith("auburn-star-") || mesh.name.startsWith("field-surface-patch-") || mesh.name.startsWith("dry-grass-")
+              || mesh.name.startsWith("rocket-engine-") || mesh.name === "rocket-exhaust-emitter";
+            const significantCaster = mesh.getTotalVertices() > 0 && mesh.getBoundingInfo().boundingBox.extendSize.length() > 0.15;
+            if (belongsToGameplay && !castsSceneBlockingShadow && !excludedFromShadow && significantCaster) {
               shadowGenerator.addShadowCaster(mesh, true);
               mesh.receiveShadows = true;
             }

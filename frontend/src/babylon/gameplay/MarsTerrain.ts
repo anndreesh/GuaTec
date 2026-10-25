@@ -25,8 +25,8 @@ export function createMarsTerrain(
 ): MarsTerrain {
   // A wide, fogged field reaches beyond the camera's visible horizon while
   // the gameplay movement bounds remain intentionally local to the mission.
-  const size = options.size ?? 1600;
-  const subdivisions = options.subdivisions ?? 512;
+  const size = options.size ?? 110;
+  const subdivisions = options.subdivisions ?? 192;
 
   const ground = BABYLONNS.MeshBuilder.CreateGround("mars-ground", { width: size, height: size, subdivisions }, scene);
   const positions = ground.getVerticesData(BABYLONNS.VertexBuffer.PositionKind);
@@ -45,6 +45,15 @@ export function createMarsTerrain(
     "/assets/polyhaven/textures/farm_soil/textures/farm_soil_arm_1k.jpg");
   ground.material = groundMat;
   ground.receiveShadows = true;
+  // Fine topology is reserved for the playable field. A coarse skirt supplies
+  // the distant horizon at a fraction of the former 524,288 ground triangles.
+  const distantGround = BABYLONNS.MeshBuilder.CreateGround("auburn-distant-ground", { width: 1600, height: 1600, subdivisions: 64 }, scene);
+  const distantPositions = distantGround.getVerticesData(BABYLONNS.VertexBuffer.PositionKind);
+  if (distantPositions) {
+    for (let i = 0; i < distantPositions.length; i += 3) distantPositions[i + 1] = terrainHeight(distantPositions[i]!, distantPositions[i + 2]!) - 1;
+    distantGround.updateVerticesData(BABYLONNS.VertexBuffer.PositionKind, distantPositions); distantGround.createNormals(false);
+  }
+  distantGround.parent = ground; distantGround.material = groundMat; distantGround.isPickable = false;
 
   const mudMat = createPbrGroundMaterial(BABYLONNS, scene, "wet-soil-mat",
     "/assets/polyhaven/textures/muddy_tracks/textures/muddy_tracks_diff_1k.jpg",
@@ -74,14 +83,16 @@ export function createMarsTerrain(
         const angle = Math.atan2(pz, px);
         const radial = 1 + Math.sin(angle * 3 + i * 1.7) * 0.075 + Math.cos(angle * 5 - i) * 0.045;
         patchPositions[v] = px * radial;
-        patchPositions[v + 1] = pz * radial;
+        patchPositions[v + 1] = pz * radial * (0.78 + (i % 3) * 0.07);
+        // The disc rotates onto XZ; negative local Z is world-space up.
+        patchPositions[v + 2] = -(terrainHeight(x + patchPositions[v]!, z + patchPositions[v + 1]!) - terrainHeight(x, z));
       }
       patch.updateVerticesData(BABYLONNS.VertexBuffer.PositionKind, patchPositions);
       patch.createNormals(false);
     }
     patch.rotation.x = Math.PI / 2;
     patch.position = new BABYLONNS.Vector3(x, terrainHeight(x, z) + 0.015, z);
-    patch.scaling.y = 0.78 + (i % 3) * 0.07;
+
     patch.material = grass ? grassMat : mudMat;
     patch.parent = surfaceRoot;
   });
@@ -235,6 +246,8 @@ function createProceduralSoilMaterial(
     texture.vScale = 128;
     texture.anisotropicFilteringLevel = 8;
   }
+  normal.gammaSpace = false;
+  arm.gammaSpace = false;
   material.bumpTexture = normal;
   material.metallicTexture = arm;
   material.useRoughnessFromMetallicTextureGreen = true;
@@ -265,6 +278,8 @@ function createPbrGroundMaterial(
     texture.vScale = tiling;
   }
   material.albedoTexture = albedo;
+  normal.gammaSpace = false;
+  arm.gammaSpace = false;
   material.bumpTexture = normal;
   material.metallicTexture = arm;
   material.useRoughnessFromMetallicTextureGreen = true;
