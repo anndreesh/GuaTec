@@ -112,6 +112,7 @@
  min-height:0;
  max-height:none;
  align-self:stretch;
+ border-radius:12px;
 }
 .mission-map-data-column .flight-metrics--map {
  display:block;
