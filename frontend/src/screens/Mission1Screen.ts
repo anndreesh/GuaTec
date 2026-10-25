@@ -603,43 +603,43 @@ export class Mission1Screen implements Screen {
     let speaker = "DIRECTOR";
     let text = "";
     if (pending.id === "lab" || pending.id === "discover") {
-      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Head to the outdoor work area. Today we see if our machine can leave the ground.";
     } else if (pending.id === "meet-team") {
       const unmet = this.state.unmetNpc();
       if (unmet === "meet-propulsion") {
-        speaker = "ANDREW WELLS · PROPULSION";
+        speaker = "INGENIERO DE PROPULSIÓN · EQUIPO DE CAMPO";
         text = "Over here by the fuel bench. We need to check these pressure lines.";
       } else if (unmet === "meet-structural") {
-        speaker = "ELENA BROOKS · STRUCTURAL";
+        speaker = "INGENIERA BOMBILLA · ESTRUCTURAS";
         text = "I'm inspecting the frame brackets by the prototype.";
       } else {
-        speaker = "MARA REED · DATA";
+        speaker = "TÉCNICA DE DATOS · EQUIPO DE CAMPO";
         text = "Checking the mechanical recording drum. Come over when you can.";
       }
     } else if (pending.id === "prototype") {
-      speaker = "ELENA BROOKS · STRUCTURAL";
+      speaker = "INGENIERA BOMBILLA · ESTRUCTURAS";
       text = "Take a close look at the combustion chamber and propellant lines on the stand.";
     } else if (pending.id === "design") {
-      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Configure the vehicle specifications at the open experimental bench.";
     } else if (pending.id === "testing") {
-      speaker = "ANDREW WELLS · PROPULSION";
+      speaker = "INGENIERO DE PROPULSIÓN · EQUIPO DE CAMPO";
       text = "Head over to the test area. Let's run the system and pressure checks.";
     } else if (pending.id === "diagnose") {
-      speaker = "ELENA BROOKS · STRUCTURAL";
+      speaker = "INGENIERA BOMBILLA · ESTRUCTURAS";
       text = "That oscillation isn't right. Return to the vehicle and inspect the possible causes.";
     } else if (pending.id === "prepare") {
-      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Bring the crew to the launch field. We must run through the final checklist.";
     } else if (pending.id === "observation") {
-      speaker = "MARA REED · DATA";
+      speaker = "TÉCNICA DE DATOS · EQUIPO DE CAMPO";
       text = "Pad cleared! Head into the observation area behind the safety barricades.";
     } else if (pending.id === "flight") {
-      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Everyone in position. Stand by for the countdown.";
     } else if (pending.id === "analysis") {
-      speaker = "ING. TOMÁS ELDRICH · DIRECTOR";
+      speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Collect the recorded traces and meet us at the outdoor analysis station.";
     }
 
@@ -674,7 +674,7 @@ export class Mission1Screen implements Screen {
     // 2. Project Director:
     if (poiId === "director-greeting") {
       this.showChoice(
-        "PROJECT DIRECTOR · ING. TOMÁS ELDRICH",
+        "DIRECTOR DEL PROYECTO · INGENIERO ANDRES L",
         `“You're here. Good. Today is an important day.\n\nToday we're going to attempt something people have doubted for years. We are going to see whether our machine can actually fly.\n\nNot because we're going somewhere, or trying to reach space. We're trying to prove one thing: that liquid-fuel propulsion can leave the ground. Welcome to the project.”`,
         [
           {
@@ -708,7 +708,7 @@ export class Mission1Screen implements Screen {
     // 3. Meet Team Members:
     if (poiId === "meet-propulsion") {
       this.showChoice(
-        "PROPULSION ENGINEER · ANDREW WELLS",
+        "INGENIERO DE PROPULSIÓN · EQUIPO DE CAMPO",
         `“Check the readings again. We're burning gasoline with liquid oxygen. If the feed system holds steady, the thrust chamber gives a steady push. Every change makes the vehicle stronger, lighter, or riskier. We have to decide where the risk goes.”`,
         [
           {
@@ -716,7 +716,7 @@ export class Mission1Screen implements Screen {
             run: () => {
               this.state.meetNpc("meet-propulsion");
               if (this.state.teamMet()) this.state.completeObjective("meet-team");
-              this.state.addLogEntry("ANDREW WELLS — Margins are tight. We check every line and gauge before any pressurized test.");
+              this.state.addLogEntry("INGENIERO DE PROPULSIÓN — Los márgenes son estrechos. Revisamos cada lectura antes de cualquier prueba.");
               this.showToast(t("Propulsion notes recorded. Inspect the prototype and meet the team."));
             },
           },
@@ -727,7 +727,7 @@ export class Mission1Screen implements Screen {
 
     if (poiId === "meet-structural") {
       this.showChoice(
-        "STRUCTURAL ENGINEER · ELENA BROOKS",
+        "INGENIERA DE ESTRUCTURAS · INGENIERA BOMBILLA",
         `“The frame is lightweight steel tubing with brass brackets. We're placing the motor up top to pull the propellant tanks for stability. If we add too much reinforcement, mass climbs quickly. We need the right balance between structural integrity and weight.”`,
         [
           {
@@ -735,7 +735,7 @@ export class Mission1Screen implements Screen {
             run: () => {
               this.state.meetNpc("meet-structural");
               if (this.state.teamMet()) this.state.completeObjective("meet-team");
-              this.state.addLogEntry("ELENA BROOKS — Look at the pipe clamps and thrust ring on the stand.");
+              this.state.addLogEntry("INGENIERA BOMBILLA — Revisa las abrazaderas y el anillo de empuje en la plataforma.");
               this.showToast(t("Structural notes recorded. Inspect the vehicle on the stand."));
             },
           },
@@ -746,7 +746,7 @@ export class Mission1Screen implements Screen {
 
     if (poiId === "meet-data") {
       this.showChoice(
-        "DATA TECHNICIAN · MARA REED",
+        "TÉCNICA DE DATOS · EQUIPO DE CAMPO",
         `“Our instruments are simple: a smoked drum recorder, mechanical pressure gauges, and visual transit sights. If the flight lasts even ten seconds, we'll capture valuable evidence. Without data, an experiment is just a spectacle.”`,
         [
           {
@@ -754,7 +754,7 @@ export class Mission1Screen implements Screen {
             run: () => {
               this.state.meetNpc("meet-data");
               if (this.state.teamMet()) this.state.completeObjective("meet-team");
-              this.state.addLogEntry("MARA REED — The observation table will record the launch trace.");
+              this.state.addLogEntry("TÉCNICA DE DATOS — La mesa de observación registrará la traza del lanzamiento.");
               this.showToast(t("Data instrumentation verified."));
             },
           },
@@ -1044,8 +1044,18 @@ export class Mission1Screen implements Screen {
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
     this.modalRoot.innerHTML = "";
-    const card = el("div", { className: "modal-card", attrs: { role: "dialog", "aria-modal": "true", "aria-label": t(title), tabindex: "-1" } });
-    card.append(el("h3", { className: "modal-title", text: t(title) }), el("p", { className: "modal-description", text: t(description) }));
+    const localizedTitle = t(title);
+    const isCharacterDialogue = /(ANDRES L|BOMBILLA|DIRECTOR|INGENIERO|INGENIERA|TÉCNICA|ENGINEER|TECHNICIAN|PROPULSION)/i.test(localizedTitle);
+    const speakerInitials = localizedTitle.includes("BOMBILLA") ? "B" : localizedTitle.includes("ANDRES") ? "AL" : "✦";
+    const card = el("div", { className: `modal-card dialogue-card${isCharacterDialogue ? " dialogue-card--character" : ""}`, attrs: { role: "dialog", "aria-modal": "true", "aria-label": localizedTitle, tabindex: "-1" } });
+    const speakerHeader = el("div", { className: "dialogue-speaker", children: [
+      el("span", { className: "dialogue-speaker__avatar", text: speakerInitials, attrs: { "aria-hidden": "true" } }),
+      el("span", { className: "dialogue-speaker__meta", children: [
+        el("span", { className: "dialogue-speaker__kicker", text: t("DIÁLOGO DE CAMPO") }),
+        el("strong", { className: "dialogue-speaker__name", text: localizedTitle }),
+      ] }),
+    ] });
+    card.append(speakerHeader, el("h3", { className: "modal-title", text: t(title) }), el("p", { className: "modal-description", text: t(description) }));
     const wrap = el("div", { className: "modal-options" });
     for (const option of options) {
       const button = el("button", { className: "btn btn-secondary", text: t(option.label), attrs: { type: "button" } });
@@ -1244,7 +1254,7 @@ export class Mission1Screen implements Screen {
     const correctOrder = ["liftoff", "peak", "recovery"];
     const events = [
       { id: "liftoff", time: "06:33:00", label: "El vehículo abandona la guía" },
-      { id: "peak", time: "06:33:10", label: "Mara marca el punto más alto" },
+      { id: "peak", time: "06:33:10", label: "La técnica de datos marca el punto más alto" },
       { id: "recovery", time: "06:33:18", label: "El equipo fija la distancia recorrida" },
     ];
     const order = ["peak", "recovery", "liftoff"];
@@ -1593,7 +1603,7 @@ export class Mission1Screen implements Screen {
       this.renderObjectives();
       this.showChoice(
         "ADVERTENCIA · INESTABILIDAD INESPERADA DETECTADA",
-        `ING. ANDREW WELLS: “Eso no estaba ahí antes.”\nING. ELENA BROOKS: “Entonces algo cambió durante el ciclo de presurización.”\nING. TOMÁS ELDRICH: “Encuéntralo.”\n\nUna oscilación mecánica apareció en el registrador de traza. Inspecciona el prototipo de cerca para diagnosticar la causa.`,
+        `INGENIERO DE PROPULSIÓN: “Eso no estaba ahí antes.”\nINGENIERA BOMBILLA: “Entonces algo cambió durante el ciclo de prueba.”\nINGENIERO ANDRES L: “Encuéntralo.”\n\nUna oscilación mecánica apareció en el registrador de traza. Inspecciona el prototipo de cerca para diagnosticar la causa.`,
         [
           {
             label: "Inspect prototype to find the cause",
@@ -1642,7 +1652,7 @@ export class Mission1Screen implements Screen {
         this.renderObjectives();
         this.showChoice(
           "PRE-LAUNCH BRIEFING",
-          t(`MARA REED: “Recording ready.”\nANDREW WELLS: “Feed system pressurized and ready.”\nING. TOMÁS ELDRICH: “All right. Let's see what happens. Clear the pad and take positions in the Observation Area.”`),
+          t(`TÉCNICA DE DATOS: “Grabación lista.”\nINGENIERO DE PROPULSIÓN: “Lecturas estables y listas.”\nINGENIERO ANDRES L: “Muy bien. Veamos qué sucede. Despejen la plataforma y tomen posición en el área de observación.”`),
           [{ label: t("Head to the Observation Area"), run: () => {
             this.state.completeObjective("prepare");
             this.showToast(t("PAD CLEARED · Walk to the Observation Area to begin launch."));
@@ -1680,7 +1690,7 @@ export class Mission1Screen implements Screen {
 
     this.showChoice(
       "OBSERVATION AREA · TAKE POSITION",
-      t(`The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. Mara Reed has the drum recorder running. Andrew Wells and Elena Brooks are tracking the ascent path.\n\nDIRECTOR: “Ready on your mark.”`),
+      t(`The crew is safely stationed behind the observation barricade, 50 meters from the launch frame. The data technician has the drum recorder running. The propulsion engineer and Ingeniera Bombilla are tracking the ascent path.\n\nINGENIERO ANDRES L: “Ready on your mark.”`),
       [
         {
           label: t("START LAUNCH COUNTDOWN (T-10)"),
@@ -1887,8 +1897,8 @@ export class Mission1Screen implements Screen {
     card.append(
       el("p", { className: "mission-launch-kicker", text: t("FIELD NOTES · AUBURN, 1926") }),
       el("h2", { className: "mission-ending-title", text: t("THE FLIGHT WAS SMALL. THE POSSIBILITY WAS NOT.") }),
-      el("p", { className: "mission-ending-dialogue", text: `${t("ING. ELENA BROOKS · STRUCTURAL ENGINEER")}\n“${t(engineerLine)}”` }),
-      el("p", { className: "mission-ending-dialogue", text: `${t("ING. TOMÁS ELDRICH · PROJECT DIRECTOR")}\n“${t("Of course. That's how this begins.") }”` }),
+      el("p", { className: "mission-ending-dialogue", text: `${t("INGENIERA BOMBILLA · INGENIERA DE ESTRUCTURAS")}\n“${t(engineerLine)}”` }),
+      el("p", { className: "mission-ending-dialogue", text: `${t("INGENIERO ANDRES L · DIRECTOR DEL PROYECTO")}\n“${t("Of course. That's how this begins.") }”` }),
       el("p", { className: "mission-ending-caption", text: t("The 1926 historical flight was brief (41 ft high, 184 ft distance). It demonstrated that liquid-fuel propulsion could produce flight. Mission 02 unlocked.") }),
     );
     const finish = el("button", { className: "btn btn-primary btn-large", text: t("MISSION 01 COMPLETE"), attrs: { type: "button" } });

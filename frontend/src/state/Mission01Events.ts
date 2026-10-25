@@ -39,7 +39,7 @@ export const MISSION_01_DIALOGUE = {
     "If it fails, we learn why.",
   ],
   engineeringLead: [
-    "RADIO — ING. JOSE VEGA · ENGINEERING LEAD",
+    "RADIO — INGENIERO ANDRES L · LÍDER DE INGENIERÍA",
     "Welcome to the Auburn field station. You are looking at a small experiment with a large consequence.",
     "We are not trying to reach space today. We are asking one careful question: can liquid-fuel propulsion lift a vehicle clear of the ground?",
     "Inspect the prototype, listen to the team, and record what we learn. The design choices here are game abstractions, not real construction instructions.",

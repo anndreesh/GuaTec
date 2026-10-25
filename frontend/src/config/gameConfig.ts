@@ -270,7 +270,7 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
   {
     id: "director-greeting",
     label: "Project director",
-    flavorText: "Ing. Tomás Eldrich waits beside the outdoor work area.",
+    flavorText: "Engineer Andres L waits beside the outdoor work area.",
     prompt: "E · SPEAK WITH DIRECTOR",
     position: { x: -5.2, z: 2.2 },
   },
@@ -286,21 +286,21 @@ export const MISSION_1_POIS: MissionPointOfInterest[] = [
   {
     id: "meet-propulsion",
     label: "Propulsion engineer",
-    flavorText: "Andrew Wells works at a technical table in the open air.",
+    flavorText: "The propulsion engineer works at a technical table in the open air.",
     prompt: "E · TALK TO PROPULSION ENGINEER",
     position: { x: 16.8, z: 9.4 },
   },
   {
     id: "meet-structural",
     label: "Structural engineer",
-    flavorText: "Elena Brooks stands beside the prototype frame.",
+    flavorText: "Ingeniera Bombilla stands beside the prototype frame.",
     prompt: "E · TALK TO STRUCTURAL ENGINEER",
     position: { x: 5.1, z: -12.2 },
   },
   {
     id: "meet-data",
     label: "Data technician",
-    flavorText: "Mara Reed is preparing the outdoor recorders.",
+    flavorText: "The data technician is preparing the outdoor recorders.",
     prompt: "E · TALK TO DATA TECHNICIAN",
     position: { x: 6.6, z: -21.2 },
   },

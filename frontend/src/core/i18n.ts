@@ -1430,6 +1430,42 @@ Object.assign(frenchTranslations, {
   "reviewed.": "examinés.",
 });
 
+Object.assign(englishExtra, {
+  "DIÁLOGO DE CAMPO": "FIELD DIALOGUE",
+  "RADIO — INGENIERO ANDRES L · LÍDER DE INGENIERÍA": "RADIO — ENGINEER ANDRES L · ENGINEERING LEAD",
+  "Engineer Andres L waits beside the outdoor work area.": "Engineer Andres L waits beside the outdoor work area.",
+  "The propulsion engineer works at a technical table in the open air.": "The propulsion engineer works at a technical table in the open air.",
+  "Ingeniera Bombilla stands beside the prototype frame.": "Engineer Bombilla stands beside the prototype frame.",
+  "The data technician is preparing the outdoor recorders.": "The data technician is preparing the outdoor recorders.",
+  "INGENIERO ANDRES L · DIRECTOR": "ENGINEER ANDRES L · DIRECTOR",
+  "INGENIERA BOMBILLA · ESTRUCTURAS": "ENGINEER BOMBILLA · STRUCTURES",
+  "INGENIERO DE PROPULSIÓN · EQUIPO DE CAMPO": "PROPULSION ENGINEER · FIELD TEAM",
+  "TÉCNICA DE DATOS · EQUIPO DE CAMPO": "DATA TECHNICIAN · FIELD TEAM",
+  "DIRECTOR DEL PROYECTO · INGENIERO ANDRES L": "PROJECT DIRECTOR · ENGINEER ANDRES L",
+  "INGENIERA DE ESTRUCTURAS · INGENIERA BOMBILLA": "STRUCTURAL ENGINEER · ENGINEER BOMBILLA",
+});
+
+Object.assign(frenchRemaining, {
+  "DIÁLOGO DE CAMPO": "DIALOGUE DE TERRAIN",
+  "RADIO — INGENIERO ANDRES L · LÍDER DE INGENIERÍA": "RADIO — INGÉNIEUR ANDRES L · RESPONSABLE INGÉNIERIE",
+  "Engineer Andres L waits beside the outdoor work area.": "L’ingénieur Andres L attend près de la zone de travail extérieure.",
+  "The propulsion engineer works at a technical table in the open air.": "L’ingénieur propulsion travaille à une table technique en plein air.",
+  "Ingeniera Bombilla stands beside the prototype frame.": "L’ingénieure Bombilla se tient près du châssis du prototype.",
+  "The data technician is preparing the outdoor recorders.": "La technicienne des données prépare les enregistreurs extérieurs.",
+  "INGENIERO ANDRES L · DIRECTOR": "INGÉNIEUR ANDRES L · DIRECTEUR",
+  "INGENIERA BOMBILLA · ESTRUCTURAS": "INGÉNIEURE BOMBILLA · STRUCTURE",
+  "INGENIERO DE PROPULSIÓN · EQUIPO DE CAMPO": "INGÉNIEUR PROPULSION · ÉQUIPE DE TERRAIN",
+  "TÉCNICA DE DATOS · EQUIPO DE CAMPO": "TECHNICIENNE DES DONNÉES · ÉQUIPE DE TERRAIN",
+  "DIRECTOR DEL PROYECTO · INGENIERO ANDRES L": "DIRECTEUR DU PROJET · INGÉNIEUR ANDRES L",
+  "INGENIERA DE ESTRUCTURAS · INGENIERA BOMBILLA": "INGÉNIEURE STRUCTURE · INGÉNIEURE BOMBILLA",
+});
+
+Object.assign(spanishFromEnglish, {
+  "Engineer Andres L waits beside the outdoor work area.": "El Ingeniero Andres L espera junto al área de trabajo exterior.",
+  "The propulsion engineer works at a technical table in the open air.": "El ingeniero de propulsión trabaja en una mesa técnica al aire libre.",
+  "The data technician is preparing the outdoor recorders.": "La técnica de datos prepara los registradores exteriores.",
+});
+
 let currentLanguage: Language =
   (["es", "en", "fr"] as Language[]).includes(localStorage.getItem(STORAGE_KEY) as Language)
     ? (localStorage.getItem(STORAGE_KEY) as Language)
