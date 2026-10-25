@@ -108,12 +108,12 @@
  min-width:0;
 }
 .mission-map-grid {
- height:clamp(420px,65vh,500px);
+ height:clamp(450px,65vh,480px);
  min-height:0;
  align-self:stretch;
 }
 .mission-map-locations {
- height:clamp(420px,65vh,500px);
+ height:clamp(450px,65vh,480px);
  min-height:0;
  max-height:none;
  align-self:stretch;
