@@ -81,7 +81,7 @@
  box-shadow:none;
 }
 .mission-map-controls .language-menu {
- position:static;
+ position:relative;
  top:auto;
  right:auto;
  z-index:auto;
@@ -93,15 +93,77 @@
 .mission-map-controls .language-menu-list {
  right:0;
 }
-.mission-map-card > .flight-metrics--map {
+.mission-map-data-column {
+ grid-column:3;
+ grid-row:2;
+ display:grid;
+ gap:8px;
+ align-content:start;
+ min-width:0;
+}
+.mission-map-data-column .flight-metrics--map {
  display:block;
  position:static;
- grid-column:3;
- grid-row:2 / span 2;
  width:auto;
  align-self:start;
  z-index:auto;
  pointer-events:auto;
+}
+.mission-map-data-column .mission-map-objective {
+ border:1px solid rgba(183,210,185,.18);
+ border-left:3px solid rgba(255,177,153,.5);
+ border-radius:10px;
+ padding:10px 11px;
+ background:rgba(6,11,17,.42);
+ font-size:.78rem;
+ line-height:1.35;
+}
+.mission-map-data-column .mission-map-kicker,
+.mission-map-data-column .mission-map-location,
+.mission-map-data-column .mission-map-distance {
+ margin:0 0 5px;
+ font-size:.66rem;
+ line-height:1.25;
+}
+.mission-map-data-column .mission-map-current {
+ margin-bottom:6px;
+ font-size:.86rem;
+ line-height:1.2;
+}
+.mission-map-data-column .mission-map-route-button {
+ min-height:32px;
+ padding:6px 8px;
+ font-size:.68rem;
+}
+.mission-map-panel-slot {
+ grid-column:1 / -1;
+ min-width:0;
+}
+.mission-map-panel-slot:empty {
+ display:none;
+}
+.mission-map-panel-slot .mission1-screen--map-embedded {
+ position:static;
+ display:block;
+ width:auto;
+ max-width:none;
+ max-height:min(38vh,360px);
+ overflow:auto;
+ padding:12px;
+ border:1px solid rgba(255,177,153,.28);
+ border-radius:12px;
+ background:rgba(6,11,17,.72);
+ box-shadow:none;
+}
+.mission-map-panel-slot .mission1-screen--map-embedded.mission1-screen--minimized {
+ display:none;
+}
+.mission-map-panel-slot .mission1-screen--map-embedded .mission1-header {
+ position:sticky;
+ top:-12px;
+ z-index:2;
+ padding:4px 0 8px;
+ background:rgba(6,11,17,.96);
 }
 .field-hud {
  width:min(300px,calc(100vw - 40px));
@@ -109,9 +171,12 @@
 }
 
 @media (max-width:720px) {
- .mission-map-card > .flight-metrics--map {
+ .mission-map-data-column {
   grid-column:auto;
   grid-row:auto;
+ }
+ .mission-map-panel-slot .mission1-screen--map-embedded {
+  max-height:42vh;
  }
 }
 

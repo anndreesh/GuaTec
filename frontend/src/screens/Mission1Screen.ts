@@ -98,6 +98,7 @@ export class Mission1Screen implements Screen {
   private mapPlayer: HTMLElement | null = null;
   private mapRoute: HTMLElement | null = null;
   private mapDistance: HTMLElement | null = null;
+  private mapPanelSlot: HTMLElement | null = null;
   private languageMenu: HTMLElement | null = null;
   private languageMenuParent: HTMLElement | null = null;
   private mapState: GameplayMapState | null = null;
@@ -351,8 +352,7 @@ export class Mission1Screen implements Screen {
       attrs: { type: "button", "aria-label": t("Abrir panel de misión") },
     });
     this.restorePanelButton.addEventListener("click", () => {
-      this.toggleMap(false);
-      this.togglePanel(true);
+      this.openPanelInMap();
     });
     controls.append(this.restorePanelButton);
     this.languageMenu = document.querySelector<HTMLElement>(".language-menu");
@@ -369,6 +369,7 @@ export class Mission1Screen implements Screen {
     map.append(this.mapRoute, this.mapPlayer, el("span", { className: "mission-map-caption", text: t("NORTH ↑ · PROJECT YARD · LAUNCH FIELD") }));
     this.mapLocations = el("nav", { className: "mission-map-locations", attrs: { "aria-label": t("ALL LOCATIONS") } });
     const details = el("aside", { className: "mission-map-objective" });
+    const dataColumn = el("div", { className: "mission-map-data-column" });
     const legend = el("div", { className: "mission-map-legend", attrs: { "aria-label": t("MAP LEGEND") } });
     legend.append(
       el("h3", { className: "mission-map-locations-title", text: t("MAP LEGEND") }),
@@ -377,8 +378,13 @@ export class Mission1Screen implements Screen {
       el("p", { text: `┄ ${t("Route to the current objective (SHOW ROUTE)")}` }),
       el("p", { text: `◌ ${t("Unexplored area · not visited yet")}` }),
     );
-    if (this.flightMetrics) this.flightMetrics.classList.add("flight-metrics--map");
-    card.append(header, map, this.mapLocations, legend, details, this.flightMetrics ?? el("div"));
+    if (this.flightMetrics) {
+      this.flightMetrics.classList.add("flight-metrics--map");
+      dataColumn.append(this.flightMetrics);
+    }
+    dataColumn.append(details);
+    this.mapPanelSlot = el("div", { className: "mission-map-panel-slot" });
+    card.append(header, map, this.mapLocations, legend, dataColumn, this.mapPanelSlot);
     this.mapOverlay.append(card);
     container.append(this.mapOverlay);
   }
@@ -389,6 +395,14 @@ export class Mission1Screen implements Screen {
     const open = force ?? this.mapOverlay.classList.contains("mission-map-overlay--hidden");
     this.mapOverlay.classList.toggle("mission-map-overlay--hidden", !open);
     if (open) this.renderMapObjective();
+  }
+
+  private openPanelInMap(): void {
+    if (!this.mapPanelSlot || !this.missionPanel) return;
+    this.togglePanel(true);
+    this.missionPanel.classList.add("mission1-screen--map-embedded");
+    this.mapPanelSlot.append(this.missionPanel);
+    this.mapPanelSlot.scrollIntoView({ block: "nearest" });
   }
 
   private updateMissionMap(state: GameplayMapState): void {
