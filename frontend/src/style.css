@@ -1491,11 +1491,6 @@ button.mission-map-location:focus-visible {
   cursor: default;
 }
 
-.mission-map-legend p {
-  margin: .2rem 0;
-  font-size: .85rem;
-}
-
 /* ==========================================================
    Mission 1 — visual polish layer (overrides; loaded last)
    Changes looks only: class names and markup are unchanged.

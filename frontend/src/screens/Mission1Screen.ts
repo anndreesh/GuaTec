@@ -370,21 +370,13 @@ export class Mission1Screen implements Screen {
     this.mapLocations = el("nav", { className: "mission-map-locations", attrs: { "aria-label": t("ALL LOCATIONS") } });
     const details = el("aside", { className: "mission-map-objective" });
     const dataColumn = el("div", { className: "mission-map-data-column" });
-    const legend = el("div", { className: "mission-map-legend", attrs: { "aria-label": t("MAP LEGEND") } });
-    legend.append(
-      el("h3", { className: "mission-map-locations-title", text: t("MAP LEGEND") }),
-      el("p", { text: `▲ ${t("You · facing direction")}` }),
-      el("p", { text: `1–9 ${t("Locations (numbered)")}` }),
-      el("p", { text: `┄ ${t("Route to the current objective (SHOW ROUTE)")}` }),
-      el("p", { text: `◌ ${t("Unexplored area · not visited yet")}` }),
-    );
     if (this.flightMetrics) {
       this.flightMetrics.classList.add("flight-metrics--map");
       dataColumn.append(this.flightMetrics);
     }
     dataColumn.append(details);
     this.mapPanelSlot = el("div", { className: "mission-map-panel-slot" });
-    card.append(header, map, this.mapLocations, legend, dataColumn, this.mapPanelSlot);
+    card.append(header, map, this.mapLocations, dataColumn, this.mapPanelSlot);
     this.mapOverlay.append(card);
     container.append(this.mapOverlay);
   }
