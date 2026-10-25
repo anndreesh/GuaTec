@@ -11,6 +11,8 @@ export interface EngineeringProfile {
   testResponse: "modify" | "retest" | "accept-risk" | null;
   launchDecision: "proceed" | "delay" | null;
   riskTolerance: number;
+  /** Derived from persisted field-task results, never an independent save authority. */
+  fieldModifiers?: { mass: number; stability: number; data: number; cost: number };
 }
 
 export const DEFAULT_ENGINEERING: EngineeringProfile = {
@@ -53,10 +55,10 @@ export function calculateEngineering(profile: EngineeringProfile) {
   const instrumentation = INSTRUMENTATION_EFFECTS[profile.instrumentation];
   const priority = PRIORITY_EFFECTS[profile.priority];
   return {
-    mass: structure.mass,
-    stability: percent(structure.stability + instrumentation.stability + priority.stability),
+    mass: percent(structure.mass + (profile.fieldModifiers?.mass ?? 0)),
+    stability: percent(structure.stability + instrumentation.stability + priority.stability + (profile.fieldModifiers?.stability ?? 0)),
     reliability: percent(structure.reliability + instrumentation.reliability + priority.reliability),
-    data: percent(instrumentation.data + priority.data),
-    cost: Math.max(0, structure.cost + instrumentation.cost + priority.cost),
+    data: percent(instrumentation.data + priority.data + (profile.fieldModifiers?.data ?? 0)),
+    cost: Math.max(0, structure.cost + instrumentation.cost + priority.cost + (profile.fieldModifiers?.cost ?? 0)),
   };
 }

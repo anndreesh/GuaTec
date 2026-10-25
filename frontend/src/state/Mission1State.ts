@@ -19,6 +19,7 @@ import type { MissionObjectiveId } from "@/state/Mission01Objectives";
 import { MISSION_01_OBJECTIVES } from "@/state/Mission01Objectives";
 import { resolveFlight, type FlightResult } from "@/state/Mission01Launch";
 import { MISSION_01_STAGES } from "@/state/Mission01Events";
+import { FIELD_TASK_IDS, fieldTaskResult, isFieldTaskId, restoreFieldDraft, type FieldTaskId, type FieldTaskDraft, type MissionMiniGameResult } from "./Mission01FieldTasks";
 
 export type MissionEngineeringTask = "propulsion" | "circuits" | "antenna" | "diagnosis" | "launch";
 const TEST_ORDER = ["system", "instrumentation", "communications", "stability"] as const;
@@ -49,6 +50,9 @@ export class Mission1State {
   riskAccepted = false;
   extraTestRequired = false;
   engineeringTasks = new Set<MissionEngineeringTask>();
+  fieldResults = new Map<FieldTaskId, MissionMiniGameResult>();
+  fieldDrafts: Partial<Record<FieldTaskId, FieldTaskDraft>> = {};
+  routeChecks = new Set<string>();
 
   constructor(saved?: MissionSaveState) {
     this.resources = Object.fromEntries(
@@ -93,6 +97,32 @@ export class Mission1State {
         }
         this.objectives = this.validateSavedObjectives(Array.isArray(extra.objectives) ? extra.objectives as MissionObjectiveId[] : []);
         this.checkpoint = this.checkpointForObjectives();
+        this.routeChecks = new Set(stringArray(extra.routeChecks).filter(id => /^route-check-[123]$/.test(id)));
+        for (const result of Array.isArray(extra.fieldResults) ? extra.fieldResults : []) {
+          if (result && isFieldTaskId(result.id) && result.completed && Number.isFinite(result.attempts) && Number.isFinite(result.mistakes)) {
+            this.fieldResults.set(result.id, result.inherited
+              ? { ...fieldTaskResult(result.id), inherited: true, score: 0, effects: {} }
+              : fieldTaskResult(result.id, result.attempts, result.mistakes));
+          }
+        }
+        for (const id of FIELD_TASK_IDS) {
+          if (extra.fieldDrafts?.[id]) this.fieldDrafts[id] = restoreFieldDraft(extra.fieldDrafts[id]);
+        }
+        // Earned legacy checkpoints remain earned. New/uncompleted phases use the field tasks.
+        if (!extra.fieldVersion) {
+          const earned: Array<[boolean, FieldTaskId[]]> = [
+            [this.objectives.has("design"), ["assembly", "mass"]],
+            [this.objectives.has("testing"), ["calibration", "signal"]],
+            [this.objectives.has("prepare"), ["route", "weather"]],
+            [this.analyzed.has("Smoked Drum Flight Record"), ["recovery"]],
+          ];
+          for (const [completed, ids] of earned) if (completed) for (const id of ids) {
+            // Compatibility records explain migration and award no retroactive effects.
+            this.fieldResults.set(id, { ...fieldTaskResult(id), inherited: true, score: 0, effects: {} });
+          }
+          if (this.fieldResults.has("route")) for (const n of [1, 2, 3]) this.routeChecks.add(`route-check-${n}`);
+        }
+        this.refreshFieldModifiers();
       }
     }
   }
@@ -178,9 +208,57 @@ export class Mission1State {
 
   setEngineering(patch: Partial<EngineeringProfile>): void {
     this.engineering = { ...this.engineering, ...patch };
+    this.refreshFieldModifiers();
     const metrics = calculateEngineering(this.engineering);
     this.resources.stability = metrics.stability;
     this.resources.telemetry = metrics.data;
+  }
+
+  setFieldDraft(id: FieldTaskId, draft: FieldTaskDraft): void {
+    if (!this.fieldResults.has(id)) this.fieldDrafts[id] = restoreFieldDraft(draft);
+  }
+
+  inspectRoute(id: string): boolean {
+    if (!this.objectives.has("diagnose") || !/^route-check-[123]$/.test(id)) return false;
+    this.routeChecks.add(id);
+    return true;
+  }
+
+  completeFieldTask(result: MissionMiniGameResult): boolean {
+    if (!isFieldTaskId(result.id) || !result.completed) return false;
+    if (this.fieldResults.has(result.id)) return true;
+    const prerequisite = result.id === "assembly" || result.id === "mass" ? "prototype"
+      : result.id === "calibration" || result.id === "signal" ? "design"
+      : result.id === "recovery" ? "flight" : "diagnose";
+    if (!this.objectives.has(prerequisite)) return false;
+    if (result.id === "route" && this.routeChecks.size !== 3) return false;
+    if ((result.id === "assembly" || result.id === "mass") && this.testsRun.size > 0) return false;
+    if (!Number.isFinite(result.attempts) || !Number.isFinite(result.mistakes)) return false;
+    const accepted = fieldTaskResult(result.id, result.attempts, result.mistakes);
+    this.fieldResults.set(accepted.id, accepted);
+    delete this.fieldDrafts[accepted.id];
+    this.refreshFieldModifiers();
+    this.resources.stability = clamp(this.resources.stability + (accepted.effects.stability ?? 0), 0, 100);
+    this.resources.telemetry = clamp(this.resources.telemetry + (accepted.effects.dataQuality ?? 0), 0, 100);
+    this.engineering.budget = clamp(this.engineering.budget + (accepted.effects.budget ?? 0), 0, 100);
+    for (let i = 0; i < (accepted.effects.time ?? 0); i++) this.advanceTick();
+    this.addLogEntry(`FIELD RESULT — ${accepted.id}: ${accepted.score}/100 · ${accepted.attempts} attempts · ${accepted.mistakes} mistakes`);
+    return true;
+  }
+
+  get launchReadiness(): number {
+    return Math.min(100, [...this.fieldResults.values()].reduce((sum, result) => sum + (result.effects.launchReadiness ?? (result.score === 0 ? result.id === "route" ? 60 : result.id === "weather" ? 40 : 0 : 0)), 0));
+  }
+
+  private refreshFieldModifiers(): void {
+    const modifiers = { mass: 0, stability: 0, data: 0, cost: 0 };
+    for (const result of this.fieldResults.values()) {
+      modifiers.mass += result.effects.mass ?? 0;
+      modifiers.stability += result.effects.stability ?? 0;
+      modifiers.data += result.effects.dataQuality ?? 0;
+      modifiers.cost -= result.effects.budget ?? 0;
+    }
+    this.engineering.fieldModifiers = modifiers;
   }
 
   analyzeData(topic: string): void {
@@ -311,6 +389,8 @@ export class Mission1State {
         metNpcs: [...this.metNpcs], testsRun: [...this.testsRun], checklist: [...this.checklist],
         inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis, riskAccepted: this.riskAccepted,
         engineeringTasks: [...this.engineeringTasks], taskVersion: 1,
+        fieldVersion: 1, fieldResults: [...this.fieldResults.values()],
+        fieldDrafts: structuredClone(this.fieldDrafts), routeChecks: [...this.routeChecks],
       },
     };
   }
@@ -346,6 +426,7 @@ export class Mission1State {
       dataRecovered: this.resources.telemetry,
       optionalObjectives: [...this.objectives].filter((id) => id === "prototype" || id === "testing"),
       historicalRecords: [...this.records],
+      fieldResults: [...this.fieldResults.values()], launchReadiness: this.launchReadiness,
     };
   }
 

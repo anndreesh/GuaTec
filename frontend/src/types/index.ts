@@ -102,6 +102,10 @@ export interface MissionSaveState {
     riskAccepted?: boolean;
     engineeringTasks?: string[];
     taskVersion?: number;
+    fieldVersion?: number;
+    fieldResults?: import("@/state/Mission01FieldTasks").MissionMiniGameResult[];
+    fieldDrafts?: Partial<Record<import("@/state/Mission01FieldTasks").FieldTaskId, import("@/state/Mission01FieldTasks").FieldTaskDraft>>;
+    routeChecks?: string[];
   };
 }
 
@@ -119,6 +123,8 @@ export interface MissionReport {
   dataRecovered?: number;
   optionalObjectives?: string[];
   historicalRecords?: string[];
+  fieldResults?: import("@/state/Mission01FieldTasks").MissionMiniGameResult[];
+  launchReadiness?: number;
 }
 
 export interface InventoryItemDTO {
