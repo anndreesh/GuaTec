@@ -1286,6 +1286,7 @@ export function createGameplayLayer(
         camera.alpha = -Math.PI / 2;
         camera.beta = 1.05;
         camera.radius = cameraOffsetRadius;
+        camera.checkCollisions = true;
         followAstronaut();
         playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
@@ -1307,8 +1308,11 @@ export function createGameplayLayer(
         launchSupport.setRelease(0);
         rocketRoot.position.copyFrom(rocketStart);
         camera.lockedTarget = null;
-        camera.radius = 8.5;
-        camera.beta = 1.05;
+        // The vehicle is the cutscene target, not an obstacle for its camera.
+        camera.checkCollisions = false;
+        camera.radius = 18;
+        camera.beta = 1.2;
+        camera.alpha = Math.PI * 0.35;
         launchSmoke.start();
         launchFlame.start();
         outerFlame.setEnabled(true);
@@ -1329,9 +1333,9 @@ export function createGameplayLayer(
           camera.radius = 4.2;
         } else {
           camera.target.copyFrom(rocketRoot.position);
-          camera.alpha = -Math.PI / 2;
-          camera.beta = 1.1;
-          camera.radius = 8.5;
+          camera.alpha = Math.PI * 0.35;
+          camera.beta = 1.2;
+          camera.radius = 18;
         }
       },
       playOpeningCinematic(onDone) {
@@ -1589,6 +1593,7 @@ export function createGameplayLayer(
           camera.radius = 12;
         } else if (activeCameraMode === "observation") {
           camera.target.copyFrom(rocketRoot.position);
+          camera.target.y += 4.2 * rocketRoot.scaling.y;
           camera.alpha = -Math.PI * 0.45;
           camera.beta = 1.25;
           camera.radius = 16;
@@ -1599,7 +1604,7 @@ export function createGameplayLayer(
           camera.radius = 4.2;
         } else {
           camera.target.copyFrom(rocketRoot.position);
-          camera.target.y += 1.8;
+          camera.target.y += 4.2 * rocketRoot.scaling.y;
           if (launchElapsed < 2.5 && !reducedMotion) {
             camera.target.x += (Math.random() - 0.5) * 0.04;
             camera.target.y += (Math.random() - 0.5) * 0.04;
@@ -1608,7 +1613,7 @@ export function createGameplayLayer(
       } else if (openingElapsed < 0) {
         followAstronaut();
       }
-      if (launchElapsed >= 18) camera.radius = cameraOffsetRadius;
+      if (launchElapsed >= 18) { camera.radius = cameraOffsetRadius; camera.checkCollisions = true; }
 
       updateNearestPoi();
       mapStateCallback?.({

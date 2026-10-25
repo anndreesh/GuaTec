@@ -71,3 +71,5 @@
  to { opacity:1; transform:translate(-50%,0); }
 }
 @media (prefers-reduced-motion:reduce) { .interaction-prompt { animation:none; } }
+/* The flight is the scene to watch, so its overlay must not blur the launch. */
+.mission-launch-overlay--cinematic { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; }

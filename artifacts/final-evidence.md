@@ -43,6 +43,10 @@ Read all user-named installed skills plus director gameplay/UI/release reference
 
 Reviewed credential probe reports Tripo/Gemini/ElevenLabs keys missing. Existing locally bundled licensed workshop/PBR assets were reused; new apparatus and clothing geometry are project-authored. No generated asset task IDs exist and no paid job was submitted. Original asset provenance stays in `assetRegistry.ts` and `public/assets/workshop/sources.json`.
 
+## Launch presentation follow-up
+
+The public full-mission pass succeeded at fbea8e2. Capture review then found that the inherited modal blur/background obscured the flight and the camera could collide with its own target. The follow-up makes the flight overlay clear, frames the 8.4m vehicle from 18m and targets its center, and temporarily disables cinematic camera collision. A compiled-browser fixture verified backdrop-filter none, camera presets 18/16/4.2m via keys1/2/3, and restored camera collision plus unpaused controls after the flight. `launch-cinematic-clear.png` shows the inspected complete vehicle. This focused presentation check complements the unchanged progression pass.
+
 ## Publication
 
 Publish focused commits to the existing `anndreesh/GuaTec/main` production pipeline and verify the `Vercel – gua-tec` status and `https://gua-tec.vercel.app` asset/guest behavior. The graphics commit is `59be4fee09aaf5d98f302b8ccfeead05970646c3`; its main Vercel check succeeded and the public bundle contains the new training apparatus, tailored crew and input APIs. Do not change the unrelated `gua-tec-n78y` project; its preexisting backend check failure is separate. Final deployment results and commit identifiers are recorded after commit in the private `/Users/andres/.codex/Cambios.md` file.
