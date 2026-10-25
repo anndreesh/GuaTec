@@ -103,13 +103,15 @@
  min-width:0;
 }
 .mission-map-grid {
- height:clamp(220px,34vh,340px);
+ height:clamp(420px,65vh,500px);
  min-height:0;
+ align-self:stretch;
 }
 .mission-map-locations {
- height:clamp(220px,34vh,340px);
+ height:clamp(420px,65vh,500px);
  min-height:0;
  max-height:none;
+ align-self:stretch;
 }
 .mission-map-data-column .flight-metrics--map {
  display:block;
@@ -182,6 +184,9 @@
 }
 
 @media (max-width:720px) {
+ .mission-map-grid {
+  height:clamp(220px,42vh,340px);
+ }
  .mission-map-data-column {
   grid-column:auto;
   grid-row:auto;
