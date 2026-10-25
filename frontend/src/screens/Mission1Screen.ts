@@ -98,6 +98,8 @@ export class Mission1Screen implements Screen {
   private mapPlayer: HTMLElement | null = null;
   private mapRoute: HTMLElement | null = null;
   private mapDistance: HTMLElement | null = null;
+  private languageMenu: HTMLElement | null = null;
+  private languageMenuParent: HTMLElement | null = null;
   private mapState: GameplayMapState | null = null;
   private routeVisible = false;
   private renderedMapObjectiveId = "";
@@ -105,7 +107,13 @@ export class Mission1Screen implements Screen {
   private lastRadioAt = 0;
   private launchDayAnnounced = false;
   private readonly onMapKey = (event: KeyboardEvent) => {
-    if (event.key.toLowerCase() === "m" && !this.isTypingTarget(event.target)) this.toggleMap();
+    if (this.isTypingTarget(event.target)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.toggleMap();
+      return;
+    }
+    if (event.key.toLowerCase() === "m") this.toggleMap();
   };
   private readonly onPanelToggleKey = (event: KeyboardEvent) => {
     if (event.key.toLowerCase() === "h" && !this.isTypingTarget(event.target)) {
@@ -191,13 +199,6 @@ export class Mission1Screen implements Screen {
     this.phaseStepper = phaseStepper;
     container.append(panel);
     minimizeButton.addEventListener("click", () => this.togglePanel());
-    this.restorePanelButton = el("button", {
-      className: "btn btn-primary mission-panel-restore mission-panel-restore--hidden",
-      text: t("☰ Abrir panel"),
-      attrs: { type: "button", "aria-label": t("Abrir panel de misión") },
-    });
-    this.restorePanelButton.addEventListener("click", () => this.togglePanel(true));
-    container.append(this.restorePanelButton);
     window.addEventListener("keydown", this.onPanelToggleKey);
 
     this.modalRoot = el("div", { className: "modal-overlay modal-overlay--hidden" });
@@ -212,7 +213,6 @@ export class Mission1Screen implements Screen {
     container.append(this.toast);
 
     this.flightMetrics = el("aside", { className: "flight-metrics", attrs: { "aria-label": t("Instrumentos de vuelo") } });
-    container.append(this.flightMetrics);
     this.createFieldHud(container);
     this.createMissionMap(container);
     this.createMobileControls(container);
@@ -337,18 +337,28 @@ export class Mission1Screen implements Screen {
   }
 
   private createMissionMap(container: HTMLElement): void {
-    const button = el("button", {
-      className: "btn btn-ghost mission-map-button",
-      text: t("M Mapa"),
-      attrs: { type: "button", "aria-label": t("Abrir mapa de misión") },
-    });
-    button.addEventListener("click", () => this.toggleMap());
-    container.append(button);
-
     this.mapOverlay = el("div", { className: "mission-map-overlay mission-map-overlay--hidden" });
     const card = el("section", { className: "mission-map-card", attrs: { role: "dialog", "aria-label": t("Mapa de misión") } });
     const header = el("header", { className: "mission-map-header" });
     header.append(el("h2", { className: "modal-title", text: t("MISSION MAP") }));
+    const controls = el("div", {
+      className: "mission-map-controls",
+      attrs: { "aria-label": this.fieldText("Controles del mapa", "Map controls", "Contrôles de la carte") },
+    });
+    this.restorePanelButton = el("button", {
+      className: "btn btn-primary mission-panel-restore mission-panel-restore--hidden",
+      text: t("☰ Abrir panel"),
+      attrs: { type: "button", "aria-label": t("Abrir panel de misión") },
+    });
+    this.restorePanelButton.addEventListener("click", () => {
+      this.toggleMap(false);
+      this.togglePanel(true);
+    });
+    controls.append(this.restorePanelButton);
+    this.languageMenu = document.querySelector<HTMLElement>(".language-menu");
+    this.languageMenuParent = this.languageMenu?.parentElement ?? null;
+    if (this.languageMenu) controls.append(this.languageMenu);
+    header.append(controls);
     const close = el("button", { className: "btn btn-ghost", text: t("Cerrar"), attrs: { type: "button" } });
     close.addEventListener("click", () => this.toggleMap(false));
     header.append(close);
@@ -367,7 +377,8 @@ export class Mission1Screen implements Screen {
       el("p", { text: `┄ ${t("Route to the current objective (SHOW ROUTE)")}` }),
       el("p", { text: `◌ ${t("Unexplored area · not visited yet")}` }),
     );
-    card.append(header, map, this.mapLocations, legend, details);
+    if (this.flightMetrics) this.flightMetrics.classList.add("flight-metrics--map");
+    card.append(header, map, this.mapLocations, legend, details, this.flightMetrics ?? el("div"));
     this.mapOverlay.append(card);
     container.append(this.mapOverlay);
   }
@@ -449,29 +460,14 @@ export class Mission1Screen implements Screen {
     const checkpoint = el("span", { className: "field-hud-checkpoint" });
     const map = el("button", { className: "field-minimap", attrs: { type: "button", "aria-label": t("Abrir mapa de misión") } });
     this.minimap = el("canvas", { attrs: { width: "180", height: "180", "aria-hidden": "true" } });
-    map.append(this.minimap, el("span", { text: "N ↑ · M" }));
+    map.append(this.minimap, el("span", { text: "N ↑" }));
     map.addEventListener("click", () => this.toggleMap());
-    const quality = el("select", { attrs: { "aria-label": this.fieldText("Calidad gráfica", "Graphics quality", "Qualité graphique") } });
-    quality.append(el("option", { text: this.fieldText("Equilibrado", "Balanced", "Équilibré"), attrs: { value: "balanced" } }), el("option", { text: this.fieldText("Alto", "High", "Élevé"), attrs: { value: "high" } }));
-    let initialQuality: "high" | "balanced" = "balanced";
-    try { if (localStorage.getItem("guatec-graphics-quality") === "high") initialQuality = "high"; } catch { /* storage optional */ }
-    quality.value = initialQuality;
     const applyQuality = (): void => {
-      const profile = quality.value === "high" ? "high" : "balanced";
+      let profile: "high" | "balanced" = "balanced";
+      try { if (localStorage.getItem("guatec-graphics-quality") === "high") profile = "high"; } catch { /* storage optional */ }
       this.gameplay?.setQuality(profile);
-      try { localStorage.setItem("guatec-graphics-quality", profile); } catch { /* storage optional */ }
     };
-    quality.addEventListener("change", applyQuality);
-    const sound = el("button", { className: "field-hud-sound", attrs: { type: "button", "aria-pressed": String(missionAudio.isMuted()) }, text: missionAudio.isMuted() ? this.fieldText("Silencio", "Muted", "Muet") : this.fieldText("Sonido ✓", "Sound ✓", "Son ✓") });
-    sound.addEventListener("click", () => {
-      const muted = sound.getAttribute("aria-pressed") !== "true";
-      sound.setAttribute("aria-pressed", String(muted));
-      missionAudio.setMuted(muted);
-      sound.textContent = muted ? this.fieldText("Silencio", "Muted", "Muet") : this.fieldText("Sonido ✓", "Sound ✓", "Son ✓");
-    });
-    const tools = el("div", { className: "field-hud-tools" });
-    tools.append(quality, sound);
-    hud.append(top, objective, next, checkpoint, map, tools);
+    hud.append(top, objective, next, checkpoint, map);
     container.append(hud);
     // Gameplay is wired immediately after mounting the HUD.
     queueMicrotask(applyQuality);
@@ -2282,6 +2278,9 @@ export class Mission1Screen implements Screen {
     window.removeEventListener("keydown", this.onPanelToggleKey);
     window.removeEventListener("keydown", this.onMapKey);
     window.removeEventListener("keydown", this.onModalKey);
+    if (this.languageMenu && this.languageMenuParent) this.languageMenuParent.append(this.languageMenu);
+    this.languageMenu = null;
+    this.languageMenuParent = null;
     this.restorePanelButton = null;
     this.missionPanel = null;
     this.flightMetrics = null;

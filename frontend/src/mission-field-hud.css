@@ -64,6 +64,57 @@
 @media (max-width:700px) and (orientation:landscape) {
  .field-minimap { top:76px; left:auto; right:16px; }
 }
+
+/* The map is the pause surface for navigation and secondary controls. */
+.mission-map-controls {
+ display:flex;
+ align-items:center;
+ justify-content:flex-end;
+ gap:8px;
+ flex-wrap:wrap;
+}
+.mission-map-controls .mission-panel-restore {
+ position:static;
+ left:auto;
+ bottom:auto;
+ z-index:auto;
+ box-shadow:none;
+}
+.mission-map-controls .language-menu {
+ position:static;
+ top:auto;
+ right:auto;
+ z-index:auto;
+}
+.mission-map-controls .language-menu-trigger {
+ min-width:52px;
+ padding:7px 11px;
+}
+.mission-map-controls .language-menu-list {
+ right:0;
+}
+.mission-map-card > .flight-metrics--map {
+ display:block;
+ position:static;
+ grid-column:3;
+ grid-row:2 / span 2;
+ width:auto;
+ align-self:start;
+ z-index:auto;
+ pointer-events:auto;
+}
+.field-hud {
+ width:min(300px,calc(100vw - 40px));
+ padding:12px 14px;
+}
+
+@media (max-width:720px) {
+ .mission-map-card > .flight-metrics--map {
+  grid-column:auto;
+  grid-row:auto;
+ }
+}
+
 /* Keep centering during entry; the shared rise animation overwrites translateX. */
 .interaction-prompt { width:max-content; animation:field-prompt-in .25s ease; }
 @keyframes field-prompt-in {
