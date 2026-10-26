@@ -61,7 +61,7 @@ function noiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
 
 export const missionAudio = {
   /** Starts looping, low-passed wind. Call from a user gesture (e.g. the opening button). */
-  startWind(level = 0.12): void {
+  startWind(level = windLevel): void {
     const ctx = ensureContext();
     if (!ctx || windSource) return;
     try {
@@ -73,7 +73,8 @@ export const missionAudio = {
       filter.frequency.value = 500;
       const gain = ctx.createGain();
       windLevel = Math.max(0, Math.min(0.5, level));
-      gain.gain.value = windLevel;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.setTargetAtTime(windLevel, ctx.currentTime, 0.38);
       source.connect(filter).connect(gain).connect(ambienceBus ?? ctx.destination);
       source.start();
       windSource = source;
@@ -96,13 +97,19 @@ export const missionAudio = {
   },
 
   stopWind(): void {
+    const ctx = context;
+    const source = windSource;
+    const gain = windGain;
     try {
-      windSource?.stop();
+      if (ctx && gain && source) {
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.075);
+        source.stop(ctx.currentTime + 0.32);
+        source.onended = () => { source.disconnect(); gain.disconnect(); };
+      } else source?.stop();
     } catch {
       /* already stopped */
     }
-    windSource?.disconnect();
-    windGain?.disconnect();
     windSource = null;
     windGain = null;
   },
@@ -201,5 +208,42 @@ export const missionAudio = {
     if (footstepClock > 0) return;
     this.footstep(surface, running);
     footstepClock = running ? 0.31 : 0.43;
+  },
+
+  /** A short, dry latch/lever sound for physical mission interactions. */
+  mechanism(): void {
+    if (muted) return;
+    const ctx = ensureContext();
+    if (!ctx) return;
+    try {
+      footstepBuffer ??= noiseBuffer(ctx, 0.16);
+      const source = ctx.createBufferSource();
+      source.buffer = footstepBuffer;
+      source.playbackRate.value = 1.35 + Math.random() * 0.35;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = 1150;
+      const noiseGain = ctx.createGain();
+      const now = ctx.currentTime;
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.07, now + 0.004);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+      const tone = ctx.createOscillator();
+      tone.type = "triangle";
+      tone.frequency.setValueAtTime(260, now);
+      tone.frequency.exponentialRampToValueAtTime(145, now + 0.09);
+      const toneGain = ctx.createGain();
+      toneGain.gain.setValueAtTime(0.0001, now);
+      toneGain.gain.exponentialRampToValueAtTime(0.045, now + 0.006);
+      toneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+      source.connect(filter).connect(noiseGain).connect(effectsBus ?? ctx.destination);
+      tone.connect(toneGain).connect(effectsBus ?? ctx.destination);
+      source.start(now); source.stop(now + 0.08);
+      tone.start(now); tone.stop(now + 0.11);
+      source.onended = () => { source.disconnect(); filter.disconnect(); noiseGain.disconnect(); };
+      tone.onended = () => { tone.disconnect(); toneGain.disconnect(); };
+    } catch {
+      /* audio is optional */
+    }
   },
 };

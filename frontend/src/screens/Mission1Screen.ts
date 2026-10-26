@@ -732,6 +732,7 @@ export class Mission1Screen implements Screen {
     if (poiId.startsWith("route-check-")) { this.inspectRoutePoint(poiId); return; }
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
+    missionAudio.mechanism();
 
     // Story locations stay explorable, but their mission actions only unlock
     // after the required checkpoint has been completed.
