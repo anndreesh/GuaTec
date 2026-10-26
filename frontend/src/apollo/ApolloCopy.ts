@@ -43,6 +43,26 @@ const CHECKPOINT_COPY: Record<string, { title: Pair; objective: Pair }> = {
     title: ['Countdown and launch', 'Compte à rebours et lancement'],
     objective: ['Watch the Saturn V lift off from the remote point 5.6 km away, at 9:32 a.m. EDT.', 'Assistez au décollage du Saturn V depuis le point éloigné situé à 5,6 km, à 9 h 32 EDT.'],
   },
+  wiring: {
+    title: ['Link panel', 'Panneau de liaison'],
+    objective: ['Restore the outdoor panel link by connecting each wire to its terminal.', 'Rétablissez la liaison du panneau extérieur en reliant chaque câble à sa borne.'],
+  },
+  tracking: {
+    title: ['Antenna tracking', 'Poursuite d’antenne'],
+    objective: ['Align the dish with the tracking signal and keep the link stable.', 'Alignez la parabole sur le signal de poursuite et maintenez la liaison stable.'],
+  },
+  card: {
+    title: ['Access control', 'Contrôle d’accès'],
+    objective: ['Swipe your credential card through the reader to enter the observation area.', 'Passez votre carte d’accréditation dans le lecteur pour entrer dans la zone d’observation.'],
+  },
+  sequence: {
+    title: ['Sequence check', 'Vérification de séquence'],
+    objective: ['Repeat the light pattern on the pre-observation verification panel.', 'Répétez le motif lumineux du panneau de vérification précédant l’observation.'],
+  },
+  telemetry: {
+    title: ['Tracking telemetry', 'Télémétrie de suivi'],
+    objective: ['Stabilize the telemetry signal by keeping the reticle on it.', 'Stabilisez le signal de télémétrie en gardant le réticule dessus.'],
+  },
   epilogue: {
     title: ['The beginning of a new era', 'Le début d’une nouvelle ère'],
     objective: ['Read the epilogue and complete the mission log.', 'Consultez l’épilogue et terminez le registre de la mission.'],
@@ -122,6 +142,26 @@ const ACTION_COPY: Record<string, { label: Pair; description: Pair }> = {
     label: ['Watch the launch', 'Assister au lancement'],
     description: ['The ignition of the five F-1 engines precedes liftoff. The count, the cameras and the communications are an original dramatization.', 'L’allumage des cinq moteurs F-1 précède le décollage. Le compte à rebours, les caméras et les communications sont une dramatisation originale.'],
   },
+  'wire-panel': {
+    label: ['Connect the panel wires', 'Connecter les câbles du panneau'],
+    description: ['Minigame: drag each wire to the terminal of its color. Three wrong connections cause a short circuit and the panel resets.', 'Mini-jeu : faites glisser chaque câble vers la borne de sa couleur. Trois mauvaises connexions provoquent un court-circuit et le panneau se réinitialise.'],
+  },
+  'align-dish': {
+    label: ['Align the antenna', 'Aligner l’antenne'],
+    description: ['Minigame: adjust azimuth and elevation until you pick up the signal and hold the lock for 3 seconds. The source drifts slowly.', 'Mini-jeu : réglez l’azimut et l’élévation jusqu’à capter le signal et maintenez le verrouillage 3 secondes. La source dérive lentement.'],
+  },
+  'swipe-card': {
+    label: ['Swipe the card', 'Passer la carte'],
+    description: ['Minigame: swipe the card through the slot at a medium speed and in a straight line. Two valid reads in a row are required.', 'Mini-jeu : passez la carte dans la fente à vitesse moyenne et en ligne droite. Deux lectures valides consécutives sont nécessaires.'],
+  },
+  'repeat-pattern': {
+    label: ['Repeat the pattern', 'Répéter le motif'],
+    description: ['Minigame: memorize the light pattern and repeat it; each round adds one step. Three mistakes restart the check.', 'Mini-jeu : mémorisez le motif lumineux et répétez-le ; chaque manche ajoute une étape. Trois erreurs relancent la vérification.'],
+  },
+  'stabilize-signal': {
+    label: ['Stabilize the signal', 'Stabiliser le signal'],
+    description: ['Minigame: keep the reticle inside the ring that follows the signal until stability reaches 100%.', 'Mini-jeu : gardez le réticule dans l’anneau qui suit le signal jusqu’à atteindre 100 % de stabilité.'],
+  },
   finish: {
     label: ['Complete mission', 'Terminer la mission'],
     description: ['On July 16, Apollo 11 left Earth. On July 20, Armstrong and Aldrin landed in Eagle while Collins stayed in lunar orbit.', 'Le 16 juillet, Apollo 11 a quitté la Terre. Le 20 juillet, Armstrong et Aldrin se sont posés à bord d’Eagle tandis que Collins restait en orbite lunaire.'],
@@ -166,6 +206,16 @@ const DIALOGUE_COPY: Record<string, Pair> = {
   'documentation-complete': ['Support report received. Identification and observations complete. Continue to the communications station.', 'Rapport de soutien reçu. Identification et observations terminées. Poursuivez vers la station de communications.'],
   'communications-enter': ['We need to keep communication clear with the other stations. Recognize the signal and report that our support link is ready.', 'Nous devons maintenir une communication claire avec les autres stations. Reconnaissez le signal et indiquez que notre liaison de soutien est prête.'],
   'communications-complete': ['I read you loud and clear. Support station ready. Before we move, we will look back at how this morning began for the crew.', 'Je vous reçois clairement. Station de soutien prête. Avant de nous déplacer, nous allons revoir comment cette matinée a commencé pour l’équipage.'],
+  'wiring-enter': ['An outdoor panel lost its link after the last check. Connect each wire to its terminal and avoid short circuits.', 'Un panneau extérieur a perdu sa liaison après la dernière vérification. Reliez chaque câble à sa borne et évitez les courts-circuits.'],
+  'wiring-complete': ['Panel link restored. Good work; now it is time to review the communications log.', 'Liaison du panneau rétablie. Bon travail ; il est maintenant temps de revoir le registre des communications.'],
+  'tracking-enter': ['The antenna must point precisely. Adjust azimuth and elevation and keep the link stable for a few seconds; the source moves slowly.', 'L’antenne doit pointer avec précision. Réglez l’azimut et l’élévation et maintenez la liaison stable quelques secondes ; la source bouge lentement.'],
+  'tracking-complete': ['Antenna aligned. With the signal stable we can recognize it and report that the station is ready.', 'Antenne alignée. Le signal étant stable, nous pouvons le reconnaître et indiquer que la station est prête.'],
+  'card-enter': ['To enter the observation area you need clearance. Swipe your card through the reader, not too fast and not too slow.', 'Pour entrer dans la zone d’observation, vous avez besoin d’une accréditation. Passez votre carte dans le lecteur, ni trop vite ni trop lentement.'],
+  'card-complete': ['Access granted. Two checks remain before you reach the observation point.', 'Accès accordé. Il reste deux vérifications avant d’arriver au point d’observation.'],
+  'sequence-enter': ['This check confirms the panel responds. Watch the light pattern and repeat it in the same order.', 'Cette vérification confirme que le panneau répond. Observez le motif lumineux et répétez-le dans le même ordre.'],
+  'sequence-complete': ['Sequence verified. The tracking telemetry still needs to be stabilized.', 'Séquence vérifiée. Il reste à stabiliser la télémétrie de suivi.'],
+  'telemetry-enter': ['The telemetry signal is drifting. Keep the reticle on it until it settles completely.', 'Le signal de télémétrie dérive. Gardez le réticule dessus jusqu’à ce qu’il se stabilise complètement.'],
+  'telemetry-complete': ['Telemetry stable. You can now head to the observation point.', 'Télémétrie stable. Vous pouvez maintenant vous diriger vers le point d’observation.'],
   'crew-enter': ['This recreation goes back to the early hours of today. There go Armstrong, Collins and Aldrin. After years of preparation, their journey is about to begin.', 'Cette reconstitution revient sur les premières heures de la journée. Les voilà : Armstrong, Collins et Aldrin. Après des années de préparation, leur voyage est sur le point de commencer.'],
   'crew-complete': ['Back to the final preparations. Our work here is done. It is time to head to the observation area.', 'Retour aux derniers préparatifs. Notre travail ici est terminé. Il est temps de nous rendre dans la zone d’observation.'],
   'observation-enter': ['Prepare the camera and check the audio from the marked area. I want you to remember what you are about to see: a journey to another world does not begin every day.', 'Préparez la caméra et vérifiez l’audio depuis la zone indiquée. Je veux que vous reteniez ce que vous allez voir : un voyage vers un autre monde ne commence pas tous les jours.'],
@@ -391,6 +441,7 @@ const UI = {
   promptCrew: ['E · Observar a la tripulación', 'E · Watch the crew', 'E · Observer l’équipage'],
   promptLaunch: ['E · Presenciar el lanzamiento', 'E · Watch the launch', 'E · Assister au lancement'],
   promptExamine: ['E · Examinar estación', 'E · Examine station', 'E · Examiner la station'],
+  promptPlay: ['E · Iniciar la tarea', 'E · Start the task', 'E · Lancer la tâche'],
 } as const satisfies Record<string, L3>;
 
 export type UiKey = keyof typeof UI;
@@ -406,9 +457,9 @@ export const COUNTDOWN: readonly L3[] = [
   ['Cinco…', 'Five…', 'Cinq…'], ['Cuatro…', 'Four…', 'Quatre…'], ['Tres…', 'Three…', 'Trois…'], ['Dos…', 'Two…', 'Deux…'], ['Uno…', 'One…', 'Un…'],
 ];
 
-export const checkpointKicker = (n: number): string => lt([`CHECKPOINT ${n} / 8`, `CHECKPOINT ${n} / 8`, `POINT DE CONTRÔLE ${n} / 8`]);
+export const checkpointKicker = (n: number): string => lt([`CHECKPOINT ${n} / ${CHECKPOINTS.length}`, `CHECKPOINT ${n} / ${CHECKPOINTS.length}`, `POINT DE CONTRÔLE ${n} / ${CHECKPOINTS.length}`]);
 export const checkpointDone = (n: number): string => lt([`CHECKPOINT ${n} COMPLETADO`, `CHECKPOINT ${n} COMPLETED`, `POINT DE CONTRÔLE ${n} TERMINÉ`]);
-export const resumeText = (n: number): string => lt([`Registro recuperado · ${n} de 8 checkpoints completados.`, `Log restored · ${n} of 8 checkpoints completed.`, `Registre récupéré · ${n} points de contrôle sur 8 terminés.`]);
+export const resumeText = (n: number): string => lt([`Registro recuperado · ${n} de ${CHECKPOINTS.length} checkpoints completados.`, `Log restored · ${n} of ${CHECKPOINTS.length} checkpoints completed.`, `Registre récupéré · ${n} points de contrôle sur ${CHECKPOINTS.length} terminés.`]);
 export const distanceTravelled = (title: string, meters: number): string => lt([`${title} · ${meters} m de recorrido simulado`, `${title} · ${meters} m of simulated travel`, `${title} · ${meters} m de parcours simulé`]);
 
 // ------------------------------------------------------------- 3D scene signs
@@ -426,12 +477,22 @@ export const WORLD_TEXT = {
   s2: ['RECONOCIMIENTO', 'RECONNAISSANCE', 'RECONNAISSANCE'],
   s2sub: ['02 · OBSERVACIÓN DEL COMPLEJO', '02 · COMPLEX OBSERVATION', '02 · OBSERVATION DU COMPLEXE'],
   s3: ['DOCUMENTACIÓN', 'DOCUMENTATION', 'DOCUMENTATION'],
-  s3sub: ['03 · REGISTRO DE COMUNICACIONES', '03 · COMMUNICATIONS LOG', '03 · REGISTRE DES COMMUNICATIONS'],
+  s3sub: ['04 · REGISTRO DE COMUNICACIONES', '04 · COMMUNICATIONS LOG', '04 · REGISTRE DES COMMUNICATIONS'],
   s4: ['COMUNICACIONES', 'COMMUNICATIONS', 'COMMUNICATIONS'],
-  s4sub: ['04 · ESTACIÓN DE APOYO', '04 · SUPPORT STATION', '04 · STATION DE SOUTIEN'],
+  s4sub: ['06 · ESTACIÓN DE APOYO', '06 · SUPPORT STATION', '06 · STATION DE SOUTIEN'],
   s5: ['LA TRIPULACIÓN', 'THE CREW', 'L’ÉQUIPAGE'],
-  s5sub: ['05 · RECREACIÓN HISTÓRICA', '05 · HISTORICAL RECREATION', '05 · RECONSTITUTION HISTORIQUE'],
+  s5sub: ['07 · RECREACIÓN HISTÓRICA', '07 · HISTORICAL RECREATION', '07 · RECONSTITUTION HISTORIQUE'],
   s6: ['OBSERVACIÓN', 'OBSERVATION', 'OBSERVATION'],
-  s6sub: ['06 · CÁMARA DE SEGUIMIENTO', '06 · TRACKING CAMERA', '06 · CAMÉRA DE SUIVI'],
+  s6sub: ['11 · CÁMARA DE SEGUIMIENTO', '11 · TRACKING CAMERA', '11 · CAMÉRA DE SUIVI'],
+  sWiring: ['PANEL DE ENLACE', 'LINK PANEL', 'PANNEAU DE LIAISON'],
+  sWiringSub: ['03 · CABLEADO EXTERIOR', '03 · OUTDOOR WIRING', '03 · CÂBLAGE EXTÉRIEUR'],
+  sTracking: ['SEGUIMIENTO', 'TRACKING', 'POURSUITE'],
+  sTrackingSub: ['05 · ALINEACIÓN DE ANTENA', '05 · ANTENNA ALIGNMENT', '05 · ALIGNEMENT D’ANTENNE'],
+  sCard: ['CONTROL DE ACCESO', 'ACCESS CONTROL', 'CONTRÔLE D’ACCÈS'],
+  sCardSub: ['08 · LECTOR DE TARJETAS', '08 · CARD READER', '08 · LECTEUR DE CARTES'],
+  sSequence: ['VERIFICACIÓN', 'VERIFICATION', 'VÉRIFICATION'],
+  sSequenceSub: ['09 · SECUENCIA DE LUCES', '09 · LIGHT SEQUENCE', '09 · SÉQUENCE LUMINEUSE'],
+  sTelemetry: ['TELEMETRÍA', 'TELEMETRY', 'TÉLÉMÉTRIE'],
+  sTelemetrySub: ['10 · ESTABILIZACIÓN DE SEÑAL', '10 · SIGNAL STABILIZATION', '10 · STABILISATION DU SIGNAL'],
 } as const satisfies Record<string, L3>;
 export const world = (key: keyof typeof WORLD_TEXT): string => lt(WORLD_TEXT[key]);
