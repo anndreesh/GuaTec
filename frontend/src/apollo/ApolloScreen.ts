@@ -334,9 +334,9 @@ export class ApolloScreen implements Screen {
     const mute=this.iconButton(this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume,this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();paintMute();});
     const paintMute=()=>{const label=this.audio.muted?'Activar audio':'Silenciar audio';mute.setAttribute('aria-label',label);mute.title=label;mute.querySelector('.ap-icon')!.innerHTML=this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume;mute.querySelector('small')!.textContent=label;};
     tools.append(mute,this.iconButton(PAUSE_ICONS.restart,'Reiniciar misión',()=>this.confirmReset()),this.iconButton(PAUSE_ICONS.back,'Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
-    box.append(tools);
     const languageMenu=document.querySelector<HTMLElement>('.language-menu');
-    if(languageMenu){this.languageMenu=languageMenu;this.languageParent=languageMenu.parentElement;const languageSlot=el('div','ap-pause-language');languageSlot.append(languageMenu);box.append(languageSlot);}
+    if(languageMenu){this.languageMenu=languageMenu;this.languageParent=languageMenu.parentElement;const languageSlot=el('div','ap-pause-language');languageSlot.append(languageMenu);tools.append(languageSlot);}
+    box.append(tools);
     box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
     const mapBox=el('div','ap-pause-map'); const mapCanvas=el('canvas','ap-large-map'); mapCanvas.width=720; mapCanvas.height=540; this.drawMap(mapCanvas);
     mapBox.append(el('small','ap-kicker','MAPA DE OPERACIONES'),mapCanvas); box.append(mapBox);
