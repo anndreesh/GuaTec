@@ -4,6 +4,7 @@
 @media(prefers-reduced-motion:reduce){.ap-radio,.ap-button,.ap-cinema{transition:none}}
 
 body.apollo-cinematic .language-menu{visibility:hidden}
+body:has(.apollo-screen.ap-playing) #app>.language-menu{display:none}
 @media(max-width:520px){.ap-mark{flex:0 0 65px}.ap-mark b{font-size:15px;letter-spacing:.12em}.ap-mark b span{display:block}.ap-controls{margin-right:72px;flex-shrink:0}.ap-controls .ap-button{font-size:9px;padding:7px;min-width:38px}.ap-objective>small:first-child{display:block;font-size:8px}.ap-progress{float:none;display:block;margin-top:5px;font-size:10px}}
 .ap-pause-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .ap-icon-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:12px 8px}
