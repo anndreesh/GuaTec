@@ -7,6 +7,7 @@ import { ApolloState, CHECKPOINTS } from './ApolloState';
 import { ApolloWorld } from './ApolloWorld';
 import { ApolloAudio } from './ApolloAudio';
 import { ApolloDialogue } from './ApolloDialogue';
+import { MINIGAME_BY_CHECKPOINT, mountMinigame, type MinigameHandle, type MinigameId } from './ApolloMinigames';
 import { COUNTDOWN, INTRO_LINES, QUESTIONS, actionText, characterText, checkpointDone, checkpointKicker, checkpointText, distanceTravelled, lt, resumeText, txt, ui, type Txt, type UiKey } from './ApolloCopy';
 import './apollo.css';
 
@@ -54,6 +55,7 @@ export class ApolloScreen implements Screen {
   private prompt!: HTMLButtonElement;
   private map!: HTMLCanvasElement;
   private modal: HTMLElement | null = null;
+  private minigame: MinigameHandle | null = null;
   private movie: 'intro'|'crew'|'launch'|null = null;
   private movieTime=0;
   private movieOverlay: HTMLElement | null=null;
@@ -100,7 +102,7 @@ export class ApolloScreen implements Screen {
   /** Re-renders every visible string in the active language without rebuilding the scene. */
   refreshLanguage() {
     if(this.disposed) return;
-    applyBindings();
+    applyBindings(); this.minigame?.refresh();
     this.renderObjective(); this.updateNavigation();
     this.dialogue?.refreshLanguage();
     if(this.map) this.drawMap(this.map);
@@ -189,7 +191,7 @@ export class ApolloScreen implements Screen {
   private renderObjective() {
     if(!this.hud) return;
     const cp=this.state.current, copy=checkpointText(cp.id); this.hud.replaceChildren();
-    this.hud.append(el('small','',ui('objectiveSmall')),el('span','ap-progress',`${String(this.state.completed.length).padStart(2,'0')} / 08`),el('h2','',copy.title),el('p','',copy.objective));
+    this.hud.append(el('small','',ui('objectiveSmall')),el('span','ap-progress',`${String(this.state.completed.length).padStart(2,'0')} / ${String(CHECKPOINTS.length).padStart(2,'0')}`),el('h2','',copy.title),el('p','',copy.objective));
     const checklist=el('div','ap-checklist');
     for(const action of cp.actions) checklist.append(el('span',this.state.checks.includes(action.id)?'ap-checked':'',`${this.state.checks.includes(action.id)?'✓':'·'} ${actionText(action.id).label}`));
     this.hud.append(checklist,el('small','ap-save',this.saveText()));
@@ -197,15 +199,15 @@ export class ApolloScreen implements Screen {
   }
   private enterCheckpoint() {
     this.activeIndex=this.state.checkpoint; this.dialogue.enter(); this.renderObjective();
-    if(this.state.checkpoint===7 && !this.state.done) {
+    if(this.state.current.id==='epilogue' && !this.state.done) {
       this.showEnd();
     }
   }
   private act(id:string) {
-    const before=this.state.checkpoint;
+    const before=this.state.checkpoint, beforeId=this.state.current.id;
     if(!this.state.act(id)) return false;
     void this.save(); this.renderObjective();
-    if(before===5 && this.state.checkpoint===6) {
+    if(beforeId==='observation' && this.state.current.id==='launch') {
       this.world.player.set(0,0,5600);
       this.notify(()=>ui('transferDone'));
     }
@@ -218,12 +220,25 @@ export class ApolloScreen implements Screen {
   private interact() {
     if(!this.started || this.paused || this.modal || this.movie || this.state.done) return;
     if(this.distance()>15) {this.notify(()=>ui('followMarker'));return;}
-    const index=this.state.checkpoint;
-    if(index===4) {this.beginMovie('crew');return;}
-    if(index===6) {this.beginMovie('launch');return;}
-    if(index===7) {this.showEnd();return;}
+    const id=this.state.current.id;
+    if(id==='crew') {this.beginMovie('crew');return;}
+    if(id==='launch') {this.beginMovie('launch');return;}
+    if(id==='epilogue') {this.showEnd();return;}
+    const game=MINIGAME_BY_CHECKPOINT[id];
+    if(game) {this.openMinigame(game);return;}
     this.showStation();
   }
+  /** Skill-based checkpoints: the minigame replaces the station menu and its win completes the single action. */
+  private openMinigame(game:MinigameId) {
+    const cp=this.state.current, action=cp.actions[0].id;
+    const box=this.openModal(()=>checkpointKicker(this.state.checkpoint+1),()=>checkpointText(cp.id).title);
+    box.classList.add('ap-mg-box');
+    this.minigame=mountMinigame(game,box,{
+      onWin:()=>{ if(this.disposed)return; this.act(action); if(this.modal)this.closeModal(); },
+      onExit:()=>this.closeModal(),
+    });
+  }
+  private stopMinigame() { this.minigame?.dispose(); this.minigame=null; }
   private showStation() {
     const cp=this.state.current, box=this.openModal(()=>checkpointKicker(this.state.checkpoint+1),()=>checkpointText(cp.id).title);
     box.append(el('p','',()=>checkpointText(cp.id).objective));
@@ -259,8 +274,8 @@ export class ApolloScreen implements Screen {
     box.append(feedback,this.button(()=>ui('backToLog'),()=>this.showStation()));
   }
   private beginMovie(mode:'intro'|'crew'|'launch') {
-    if(mode==='crew' && (this.state.checkpoint!==4 || this.distance()>15)) return;
-    if(mode==='launch' && (this.state.checkpoint!==6 || this.distance()>15)) return;
+    if(mode==='crew' && (this.state.current.id!=='crew' || this.distance()>15)) return;
+    if(mode==='launch' && (this.state.current.id!=='launch' || this.distance()>15)) return;
     this.closeModal(); this.dialogue.clear(); this.movie=mode; this.movieTime=0; this.world.setSuspended(true);
     this.movieOverlay=el('div','ap-cinema'); this.root.append(this.movieOverlay); this.root.classList.add('ap-in-cinema'); document.body.classList.add('apollo-cinematic');
     if(mode==='intro') this.movieOverlay.append(this.button(()=>ui('skipIntro'),()=>this.finishMovie(),'ap-skip'));
@@ -320,7 +335,7 @@ export class ApolloScreen implements Screen {
       if(!this.state.done)this.act('finish');
       void this.save().then(async()=>{
         // The summary is a stable Spanish key; the report screen translates it with t().
-        try { await progressApi.complete(SLUG,{ticksSurvived:Math.floor(this.state.elapsed),decisionsMade:19,samplesCollected:0,finalResources:{fuel:100,pressure:100,stability:100,telemetry:100},outcome:'success',summary:'Apollo 11: ocho checkpoints de apoyo terrestre completados; traslado y lanzamiento observados desde el área segura.'}); } catch { this.notify(()=>ui('reportQueued')); }
+        try { await progressApi.complete(SLUG,{ticksSurvived:Math.floor(this.state.elapsed),decisionsMade:19,samplesCollected:0,finalResources:{fuel:100,pressure:100,stability:100,telemetry:100},outcome:'success',summary:'Apollo 11: trece checkpoints de apoyo terrestre completados; traslado y lanzamiento observados desde el área segura.'}); } catch { this.notify(()=>ui('reportQueued')); }
         return this.app.showMissionSelect();
       });
     },'ap-button ap-primary'));
@@ -331,7 +346,7 @@ export class ApolloScreen implements Screen {
     this.languageMenu=null; this.languageParent=null;
   }
   private openModal(kicker:Txt,title:Txt) {
-    this.restoreLanguageMenu(); this.modal?.remove(); this.previousFocus=document.activeElement as HTMLElement|null;
+    this.stopMinigame(); this.restoreLanguageMenu(); this.modal?.remove(); this.previousFocus=document.activeElement as HTMLElement|null;
     const overlay=el('div','ap-modal'); const box=el('section','ap-dialog');
     box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); bindAttr(box,'aria-label',title); box.tabIndex=-1;
     box.append(el('small','ap-kicker',kicker),el('h1','',title)); overlay.append(box); this.root.append(overlay); this.modal=overlay;
@@ -346,7 +361,7 @@ export class ApolloScreen implements Screen {
     box.focus(); return box;
   }
   private closeModal() {
-    this.restoreLanguageMenu(); this.modal?.remove();this.modal=null;this.paused=false;
+    this.stopMinigame(); this.restoreLanguageMenu(); this.modal?.remove();this.modal=null;this.paused=false;
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
   }
@@ -402,7 +417,7 @@ export class ApolloScreen implements Screen {
     const [rx,rz]=p(0,0);c.fillStyle='#b55c4a30';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#c37463';c.lineWidth=1;c.stroke();
     c.font=`${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#afc1c2';c.fillText('N ↑',10,20);c.fillText('39A',rx+10,rz+4);
     c.fillStyle='#a7b9b5';c.fillText('↖ VAB · 1 km',8,Math.max(36,h*.18));
-    CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);c.fillStyle=this.state.completed.includes(cp.id)?'#8eba9d':i===this.state.checkpoint?'#f4be67':'#597275';c.beginPath();c.arc(x,z,i===this.state.checkpoint?6:3,0,Math.PI*2);c.fill();if(w>300)c.fillText(`${i+1}. ${checkpointText(cp.id).title}`,x+10,z+5);});
+    CHECKPOINTS.forEach((cp,i)=>{if(cp.target.z>1000)return;const [x,z]=p(cp.target.x,cp.target.z);c.fillStyle=this.state.completed.includes(cp.id)?'#8eba9d':i===this.state.checkpoint?'#f4be67':'#597275';c.beginPath();c.arc(x,z,i===this.state.checkpoint?6:3,0,Math.PI*2);c.fill();if(w>300)c.fillText(i===this.state.checkpoint?`${i+1}. ${checkpointText(cp.id).title}`:String(i+1),x+10,z+5);});
     const target=this.state.current.target;
     const remote=this.world.player.z>5000;
     const [tx,tz]=p(target.x,remote?355:target.z),[px,pz]=p(this.world.player.x,remote?355:this.world.player.z);
@@ -432,7 +447,7 @@ export class ApolloScreen implements Screen {
     const links:[Txt,string][]=[[()=>ui('crLinkNasa'),'https://www.nasa.gov/mission/apollo-11/'],[()=>ui('crLinkLaunch'),'https://www.nasa.gov/history/50-years-ago-apollo-11-off-to-the-moon/'],['Mercenary Astronaut · Peter_D · CC BY 4.0','https://sketchfab.com/3d-models/mercenary-astronaut-7fd399d488ae4576a0fc62715892956c'],[()=>ui('crLinkLicense'),'https://creativecommons.org/licenses/by/4.0/']];
     for(const [label,url]of links){const a=el('a','ap-link',label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
     box.append(el('p','ap-note',()=>ui('crNote')));
-    box.append(this.button(()=>ui('back'),()=>{this.closeModal();if(this.state.checkpoint===7)this.showEnd();else if(!this.started)this.showWelcome();}));
+    box.append(this.button(()=>ui('back'),()=>{this.closeModal();if(this.state.current.id==='epilogue')this.showEnd();else if(!this.started)this.showWelcome();}));
   }
   private notify(text:Txt) {
     this.root.querySelector('.ap-toast')?.remove();const n=el('div','ap-toast',typeof text==='function'?text:txt(text));n.setAttribute('role','status');this.root.append(n);
@@ -444,7 +459,7 @@ export class ApolloScreen implements Screen {
     try {localStorage.setItem(this.localKey,JSON.stringify({state:snapshot,savedAt}));this.saveKey='saveLocalSync';} catch {this.saveKey='saveNoLocalSync';}
     const wire={tick:Math.floor(this.state.elapsed),resources:{fuel:100,pressure:100,stability:100,telemetry:100},resolvedDecisionIds:[],log:[],apollo11:snapshot,apollo11SavedAt:savedAt} as unknown as MissionSaveState;
     this.saveQueue=this.saveQueue.catch(()=>{}).then(async()=>{
-      try {await progressApi.autosave(SLUG,wire,snapshot.completed.length/8*100);this.saveKey='saveSynced';}
+      try {await progressApi.autosave(SLUG,wire,snapshot.completed.length/CHECKPOINTS.length*100);this.saveKey='saveSynced';}
       catch {this.saveKey='saveLocalOffline';}
       if(!this.disposed)this.renderObjective();
     });
@@ -475,9 +490,9 @@ export class ApolloScreen implements Screen {
   };
   private updateNavigation() {
     if(!this.prompt)return;
-    const near=this.distance()<=15;
+    const near=this.distance()<=15, cid=this.state.current.id;
     this.prompt.hidden=!this.started || this.paused || !!this.movie || this.state.done;
-    this.prompt.textContent=near?(this.state.checkpoint===4?ui('promptCrew'):this.state.checkpoint===6?ui('promptLaunch'):ui('promptExamine')):`${Math.round(this.distance())} m · ${checkpointText(this.state.current.id).title}`;
+    this.prompt.textContent=near?(cid==='crew'?ui('promptCrew'):cid==='launch'?ui('promptLaunch'):MINIGAME_BY_CHECKPOINT[cid]?ui('promptPlay'):ui('promptExamine')):`${Math.round(this.distance())} m · ${checkpointText(this.state.current.id).title}`;
     this.prompt.disabled=!near;
     if(this.uiTarget) {this.uiTarget.hidden=!!this.movie || this.paused;this.uiTarget.textContent=`◇ ${Math.round(this.distance())} m`;}
   }
@@ -490,6 +505,6 @@ export class ApolloScreen implements Screen {
     this.disposed=true;cancelAnimationFrame(this.raf);clearTimeout(this.flashTimer);
     document.removeEventListener('keydown',this.onKey);document.removeEventListener('visibilitychange',this.onVisibility);
     window.removeEventListener('resize',this.onResize);window.removeEventListener('pagehide',this.onPageHide);
-    this.audio.dispose();this.world?.dispose();this.restoreLanguageMenu();this.modal?.remove();this.root?.remove();bindings.clear();
+    this.stopMinigame();this.audio.dispose();this.world?.dispose();this.restoreLanguageMenu();this.modal?.remove();this.root?.remove();bindings.clear();
   }
 }
