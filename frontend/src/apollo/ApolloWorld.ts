@@ -23,6 +23,11 @@ export class ApolloWorld {
   yaw = 0;
   private pitch = 0.28;
   private zoomed = false;
+  /** Jump: vertical velocity (m/s) and a queued Space press, consumed when the player is on the ground. */
+  private vy = 0;
+  private jumpQueued = false;
+  /** The Mercenary Astronaut GLB faces +Z; the procedural fallback suit faces -Z. */
+  private facingOffset = Math.PI;
   private keys = new Set<string>();
   private suspended = false;
   private disposed = false;
@@ -619,6 +624,7 @@ export class ApolloWorld {
     } catch (error) {
       this.assetErrors.push(`Mercenary Astronaut: ${String(error)}`);
       // Failure remains visible in diagnostics. A local authored suit preserves play.
+      this.facingOffset = 0;
       this.addFallbackSuit(this.playerRoot);
       for (let i = 0; i < 3; i++) { const root = new THREE.Group(); this.addFallbackSuit(root); this.crewRoot.add(root); this.crew.push(root); }
       this.crewRoot.visible = false;
@@ -685,13 +691,24 @@ export class ApolloWorld {
     // Substeps cap wall crossings even after a slow frame.
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.25));
     for (let i = 0; i < steps; i++) { if (this.canMove(this.player.x + dx / steps, this.player.z)) this.player.x += dx / steps; if (this.canMove(this.player.x, this.player.z + dz / steps)) this.player.z += dz / steps; }
-    this.playerRoot.rotation.y = Math.atan2(-dx, -dz);
+    this.playerRoot.rotation.y = Math.atan2(-dx, -dz) + this.facingOffset;
     return true;
+  }
+  /** Simple ballistic jump (about 1.1 m apex); ignored while paused, in cinematics and at the 5.6 km site. */
+  private stepJump(dt: number): void {
+    if (this.suspended || this.mode || this.player.z > 5000) { this.player.y = 0; this.vy = 0; this.jumpQueued = false; return; }
+    if (this.jumpQueued && this.player.y === 0) this.vy = 6.2;
+    this.jumpQueued = false;
+    if (this.vy !== 0 || this.player.y > 0) {
+      this.vy -= 17 * dt; this.player.y = Math.max(0, this.player.y + this.vy * dt);
+      if (this.player.y === 0) this.vy = 0;
+    }
   }
   update(dt: number): void {
     if (this.disposed) return;
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
     dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
+    this.stepJump(dt);
     const moving = this.move(dt); this.playerRoot.position.copy(this.player);
     // The observation site is genuinely 5.6 km away: keep humid distance haze
     // subtle enough for the long lens instead of hiding the rocket in dense fog.
@@ -706,11 +723,12 @@ export class ApolloWorld {
     else if (this.mode === 'crew') this.crewCamera(this.cinematicElapsed);
     else if (this.mode === 'launch') this.launchCamera(this.cinematicElapsed);
     else {
-      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 11, 4.5 + this.pitch, this.player.z + Math.cos(this.yaw) * 11);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 12, 6 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 12);
+      // Close third-person camera: behind the shoulder, aimed at the upper body.
+      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 4.4, 1.9 + this.pitch * 2.4 + this.player.y * 0.7, this.player.z + Math.cos(this.yaw) * 4.4);
+      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 1.6, 1.45 + this.player.y * 0.8, this.player.z - Math.cos(this.yaw) * 1.6);
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
-      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 70; this.camera.updateProjectionMatrix();
+      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -787,6 +805,7 @@ export class ApolloWorld {
     if ((event.target as HTMLElement)?.closest('input,textarea,select,button')) return;
     const key = event.key.toLowerCase();
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', ' '].includes(key)) { if (!this.suspended && !this.mode) this.keys.add(key); event.preventDefault(); }
+    if (key === ' ' && !event.repeat && !this.suspended && !this.mode) this.jumpQueued = true;
     if (key === 'e' && !event.repeat && !this.suspended && !this.mode) this.callbacks.onInteract();
     if (key === 'm' && !event.repeat && !this.mode) this.callbacks.onMap();
   };
