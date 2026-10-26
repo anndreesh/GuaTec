@@ -1482,6 +1482,20 @@ Object.assign(spanishFromEnglish, {
   "The data technician is preparing the outdoor recorders.": "La técnica de datos prepara los registradores exteriores.",
 });
 
+Object.assign(translations, {
+  "Misión 01: Apollo 11": "Mission 01: Apollo 11",
+  "El comienzo de una nueva era · 16 de julio de 1969": "The beginning of a new era · July 16, 1969",
+  "Kennedy Space Center. Completa operaciones de apoyo, observa el traslado de la tripulación y presencia el lanzamiento del Saturn V.": "Kennedy Space Center. Complete support operations, watch the crew transfer and witness the Saturn V launch.",
+  "Apollo 11: ocho checkpoints de apoyo terrestre completados; traslado y lanzamiento observados desde el área segura.": "Apollo 11: eight ground-support checkpoints completed; transfer and launch observed from the safe area.",
+});
+
+Object.assign(frenchTranslations, {
+  "Misión 01: Apollo 11": "Mission 01 : Apollo 11",
+  "El comienzo de una nueva era · 16 de julio de 1969": "Le début d’une nouvelle ère · 16 juillet 1969",
+  "Kennedy Space Center. Completa operaciones de apoyo, observa el traslado de la tripulación y presencia el lanzamiento del Saturn V.": "Centre spatial Kennedy. Terminez les opérations de soutien, observez le transfert de l’équipage et assistez au lancement du Saturn V.",
+  "Apollo 11: ocho checkpoints de apoyo terrestre completados; traslado y lanzamiento observados desde el área segura.": "Apollo 11 : huit points de contrôle de soutien au sol terminés ; transfert et lancement observés depuis la zone sûre.",
+});
+
 let currentLanguage: Language =
   (["es", "en", "fr"] as Language[]).includes(localStorage.getItem(STORAGE_KEY) as Language)
     ? (localStorage.getItem(STORAGE_KEY) as Language)
