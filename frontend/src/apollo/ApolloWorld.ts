@@ -405,6 +405,12 @@ export class ApolloWorld {
     this.station(70, 235, () => world('s4'), () => world('s4sub'), 'radio');
     this.station(0, 150, () => world('s5'), () => world('s5sub'), 'crew');
     this.station(0, 355, () => world('s6'), () => world('s6sub'), 'camera');
+    // Minigame stations: each one is a hands-on task (see ApolloMinigames).
+    this.station(-92, 190, () => world('sWiring'), () => world('sWiringSub'), 'panel');
+    this.station(45, 200, () => world('sTracking'), () => world('sTrackingSub'), 'dishstation');
+    this.station(-45, 255, () => world('sCard'), () => world('sCardSub'), 'card');
+    this.station(-25, 300, () => world('sSequence'), () => world('sSequenceSub'), 'panel');
+    this.station(40, 320, () => world('sTelemetry'), () => world('sTelemetrySub'), 'panel');
     const steel = this.material('galvanized', 0xa4aaa5, 0.58, 0.7);
     // Deep-space style parabolic dish, original geometry; visual educational approximation.
     const g = new THREE.Group(); g.position.set(82, 0, 236);
@@ -442,9 +448,30 @@ export class ApolloWorld {
         this.cylinder(0.025, 0.025, 2.1, steel, x + 1, 2.6, z - 0.1);
         this.box(0.3, 0.22, 0.25, this.material('radio-panel', 0x242f2b), x - 0.7, 1.25, z + 0.25);
       }
+      if (type === 'panel') {
+        // Equipment cabinet with a lit status face and loose colored wires.
+        this.box(1.5, 2.2, 0.5, this.material('cabinet', 0x3a4d52, 0.55, 0.45), x + 1.7, 1.1, z);
+        this.box(1.2, 1.7, 0.06, this.material('radio-panel', 0x242f2b), x + 1.7, 1.15, z + 0.27);
+        [0xef4444, 0x3b82f6, 0xfacc15, 0x22c55e, 0xd946ef, 0xfb923c].forEach((c, i) => this.box(0.22, 0.22, 0.05, this.material('led' + i, c, 0.35), x + 1.3 + (i % 3) * 0.4, 1.55 - Math.floor(i / 3) * 0.45, z + 0.32));
+        this.beam(new THREE.Vector3(x + 1.7, 0.4, z + 0.3), new THREE.Vector3(x + 0.6, 1.0, z + 0.55), 0.05, this.material('led0', 0xef4444, 0.35));
+        this.beam(new THREE.Vector3(x + 1.5, 0.4, z + 0.3), new THREE.Vector3(x + 0.5, 1.0, z + 0.4), 0.05, this.material('led1', 0x3b82f6, 0.35));
+      }
+      if (type === 'dishstation') {
+        // Small tracking dish on a pole next to the console.
+        this.cylinder(0.08, 0.1, 2.4, steel, x + 1.7, 1.2, z);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), this.material('dish', 0xd0d1c5, 0.6, 0.45));
+        cap.position.set(x + 1.7, 2.65, z); cap.rotation.set(-0.7, 0, 0.4); this.addStatic(cap);
+      }
+      if (type === 'card') {
+        // Wall-style card reader on a stand.
+        this.box(0.36, 0.55, 0.22, steel, x - 0.9, 1.45, z + 0.1);
+        this.box(0.3, 0.05, 0.24, this.material('radio-panel', 0x242f2b), x - 0.9, 1.6, z + 0.1);
+        this.box(0.07, 0.07, 0.04, this.material('led3', 0x22c55e, 0.35), x - 0.9, 1.35, z + 0.22);
+      }
     }
     this.sign(title, subtitle, x + 0.5, 2.5, z - 2, 0, 5.5);
-    this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
+    const wide = type === 'panel' || type === 'dishstation';
+    this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : wide ? 2.5 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
   }
   private fence(from: number, to: number, z: number): void {
     const metal = this.material('fence', 0x717b79, 0.8, 0.5);
