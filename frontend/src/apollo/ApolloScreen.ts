@@ -20,6 +20,13 @@ const INTRO = [
 ];
 type Quality = 'low'|'medium'|'high';
 type Saved = { state:ReturnType<ApolloState['toJSON']>; savedAt:number };
+const ICON=(paths:string)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
+const PAUSE_ICONS={
+  volume:ICON('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'),
+  muted:ICON('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/>'),
+  restart:ICON('<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/>'),
+  back:ICON('<path d="M15 5l-7 7 7 7"/><path d="M8 12h12"/>'),
+};
 
 /** Apollo 11 screen plugs into the existing router, identity and Flask progress API. */
 export class ApolloScreen implements Screen {
@@ -114,6 +121,11 @@ export class ApolloScreen implements Screen {
   }
   private button(text:string, callback:()=>void, cls='ap-button') {
     const b=el('button',cls,text); b.type='button'; b.addEventListener('click',callback); return b;
+  }
+  private iconButton(icon:string, label:string, callback:()=>void) {
+    const b=this.button('',callback,'ap-button ap-icon-button'); b.setAttribute('aria-label',label); b.title=label;
+    const i=el('span','ap-icon'); i.setAttribute('aria-hidden','true'); i.innerHTML=icon;
+    b.append(i,el('small','',label)); return b;
   }
   private buildHud() {
     const top=el('div','ap-topbar');
@@ -313,9 +325,12 @@ export class ApolloScreen implements Screen {
     if(!this.world || !this.started || this.modal)return;
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
     box.append(this.button('Continuar',()=>this.closeModal(),'ap-button ap-primary'));
-    const mute=this.button(this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();mute.textContent=this.audio.muted?'Activar audio':'Silenciar audio';});box.append(mute);
+    const tools=el('div','ap-pause-tools');
+    const mute=this.iconButton(this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume,this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();paintMute();});
+    const paintMute=()=>{const label=this.audio.muted?'Activar audio':'Silenciar audio';mute.setAttribute('aria-label',label);mute.title=label;mute.querySelector('.ap-icon')!.innerHTML=this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume;mute.querySelector('small')!.textContent=label;};
+    tools.append(mute,this.iconButton(PAUSE_ICONS.restart,'Reiniciar misión',()=>this.confirmReset()),this.iconButton(PAUSE_ICONS.back,'Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
+    box.append(tools);
     box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
-    box.append(this.button('Reiniciar solo Misión 01',()=>this.confirmReset()),this.button('Guardar y volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
   }
   private confirmReset() {
     const box=this.openModal('REINICIAR MISIÓN 01','Volver al comienzo');
