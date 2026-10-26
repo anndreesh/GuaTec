@@ -5,13 +5,14 @@
 
 body.apollo-cinematic .language-menu{visibility:hidden}
 @media(max-width:520px){.ap-mark{flex:0 0 65px}.ap-mark b{font-size:15px;letter-spacing:.12em}.ap-mark b span{display:block}.ap-controls{margin-right:72px;flex-shrink:0}.ap-controls .ap-button{font-size:9px;padding:7px;min-width:38px}.ap-objective>small:first-child{display:block;font-size:8px}.ap-progress{float:none;display:block;margin-top:5px;font-size:10px}}
-.ap-pause-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ap-pause-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .ap-icon-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:12px 8px}
 .ap-icon-button .ap-icon{display:block;width:26px;height:26px}
 .ap-icon-button svg{display:block;width:26px;height:26px}
 .ap-icon-button small{font-size:11px;line-height:1.3}
 .ap-pause-map{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .ap-pause-map .ap-large-map{width:100%;max-height:34dvh}
-.ap-pause-language{display:flex;justify-content:flex-end}
-.ap-pause-language .language-menu{position:relative;top:auto;right:auto;z-index:1}
-.ap-pause-language .language-menu-list{position:static;margin-top:6px}
+.ap-pause-language{position:relative;display:flex}
+.ap-pause-language .language-menu{position:static;top:auto;right:auto;z-index:1;width:100%;display:flex}
+.ap-pause-language .language-menu-trigger{width:100%;min-height:44px;border-radius:3px;font-size:13px}
+.ap-pause-language .language-menu-list{position:absolute;top:calc(100% + 6px);right:0;z-index:5}
