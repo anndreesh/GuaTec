@@ -13,6 +13,14 @@ type Collider = { x: number; z: number; w: number; d: number };
 const UP = new THREE.Vector3(0, 1, 0);
 const clamp = THREE.MathUtils.clamp;
 
+function useConservativeRenderer(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  // Safari/iOS can expose WebGL2 while still rejecting an aggressive context
+  // request on integrated or mobile GPUs. Prefer a smaller, default context.
+  return /Safari\//.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/.test(ua);
+}
+
 /** All positions are metres. The traversable support route is deliberately compressed;
  * the 110.6 m Saturn V, its tower, vehicles and people keep a common physical scale. */
 export class ApolloWorld {
@@ -76,7 +84,12 @@ export class ApolloWorld {
       tube: (a, b, width, material) => this.beam(a, b, width, material),
       sheet: (w, d, tex, x, y, z, tilt = 0) => { const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); mesh.rotation.x = -Math.PI / 2 + tilt; mesh.position.set(x, y, z); this.scene.add(mesh); },
     };
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    const conservativeRenderer = useConservativeRenderer();
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: !conservativeRenderer,
+      powerPreference: conservativeRenderer ? 'default' : 'high-performance',
+      precision: conservativeRenderer ? 'mediump' : 'highp',
+    });
     this.renderer.domElement.className = 'apollo-world-canvas';
     this.renderer.domElement.setAttribute('aria-label', 'Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.');
     this.renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;touch-action:none';
