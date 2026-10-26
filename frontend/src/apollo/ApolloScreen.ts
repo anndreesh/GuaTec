@@ -141,7 +141,6 @@ export class ApolloScreen implements Screen {
     const mapButton=this.button('',()=>this.openMap(),'ap-minimap'); mapButton.setAttribute('aria-label','Abrir mapa de Kennedy');
     this.map=el('canvas'); this.map.width=240; this.map.height=200;
     mapButton.append(this.map,el('span','','LC-39A · MAPA / M')); this.root.append(mapButton);
-    const help=el('div','ap-help','WASD / Flechas · Moverse     Shift · Caminar rápido     Arrastrar · Mirar     E · Interactuar'); this.root.append(help);
     this.uiTarget=el('div','ap-waypoint'); this.root.append(this.uiTarget);
     this.renderObjective();
   }
