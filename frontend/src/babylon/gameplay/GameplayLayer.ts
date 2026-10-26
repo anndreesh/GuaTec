@@ -107,8 +107,6 @@ export function createGameplayLayer(
   let fieldCameraBackup: { alpha: number; beta: number; radius: number } | null = null;
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
-  createAuburnStars(BABYLONNS, scene, root);
-
   const terrain = createMarsTerrain(BABYLONNS, scene);
   terrain.ground.parent = root;
   // The floor never changes after creation; avoid per-frame transform work.
@@ -122,7 +120,7 @@ export function createGameplayLayer(
   ];
   const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)]!;
   scene.fogDensity = weather.fogDensity;
-  scene.fogColor = BABYLONNS.Color3.FromHexString("#10182b");
+  scene.fogColor = BABYLONNS.Color3.FromHexString("#b9aa91");
 
   const astronaut = createAstronautCharacter(BABYLONNS, scene);
   astronaut.root.parent = root;
@@ -1407,8 +1405,8 @@ export function createGameplayLayer(
       setMissionProgress(progress) {
         const launchGlow = Math.max(0, Math.min(1, progress));
         scene.fogColor = BABYLONNS.Color3.Lerp(
-          BABYLONNS.Color3.FromHexString("#10182b"),
-          BABYLONNS.Color3.FromHexString("#241d32"),
+          BABYLONNS.Color3.FromHexString("#b9aa91"),
+          BABYLONNS.Color3.FromHexString("#d09a70"),
           launchGlow * 0.42,
         );
       },
@@ -1751,59 +1749,26 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   // Keep the sky dome fixed in the mission world. The star meshes sit just
   // inside this shell, so moving an infinite-distance dome would hide them.
   sky.infiniteDistance = false;
-  const texture = new BABYLONNS.DynamicTexture("auburn-procedural-starry-sky", { width: 2048, height: 1024 }, scene, false);
+  const texture = new BABYLONNS.DynamicTexture("auburn-morning-sky", { width: 2048, height: 1024 }, scene, false);
   const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
   const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
-  gradient.addColorStop(0, "#02050d");
-  gradient.addColorStop(0.24, "#060b1a");
-  gradient.addColorStop(0.43, "#111b35");
-  gradient.addColorStop(0.5, "#313047");
-  gradient.addColorStop(0.56, "#493847");
-  gradient.addColorStop(0.69, "#171b31");
-  gradient.addColorStop(1, "#050814");
+  gradient.addColorStop(0, "#7794aa");
+  gradient.addColorStop(0.27, "#a7b5b7");
+  gradient.addColorStop(0.46, "#d8c4a0");
+  gradient.addColorStop(0.52, "#efc08a");
+  gradient.addColorStop(0.58, "#d3b18c");
+  gradient.addColorStop(0.74, "#a9aaa0");
+  gradient.addColorStop(1, "#8399a4");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 2048, 1024);
 
-  // A broad, feathered galactic band gives the panorama depth beyond the stars.
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  for (const layer of [
-    { color: "rgba(104, 119, 171, 0.04)", width: 190, blur: 90 },
-    { color: "rgba(150, 131, 183, 0.055)", width: 108, blur: 54 },
-    { color: "rgba(190, 182, 208, 0.07)", width: 36, blur: 28 },
-  ]) {
-    ctx.beginPath();
-    ctx.moveTo(-80, 320);
-    ctx.bezierCurveTo(390, 430, 680, 430, 1100, 320);
-    ctx.bezierCurveTo(1460, 210, 1700, 210, 2130, 320);
-    ctx.strokeStyle = layer.color;
-    ctx.lineWidth = layer.width;
-    ctx.lineCap = "round";
-    ctx.shadowColor = layer.color;
-    ctx.shadowBlur = layer.blur;
-    ctx.stroke();
-  }
-  ctx.shadowBlur = 0;
-  let seed = 19260316;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  // Soft nebula knots and dust lanes sit inside the galactic band.
-  for (let i = 0; i < 160; i++) {
-    const x = random() * 2048;
-    const centerY = 320 + Math.sin(x * 0.00307) * 108;
-    const y = centerY + (random() - 0.5) * 190;
-    const radius = 18 + random() * 115;
-    const cloud = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    cloud.addColorStop(0, random() > 0.5 ? "rgba(167, 177, 213, 0.035)" : "rgba(195, 150, 190, 0.03)");
-    cloud.addColorStop(1, "rgba(74, 89, 140, 0)");
-    ctx.fillStyle = cloud;
-    ctx.beginPath();
-    ctx.ellipse(x, y, radius, radius * (0.18 + random() * 0.45), -0.24, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  // The diffuse low sun reads as morning light without a hard artificial orb.
+  const sunrise = ctx.createRadialGradient(1480, 520, 12, 1480, 520, 330);
+  sunrise.addColorStop(0, "rgba(255, 226, 176, 0.42)");
+  sunrise.addColorStop(0.35, "rgba(244, 202, 155, 0.2)");
+  sunrise.addColorStop(1, "rgba(244, 202, 155, 0)");
+  ctx.fillStyle = sunrise;
+  ctx.fillRect(0, 0, 2048, 1024);
 
   texture.update();
   const material = new BABYLONNS.StandardMaterial("auburn-sky-material", scene);
@@ -1815,67 +1780,6 @@ function createAuburnSky(BABYLONNS: BabylonNamespace, scene: BABYLON.Scene): BAB
   sky.material = material;
   sky.isPickable = false;
   return sky;
-}
-
-function createAuburnStars(
-  BABYLONNS: BabylonNamespace,
-  scene: BABYLON.Scene,
-  root: BABYLON.TransformNode,
-): void {
-  const makeMaterial = (name: string, color: string): BABYLON.StandardMaterial => {
-    const material = new BABYLONNS.StandardMaterial(name, scene);
-    material.diffuseColor = BABYLONNS.Color3.Black();
-    material.emissiveColor = BABYLONNS.Color3.FromHexString(color);
-    material.specularColor = BABYLONNS.Color3.Black();
-    material.disableLighting = true;
-    material.backFaceCulling = false;
-    return material;
-  };
-  const softIvory = makeMaterial("auburn-star-soft-ivory", "#c7d5ee");
-  const coolWhite = makeMaterial("auburn-star-cool-white", "#edf2ff");
-  const warmAccent = makeMaterial("auburn-star-warm-accent", "#e6bd91");
-  // Seeded random points create a natural sky while staying stable between
-  // frames and reloads. A minimum angular gap keeps them from forming noisy
-  // clumps; the world-space positions never depend on camera direction.
-  let seed = 19260316;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-  const directions: BABYLON.Vector3[] = [];
-  const minimumDot = Math.cos(13 * Math.PI / 180);
-  for (let attempt = 0; directions.length < 22 && attempt < 2000; attempt++) {
-    // Keep the seeded scatter across the fixed forward sky above the range,
-    // where it is visible from the starting position; these world angles do
-    // not change when the player or camera moves.
-    const azimuth = Math.PI + (random() - 0.5) * Math.PI * 0.9;
-    const elevation = (10 + random() * 58) * Math.PI / 180;
-    const direction = new BABYLONNS.Vector3(
-      Math.sin(azimuth) * Math.cos(elevation),
-      Math.sin(elevation),
-      Math.cos(azimuth) * Math.cos(elevation),
-    );
-    if (directions.every((other) => BABYLONNS.Vector3.Dot(other, direction) < minimumDot)) {
-      directions.push(direction);
-    }
-  }
-  const skyRadius = 82;
-  directions.forEach((direction, index) => {
-    const focalStar = index % 7 === 0;
-    const size = focalStar ? 0.58 : 0.3 + random() * 0.15;
-    const star = BABYLONNS.MeshBuilder.CreateSphere(`auburn-star-${index}`, {
-      diameter: size,
-      segments: 8,
-    }, scene);
-    star.position.copyFrom(direction.scale(skyRadius));
-    star.parent = root;
-    star.material = focalStar
-      ? [coolWhite, warmAccent][Math.floor(random() * 2)]!
-      : softIvory;
-    star.isPickable = false;
-    star.receiveShadows = false;
-    star.alwaysSelectAsActiveMesh = true;
-  });
 }
 
 function createWeatheredMaterial(

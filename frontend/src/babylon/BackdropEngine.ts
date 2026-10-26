@@ -186,26 +186,26 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           starfield.setEnabled(true);
           break;
         case "mission1-gameplay":
-          // A cool moon and dim sky fill the field while directional light
-          // gives the rocket, launch frame, and rolling soil readable shadows.
+          // Soft, warm morning fill matches the Auburn field while directional
+          // light keeps the rocket and launch frame readable against the sky.
           scene.shadowsEnabled = true;
           planet.setEnabled(false);
           starfield.setEnabled(false);
           fieldEnvironment ??= new BABYLON.HDRCubeTexture("/assets/polyhaven/hdri/suburban_field_01_1k.hdr", scene, 128, false, true, false, true);
           scene.environmentTexture = fieldEnvironment;
-          scene.environmentIntensity = 0.32;
-          ambient.intensity = 0.68;
-          ambient.diffuse = BABYLON.Color3.FromHexString("#a8bce9");
-          ambient.groundColor = BABYLON.Color3.FromHexString("#1c1a2a");
+          scene.environmentIntensity = 0.42;
+          ambient.intensity = 0.58;
+          ambient.diffuse = BABYLON.Color3.FromHexString("#ead8bd");
+          ambient.groundColor = BABYLON.Color3.FromHexString("#625440");
           sun.direction = new BABYLON.Vector3(-0.18, -0.9, 0.32).normalize();
           sun.position = new BABYLON.Vector3(18, 24, -20);
-          sun.intensity = 0.84;
-          sun.diffuse = BABYLON.Color3.FromHexString("#bed0f4");
-          sun.specular = BABYLON.Color3.FromHexString("#c9d8ff");
+          sun.intensity = 1.05;
+          sun.diffuse = BABYLON.Color3.FromHexString("#ffe0b4");
+          sun.specular = BABYLON.Color3.FromHexString("#f7e8d3");
           scene.imageProcessingConfiguration.toneMappingEnabled = true;
           scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-          scene.imageProcessingConfiguration.exposure = 1.08;
-          scene.imageProcessingConfiguration.contrast = 1.06;
+          scene.imageProcessingConfiguration.exposure = 1.02;
+          scene.imageProcessingConfiguration.contrast = 1.03;
           const layer = ensureGameplayLayer();
           layer.enable();
           let savedQuality: "high" | "balanced" = "balanced";
