@@ -365,7 +365,7 @@ export class ApolloScreen implements Screen {
     const [tx,tz]=p(target.x,remote?355:target.z),[px,pz]=p(this.world.player.x,remote?355:this.world.player.z);
     if(remote){c.fillStyle='#e0c497';c.fillText('OBSERVACIÓN · 5,6 km',10,h-12);}
     c.strokeStyle='#edbd6a';c.lineWidth=2;c.setLineDash([4,5]);c.beginPath();c.moveTo(px,pz);c.lineTo(tx,tz);c.stroke();c.setLineDash([]);
-    c.save();c.translate(px,pz);c.rotate(this.world.yaw);c.fillStyle='#fff1d5';c.beginPath();c.moveTo(0,-7);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.restore();
+    c.save();c.translate(px,pz);c.rotate(-this.world.yaw);c.fillStyle='#fff1d5';c.beginPath();c.moveTo(0,-7);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.restore();
   }
   private openSketchfab() {
     const box=this.openModal('VISOR OFICIAL EXTERNO · NO INTEGRADO EN EL ESCENARIO','Saturn V de HUuser2024');
