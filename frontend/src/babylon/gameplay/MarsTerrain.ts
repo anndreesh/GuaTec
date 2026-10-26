@@ -30,9 +30,9 @@ export function createMarsTerrain(
     height: size,
     subdivisions: 1,
   }, scene);
-  const groundMat = new BABYLONNS.StandardMaterial("static-mars-ground-material", scene);
-  // Use the project's real farm-soil albedo so the field reads as earth,
-  // while keeping the expensive normal/ARM maps disabled.
+  const groundMat = new BABYLONNS.PBRMaterial("Auburn-field-soil-PBR", scene);
+  // The bundled farm-soil set is glTF/GL compatible: albedo, normal and packed
+  // AO/roughness/metallic. Use all three for scale and contact under daylight.
   const dirtTexture = new BABYLONNS.Texture(
     "/assets/polyhaven/textures/farm_soil/textures/farm_soil_diff_1k.jpg",
     scene,
@@ -47,12 +47,48 @@ export function createMarsTerrain(
   dirtTexture.uScale = 4;
   dirtTexture.vScale = 4;
   dirtTexture.anisotropicFilteringLevel = 4;
-  groundMat.diffuseTexture = dirtTexture;
-  groundMat.specularColor = BABYLONNS.Color3.Black();
+  groundMat.albedoTexture = dirtTexture;
+  groundMat.albedoColor = BABYLONNS.Color3.FromHexString("#d9cbb3");
+  groundMat.roughness = 0.96;
+  groundMat.metallic = 0;
+
+  const normalTexture = new BABYLONNS.Texture(
+    "/assets/polyhaven/textures/farm_soil/textures/farm_soil_nor_gl_1k.jpg",
+    scene,
+    false,
+    false,
+    BABYLONNS.Texture.TRILINEAR_SAMPLINGMODE,
+  );
+  normalTexture.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  normalTexture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  normalTexture.uScale = 4;
+  normalTexture.vScale = 4;
+  normalTexture.anisotropicFilteringLevel = 4;
+  normalTexture.level = 0.32;
+  groundMat.bumpTexture = normalTexture;
+
+  const armTexture = new BABYLONNS.Texture(
+    "/assets/polyhaven/textures/farm_soil/textures/farm_soil_arm_1k.jpg",
+    scene,
+    false,
+    false,
+    BABYLONNS.Texture.TRILINEAR_SAMPLINGMODE,
+  );
+  armTexture.wrapU = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  armTexture.wrapV = BABYLONNS.Texture.WRAP_ADDRESSMODE;
+  armTexture.uScale = 4;
+  armTexture.vScale = 4;
+  armTexture.anisotropicFilteringLevel = 4;
+  groundMat.metallicTexture = armTexture;
+  groundMat.useMetallnessFromMetallicTextureBlue = true;
+  groundMat.useRoughnessFromMetallicTextureGreen = true;
+  groundMat.ambientTexture = armTexture;
+  groundMat.useAmbientInGrayScale = true;
+  groundMat.ambientTextureStrength = 0.28;
   ground.material = groundMat;
   ground.checkCollisions = false;
   ground.isPickable = false;
-  ground.receiveShadows = false;
+  ground.receiveShadows = true;
 
   return {
     ground,
@@ -60,6 +96,8 @@ export function createMarsTerrain(
     dispose() {
       ground.dispose();
       dirtTexture.dispose();
+      normalTexture.dispose();
+      armTexture.dispose();
       groundMat.dispose();
     },
   };
