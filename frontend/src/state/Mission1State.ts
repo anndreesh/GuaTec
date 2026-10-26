@@ -22,6 +22,7 @@ import { MISSION_01_STAGES } from "@/state/Mission01Events";
 import { FIELD_TASK_IDS, fieldTaskResult, isFieldTaskId, restoreFieldDraft, type FieldTaskId, type FieldTaskDraft, type MissionMiniGameResult } from "./Mission01FieldTasks";
 
 export type MissionEngineeringTask = "propulsion" | "circuits" | "antenna" | "diagnosis" | "launch";
+export type MissionWorldWeather = "CLEAR" | "CLOUDY" | "LIGHT MIST" | "WINDY";
 const TEST_ORDER = ["system", "instrumentation", "communications", "stability"] as const;
 
 /**
@@ -53,6 +54,7 @@ export class Mission1State {
   fieldResults = new Map<FieldTaskId, MissionMiniGameResult>();
   fieldDrafts: Partial<Record<FieldTaskId, FieldTaskDraft>> = {};
   routeChecks = new Set<string>();
+  worldWeather: MissionWorldWeather | null = null;
 
   constructor(saved?: MissionSaveState) {
     this.resources = Object.fromEntries(
@@ -105,6 +107,11 @@ export class Mission1State {
               : fieldTaskResult(result.id, result.attempts, result.mistakes, result.conditions));
           }
         }
+        const validWeather = (value: unknown): value is MissionWorldWeather =>
+          value === "CLEAR" || value === "CLOUDY" || value === "LIGHT MIST" || value === "WINDY";
+        this.worldWeather = validWeather(extra.worldWeather)
+          ? extra.worldWeather
+          : this.fieldResults.get("weather")?.conditions ?? null;
         for (const id of FIELD_TASK_IDS) {
           if (extra.fieldDrafts?.[id]) this.fieldDrafts[id] = restoreFieldDraft(extra.fieldDrafts[id]);
         }
@@ -395,8 +402,13 @@ export class Mission1State {
         engineeringTasks: [...this.engineeringTasks], taskVersion: 1,
         fieldVersion: 2, fieldResults: [...this.fieldResults.values()],
         fieldDrafts: structuredClone(this.fieldDrafts), routeChecks: [...this.routeChecks],
+        ...(this.worldWeather ? { worldWeather: this.worldWeather } : {}),
       },
     };
+  }
+
+  setWorldWeather(weather: MissionWorldWeather): void {
+    this.worldWeather = weather;
   }
 
   buildReport(): MissionReport {

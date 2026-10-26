@@ -300,6 +300,8 @@ export class Mission1Screen implements Screen {
     this.gameplay.onMapStateChange((state) => this.updateMissionMap(state));
     this.gameplay.onInteract((poiId) => this.handleInteract(poiId));
     if (resetWorld) this.gameplay.reset();
+    if (this.state.worldWeather) this.gameplay.setWeather(this.state.worldWeather);
+    else this.state.setWorldWeather(this.gameplay.getWeather());
     this.gameplay.setDesign(this.state.engineering.structure, this.state.engineering.instrumentation);
     this.gameplay.setMissionProgress(this.state.progressPercent() / 100);
     this.gameplay.setInputSuspended(this.paused);

@@ -92,3 +92,11 @@ test('current saves require validated task records as well as test IDs', () => {
   assert.equal(resumed.testsComplete(), false);
   assert.equal(resumed.objectives.has('testing'), false);
 });
+test('world weather survives save and reload and rejects unknown values', () => {
+  const state = new Mission1State();
+  state.setWorldWeather('WINDY');
+  const saved = structuredClone(state.toSaveState());
+  assert.equal(new Mission1State(saved).worldWeather, 'WINDY');
+  saved.mission01!.worldWeather = 'STORM' as typeof saved.mission01.worldWeather;
+  assert.equal(new Mission1State(saved).worldWeather, null);
+});

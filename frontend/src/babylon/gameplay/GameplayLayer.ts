@@ -45,6 +45,7 @@ export interface GameplayHandle {
   jump(): void;
   interact(): void;
   getWeather(): AuburnWeather;
+  setWeather(weather: AuburnWeather): void;
   setCameraMode(mode: "cinematic" | "observation" | "telemetry"): void;
   setEngineeringFeedback(kind: EngineeringFeedbackKind, progress: number, value?: number): void;
   setInputSuspended(suspended: boolean): void;
@@ -121,7 +122,9 @@ export function createGameplayLayer(
     { label: "LIGHT MIST", fogDensity: 0.0032 },
     { label: "WINDY", fogDensity: 0.0025 },
   ];
-  const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)]!;
+  let weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)]!;
+  let weatherParticleMultiplier = 1;
+  let missionProgressGlow = 0;
   scene.fogDensity = weather.fogDensity;
   scene.fogColor = BABYLONNS.Color3.FromHexString("#b9aa91");
 
@@ -645,6 +648,20 @@ export function createGameplayLayer(
   }, shadowGenerator);
   const instruments = createEngineeringInstruments(BABYLONNS, scene, root, terrain.getHeightAt(-6, 10.6));
   const fieldKit = createFieldStations(BABYLONNS, scene, root, terrain.getHeightAt);
+  fieldKit.setWeather(weather.label);
+
+  function applyWeather(condition: AuburnWeather): void {
+    weather = weatherOptions.find((option) => option.label === condition) ?? weatherOptions[0]!;
+    scene.fogDensity = weather.fogDensity;
+    const fogBase = condition === "CLOUDY" ? "#a9aaa3" : condition === "LIGHT MIST" ? "#c5c0ad" : condition === "WINDY" ? "#c6b69b" : "#b9aa91";
+    scene.fogColor = BABYLONNS.Color3.Lerp(
+      BABYLONNS.Color3.FromHexString(fogBase), BABYLONNS.Color3.FromHexString("#d09a70"), missionProgressGlow * 0.42,
+    );
+    weatherParticleMultiplier = condition === "WINDY" ? 1.8 : condition === "LIGHT MIST" ? 0.45 : condition === "CLOUDY" ? 0.65 : 1;
+    ambientDust.emitRate = (quality === "high" ? 2 : 0.7) * weatherParticleMultiplier;
+    missionAudio.setWindLevel(condition === "WINDY" ? 0.22 : condition === "LIGHT MIST" ? 0.1 : 0.14);
+    fieldKit.setWeather(condition);
+  }
   fieldKit.setWeather(weather.label);
   const collisionObstacles = [launchSupport.footprint, { minX: -6.55, maxX: -5.45, minZ: 10.05, maxZ: 11.15 }, ...fieldKit.colliders];
 
@@ -1287,7 +1304,7 @@ export function createGameplayLayer(
         scene.getEngine().setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, dprCap));
         shadowGenerator.mapSize = profile === "high" ? 2048 : 1024;
         shadowGenerator.blurKernel = profile === "high" ? 16 : 8;
-        ambientDust.emitRate = profile === "high" ? 2 : 0.7;
+        ambientDust.emitRate = (profile === "high" ? 2 : 0.7) * weatherParticleMultiplier;
         scene.getEngine().resize();
       },
       getDiagnostics() {
@@ -1415,11 +1432,12 @@ export function createGameplayLayer(
         launchPeakAltitude = Math.max(2, Math.min(16, meters));
       },
       setMissionProgress(progress) {
-        const launchGlow = Math.max(0, Math.min(1, progress));
+        missionProgressGlow = Math.max(0, Math.min(1, progress));
+        const fogBase = weather.label === "CLOUDY" ? "#a9aaa3" : weather.label === "LIGHT MIST" ? "#c5c0ad" : weather.label === "WINDY" ? "#c6b69b" : "#b9aa91";
         scene.fogColor = BABYLONNS.Color3.Lerp(
-          BABYLONNS.Color3.FromHexString("#b9aa91"),
+          BABYLONNS.Color3.FromHexString(fogBase),
           BABYLONNS.Color3.FromHexString("#d09a70"),
-          launchGlow * 0.42,
+          missionProgressGlow * 0.42,
         );
       },
       setTouchMovement(x, y) {
@@ -1446,6 +1464,7 @@ export function createGameplayLayer(
         }
       },
       getWeather() { return weather.label; },
+      setWeather(condition) { applyWeather(condition); },
     },
     enable() {
       if (enabled) return;

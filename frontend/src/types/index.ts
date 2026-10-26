@@ -106,6 +106,7 @@ export interface MissionSaveState {
     fieldResults?: import("@/state/Mission01FieldTasks").MissionMiniGameResult[];
     fieldDrafts?: Partial<Record<import("@/state/Mission01FieldTasks").FieldTaskId, import("@/state/Mission01FieldTasks").FieldTaskDraft>>;
     routeChecks?: string[];
+    worldWeather?: "CLEAR" | "CLOUDY" | "LIGHT MIST" | "WINDY";
   };
 }
 
