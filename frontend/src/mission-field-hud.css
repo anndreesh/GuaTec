@@ -32,6 +32,30 @@
  .gameplay-toast { max-width:calc(100vw - 24px); top:auto; bottom:112px; }
  .mission-task-card { max-height:calc(100dvh - 16px); }
 }
+@media (max-width:720px) {
+ .mission-map-header {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"title close" "controls controls";
+  align-items:center;
+  gap:8px 12px;
+ }
+ .mission-map-header > .modal-title {
+  grid-area:title;
+  min-width:0;
+  margin:0;
+  line-height:1.15;
+ }
+ .mission-map-header > .btn { grid-area:close; white-space:nowrap; }
+ .mission-map-controls {
+  grid-area:controls;
+  width:100%;
+  min-width:0;
+  flex-wrap:nowrap;
+  justify-content:space-between;
+ }
+ .mission-map-controls .mission-panel-restore { white-space:nowrap; }
+}
 @media (max-height:600px) and (min-width:701px) {
  .field-hud { width:270px; top:8px; left:8px; padding:9px 12px; }
  .field-hud-next { display:none; }
