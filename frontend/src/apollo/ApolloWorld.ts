@@ -3,7 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { txt, world, type Txt } from './ApolloCopy';
+import { loadProp, scatter, type PropOptions } from './ApolloProps';
+import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
+import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -23,11 +25,6 @@ export class ApolloWorld {
   yaw = 0;
   private pitch = 0.28;
   private zoomed = false;
-  /** Jump: vertical velocity (m/s) and a queued Space press, consumed when the player is on the ground. */
-  private vy = 0;
-  private jumpQueued = false;
-  /** The Mercenary Astronaut GLB faces +Z; the procedural fallback suit faces -Z. */
-  private facingOffset = Math.PI;
   private keys = new Set<string>();
   private suspended = false;
   private disposed = false;
@@ -35,17 +32,13 @@ export class ApolloWorld {
   private mode: Mode = null;
   private cinematicElapsed = 0;
   private clock = 0;
-  /** Repaint callbacks for every text sign, so 3D lettering follows the selected language. */
-  private textRepaints: Array<() => void> = [];
   private playerRoot = new THREE.Group();
   private crewRoot = new THREE.Group();
   private rocket = new THREE.Group();
   private van = new THREE.Group();
   private arms: THREE.Group[] = [];
   private crew: THREE.Group[] = [];
-  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null; run: THREE.AnimationAction | null }[] = [];
-  /** Smoothed blend weights of the player's idle / walk / run(+jump) animations. */
-  private animWeights = { idle: 1, walk: 0, run: 0 };
+  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null }[] = [];
   private mixers: THREE.AnimationMixer[] = [];
   private colliders: Collider[] = [];
   private sun = new THREE.DirectionalLight(0xfff0d3, 3.2);
@@ -66,8 +59,23 @@ export class ApolloWorld {
   private resizeObserver: ResizeObserver;
   private frameDurations: number[] = [];
   private palmLeaves: THREE.InstancedMesh | null = null;
+  private furniture: Kit;
+  private inspectionTarget:'rocket'|'tower'|'vab'|null=null;
+  private inspectionPosition=new THREE.Vector3();
+  private smokeBillboard=new THREE.Quaternion();
+  private lateProps = new THREE.Group();
+  private nasaTexture: THREE.Texture | null = null;
+  private cloudSprites = new THREE.Group();
 
   constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void }) {
+    this.furniture = {
+      mat: (name, color, roughness, metalness) => this.material(name, color, roughness, metalness),
+      box: (w, h, d, material, x, y, z, ry = 0) => { this.box(w, h, d, material, x, y, z, undefined, ry); },
+      cyl: (rt, rb, h, material, x, y, z, rx = 0, rz = 0) => { const mesh = this.cylinder(rt, rb, h, material, x, y, z); mesh.rotation.x = rx; mesh.rotation.z = rz; },
+      ball: (r, material, x, y, z, squash = 1, dome = false) => { const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 12, dome ? 6 : 10, 0, Math.PI * 2, dome ? 0 : 0, dome ? Math.PI / 2 : Math.PI), material); mesh.position.set(x, y, z); mesh.scale.y = squash; mesh.castShadow = true; this.staticBuffers.set(material, [...(this.staticBuffers.get(material) ?? []), mesh.geometry.clone().applyMatrix4(mesh.matrix)]); },
+      tube: (a, b, width, material) => this.beam(a, b, width, material),
+      sheet: (w, d, tex, x, y, z, tilt = 0) => { const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); mesh.rotation.x = -Math.PI / 2 + tilt; mesh.position.set(x, y, z); this.scene.add(mesh); },
+    };
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.domElement.className = 'apollo-world-canvas';
     this.renderer.domElement.setAttribute('aria-label', 'Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.');
@@ -99,14 +107,15 @@ export class ApolloWorld {
     this.buildVegetation();
     this.buildVehicles();
     this.buildClouds();
-    for (const child of [...this.scene.children]) if (child instanceof THREE.Group) this.mergeAuthored(child);
+    this.buildServiceDetails();
+    for (const child of [...this.scene.children]) if (child instanceof THREE.Group && child!==this.lateProps) this.mergeAuthored(child);
     this.flushStatic();
     this.scene.add(this.playerRoot, this.crewRoot);
     this.playerRoot.position.copy(this.player);
     this.camera.position.set(this.player.x, 4.8, this.player.z + 11); this.camera.lookAt(0, 58, 0);
     this.buildMarker();
-    const smokeMaterial = new THREE.MeshStandardMaterial({ color: 0xdfd8c5, roughness: 1, transparent: true, opacity: 0.75, depthWrite: false });
-    this.smoke = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), smokeMaterial, this.smokeCount);
+    const smokeMaterial = new THREE.MeshBasicMaterial({ map:createSmokeTexture(), color:0xe8e3d6, transparent:true, opacity:.72, depthWrite:false, side:THREE.DoubleSide });
+    this.smoke = new THREE.InstancedMesh(new THREE.PlaneGeometry(2,2), smokeMaterial, this.smokeCount);
     this.smoke.frustumCulled = false;
     this.smoke.visible = false;
     this.scene.add(this.smoke);
@@ -121,7 +130,37 @@ export class ApolloWorld {
     this.renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
     this.renderer.domElement.addEventListener('pointercancel', this.onPointerUp);
-    this.ready = this.loadAstronauts();
+    this.ready = Promise.all([this.loadAstronauts(), this.loadProps()]).then(() => undefined);
+  }
+
+  private async loadProps(): Promise<void> {
+    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    this.lateProps.name = 'Apollo late-loaded GLB props'; this.scene.add(this.lateProps);
+    const load = async (label: string, url: string, options: PropOptions, x: number, z: number, ry: number, collider?: Collider) => {
+      try {
+        if (this.quality === 'low' && /shuttle|bacardi/i.test(label)) return;
+        const prop = await loadProp(loader, url, options); prop.group.position.set(x, 0, z); prop.group.rotation.y = ry; this.lateProps.add(prop.group);
+        if (collider) this.colliders.push(collider);
+      } catch (error) { this.assetErrors.push(`${label}: ${String(error)}`); }
+    };
+    await Promise.all([
+      load('edificio_colon', '/assets/models/edificio_colon_-_modelo_3d_optimized.glb', { fit: { axis: 'y', size: 46 } }, -125, 205, Math.PI / 2, { x: -125, z: 205, w: 23, d: 15 }),
+      load('icac_headquarters', '/assets/models/edificio_colon_-_modelo_3d_optimized.glb', { fit: { axis: 'y', size: 38 } }, 118, 262, -Math.PI / 2, { x: 118, z: 262, w: 20, d: 14 }),
+      load('mies_van_der_rohe_oficina_bacardi', '/assets/models/mies_van_der_rohe_oficina_bacardi_optimized.glb', { fit: { axis: 'x', size: 30 }, hide: /^Plataforma 00[124]/ }, -122, 345, Math.PI / 2, { x: -122, z: 345, w: 16, d: 11 }),
+      load('space_shuttle_nasa', '/assets/models/space_shuttle_nasa_optimized.glb', { fit: { axis: 'z', size: 33 } }, 120, 150, Math.PI / 2, { x: 120, z: 150, w: 17, d: 8 }),
+    ]);
+    try {
+      const trees = await loadProp(loader, '/assets/models/arboles_optimized.glb', { fit: { axis: 'y', size: 8 } });
+      this.lateProps.add(scatter(trees, [{ x: -138, z: 178, yaw: 0, scale: 1 }, { x: 138, z: 205, yaw: 0, scale: 1 }, { x: -136, z: 292, yaw: 0, scale: 1 }, { x: 137, z: 372, yaw: 0, scale: 1 }]));
+    } catch (error) { this.assetErrors.push(`arboles_optimized: ${String(error)}`); }
+    try {
+      const statue = await loadProp(loader, '/assets/models/astronaut.glb', { fit: { axis: 'y', size: 2.6 } });
+      statue.group.position.set(24, 1.2, 116); this.lateProps.add(statue.group); this.box(3.4, 1.2, 3.4, this.material('memorial-pedestal', 0xb6b0a0), 24, .6, 116); this.colliders.push({ x: 24, z: 116, w: 2.2, d: 2.2 });
+    } catch (error) { this.assetErrors.push(`astronaut: ${String(error)}`); }
+    try {
+      const consoleModel = await loadProp(loader, '/assets/models/old_nasa_style_computer_console.glb', { fit: { axis: 'y', size: 1.45 } });
+      this.lateProps.add(scatter(consoleModel, [{ x: -35, z: 127, yaw: 0, scale: 1 }, { x: -70, z: 162, yaw: 0, scale: 1 }, { x: -100, z: 217, yaw: 0, scale: 1 }, { x: 70, z: 232, yaw: 0, scale: 1 }]));
+    } catch (error) { this.assetErrors.push(`old_nasa_style_computer_console: ${String(error)}`); }
   }
 
   private material(name: string, color: number, roughness = 0.8, metalness = 0): THREE.MeshStandardMaterial {
@@ -213,7 +252,7 @@ export class ApolloWorld {
     const grass = new THREE.MeshStandardMaterial({ map: this.texture('grass', 180), roughness: 1 });
     this.groundPlane(16000, 16000, 0, 0, grass, -0.12);
     this.groundPlane(42, 35, 0, 5600, new THREE.MeshStandardMaterial({ map: this.texture('concrete', 3), roughness: 1 }), 0.04);
-    this.sign(() => world('launchObs'), () => world('safetyDistance'), -8, 2.2, 5590, 0, 8);
+    this.sign('OBSERVACIÓN DEL LANZAMIENTO', 'DISTANCIA DE SEGURIDAD · 5,6 KM', -8, 2.2, 5590, 0, 8);
     const concrete = new THREE.MeshStandardMaterial({ map: this.texture('concrete', 7), roughness: 0.95 });
     this.groundPlane(132, 130, 0, 0, concrete, 0.01);
     const asphalt = new THREE.MeshStandardMaterial({ map: this.texture('asphalt', 22), roughness: 0.98 });
@@ -227,10 +266,16 @@ export class ApolloWorld {
     const mark = this.material('road-line', 0xdacb9b);
     for (let z = 85; z < 465; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
     for (const x of [-6, 6]) this.box(0.1, 0.02, 410, mark, x, 0.07, 250);
+    const water = this.material('water', 0x4e9ba8, 0.3, 0.22);
+    this.groundPlane(3200, 10000, 3000, 0, water, -0.09);
     const sand = this.material('sand', 0xcdbd91);
     this.groundPlane(100, 10000, 1375, 0, sand, -0.07);
-    this.sign(() => world('kennedy'), () => world('groundOps'), -18, 2.2, 118, 0, 7);
-    this.sign(() => world('pad'), () => world('restricted'), -11, 1.9, 91, 0, 4.5);
+    for (let i = 0; i < 11; i++) {
+      this.groundPlane(30 + (i % 3) * 13, 100 + i * 7, -150 - (i % 3) * 50, 90 + i * 80, water, -0.04);
+    }
+    this.groundPlane(26, 920, 195, 220, water, -0.03);
+    this.sign('KENNEDY SPACE CENTER', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
+    this.sign('PAD 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
   }
   private buildPad(): void {
     const steel = this.material('tower', 0x8f3c30, 0.64, 0.45);
@@ -283,7 +328,7 @@ export class ApolloWorld {
       this.box(5, 0.35, 1.5, silver, x, 45, z);
       for (let i = 0; i < 3; i++) this.box(0.9, 0.9, 0.5, this.material('floodlight', 0xe9e6c9), x - 1.5 + i * 1.5, 44.6, z + 0.5);
     }
-    this.sign('APOLLO 11', () => world('rocket'), 22, 4, 47, 0, 11);
+    this.sign('APOLLO 11', 'SATURN V · AS-506 · LC-39A', 22, 4, 47, 0, 11);
   }
   private buildSaturn(): void {
     const white = this.material('saturn-white', 0xf1f0e5, 0.46, 0.22);
@@ -370,7 +415,7 @@ export class ApolloWorld {
     this.box(160, 2, 136, roof, 0, 161, 0, vab);
     for (let i = 0; i < 6; i++) this.box(13, 130, 0.3, this.material('vab-door', 0x929e9f), -60 + i * 24, 65, 67.2, vab);
     for (let y = 4; y < 155; y += 4) this.box(158, 0.1, 0.2, roof, 0, y, 67.4, vab);
-    const vabSub = this.textPlane(() => world('vab'), 105, 5, '#31434b', false); vabSub.position.set(0, 151, 67.5); vab.add(vabSub);
+    const vabSub = this.textPlane('VEHICLE ASSEMBLY BUILDING', 105, 5, '#31434b', false); vabSub.position.set(0, 151, 67.5); vab.add(vabSub);
     const vabLod = new THREE.LOD();
     vab.position.set(0, 0, 0); this.mergeAuthored(vab);
     const distantVab = new THREE.Group();
@@ -393,18 +438,12 @@ export class ApolloWorld {
     this.fence(-150, -80, 325);
   }
   private buildStations(): void {
-    this.station(-35, 130, () => world('s1'), () => world('s1sub'), 'map');
-    this.station(-70, 165, () => world('s2'), () => world('s2sub'), 'camera');
-    this.station(-100, 220, () => world('s3'), () => world('s3sub'), 'desk');
-    this.station(70, 235, () => world('s4'), () => world('s4sub'), 'radio');
-    this.station(0, 150, () => world('s5'), () => world('s5sub'), 'crew');
-    this.station(0, 355, () => world('s6'), () => world('s6sub'), 'camera');
-    // Minigame stations: each one is a hands-on task (see ApolloMinigames).
-    this.station(-92, 190, () => world('sWiring'), () => world('sWiringSub'), 'panel');
-    this.station(45, 200, () => world('sTracking'), () => world('sTrackingSub'), 'dishstation');
-    this.station(-45, 255, () => world('sCard'), () => world('sCardSub'), 'card');
-    this.station(-25, 300, () => world('sSequence'), () => world('sSequenceSub'), 'panel');
-    this.station(40, 320, () => world('sTelemetry'), () => world('sTelemetrySub'), 'panel');
+    this.station(-35, 130, 'ORIENTACIÓN', '01 · OPERACIONES DE APOYO', 'map');
+    this.station(-70, 165, 'RECONOCIMIENTO', '02 · OBSERVACIÓN DEL COMPLEJO', 'camera');
+    this.station(-100, 220, 'DOCUMENTACIÓN', '03 · REGISTRO DE COMUNICACIONES', 'desk');
+    this.station(70, 235, 'COMUNICACIONES', '04 · ESTACIÓN DE APOYO', 'radio');
+    this.station(0, 150, 'LA TRIPULACIÓN', '05 · RECREACIÓN HISTÓRICA', 'crew');
+    this.station(0, 355, 'OBSERVACIÓN', '06 · CÁMARA DE SEGUIMIENTO', 'camera');
     const steel = this.material('galvanized', 0xa4aaa5, 0.58, 0.7);
     // Deep-space style parabolic dish, original geometry; visual educational approximation.
     const g = new THREE.Group(); g.position.set(82, 0, 236);
@@ -420,52 +459,16 @@ export class ApolloWorld {
       for (const dx of [-0.43, 0.43]) this.box(0.12, 0.85, 0.78, this.material('crate-trim', 0x544c3e), x + dx, 0.43, z);
     }
     // Tracking tripod at the spectator area is a distinct authored piece.
-    for (let i = 0; i < 6; i++) this.box(3.2, 0.14, 0.55, this.material('bench', 0x7b6651), -22 + i * 9, 0.9, 381);
+    for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
   }
-  private station(x: number, z: number, title: Txt, subtitle: Txt, type: string): void {
+  private station(x: number, z: number, title: string, subtitle: string, type: string): void {
     const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
     const cream = this.material('station-cream', 0xc6c4ad, 0.8);
     this.box(7, 0.12, 5, this.material('station-concrete', 0xb7b3a0), x, 0.05, z);
-    if (type === 'camera') {
-      this.box(0.9, 0.6, 1.4, this.material('camera', 0x283b41), x, 1.8, z);
-      this.beam(new THREE.Vector3(x, 1.8, z - 0.7), new THREE.Vector3(x, 1.8, z - 1.35), 0.38, this.material('lens', 0x243443));
-      for (let i = 0; i < 3; i++) this.beam(new THREE.Vector3(x, 1.5, z), new THREE.Vector3(x + Math.sin(i * Math.PI * 2 / 3) * 0.9, 0.1, z + Math.cos(i * Math.PI * 2 / 3) * 0.9), 0.08, steel);
-      for (const dx of [-0.27, 0.27]) this.cylinder(0.33, 0.33, 0.15, steel, x + dx, 2.4, z);
-    } else {
-      this.box(2.7, 0.15, 1.3, cream, x, 1.05, z);
-      for (const dx of [-1.1, 1.1]) for (const dz of [-0.45, 0.45]) this.box(0.08, 1, 0.08, steel, x + dx, 0.5, z + dz);
-      this.box(1.1, 0.55, 0.7, steel, x + 0.4, 1.4, z);
-      this.box(0.9, 0.35, 0.08, this.material('radio-panel', 0x242f2b), x + 0.4, 1.45, z + 0.37);
-      for (let i = 0; i < 4; i++) this.cylinder(0.045, 0.045, 0.08, cream, x + 0.1 + i * 0.2, 1.66, z + 0.4);
-      this.box(0.6, 0.02, 0.8, this.material('paper', 0xe4ddc3), x - 0.7, 1.15, z);
-      if (type === 'radio') {
-        this.cylinder(0.025, 0.025, 2.1, steel, x + 1, 2.6, z - 0.1);
-        this.box(0.3, 0.22, 0.25, this.material('radio-panel', 0x242f2b), x - 0.7, 1.25, z + 0.25);
-      }
-      if (type === 'panel') {
-        // Equipment cabinet with a lit status face and loose colored wires.
-        this.box(1.5, 2.2, 0.5, this.material('cabinet', 0x3a4d52, 0.55, 0.45), x + 1.7, 1.1, z);
-        this.box(1.2, 1.7, 0.06, this.material('radio-panel', 0x242f2b), x + 1.7, 1.15, z + 0.27);
-        [0xef4444, 0x3b82f6, 0xfacc15, 0x22c55e, 0xd946ef, 0xfb923c].forEach((c, i) => this.box(0.22, 0.22, 0.05, this.material('led' + i, c, 0.35), x + 1.3 + (i % 3) * 0.4, 1.55 - Math.floor(i / 3) * 0.45, z + 0.32));
-        this.beam(new THREE.Vector3(x + 1.7, 0.4, z + 0.3), new THREE.Vector3(x + 0.6, 1.0, z + 0.55), 0.05, this.material('led0', 0xef4444, 0.35));
-        this.beam(new THREE.Vector3(x + 1.5, 0.4, z + 0.3), new THREE.Vector3(x + 0.5, 1.0, z + 0.4), 0.05, this.material('led1', 0x3b82f6, 0.35));
-      }
-      if (type === 'dishstation') {
-        // Small tracking dish on a pole next to the console.
-        this.cylinder(0.08, 0.1, 2.4, steel, x + 1.7, 1.2, z);
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), this.material('dish', 0xd0d1c5, 0.6, 0.45));
-        cap.position.set(x + 1.7, 2.65, z); cap.rotation.set(-0.7, 0, 0.4); this.addStatic(cap);
-      }
-      if (type === 'card') {
-        // Wall-style card reader on a stand.
-        this.box(0.36, 0.55, 0.22, steel, x - 0.9, 1.45, z + 0.1);
-        this.box(0.3, 0.05, 0.24, this.material('radio-panel', 0x242f2b), x - 0.9, 1.6, z + 0.1);
-        this.box(0.07, 0.07, 0.04, this.material('led3', 0x22c55e, 0.35), x - 0.9, 1.35, z + 0.22);
-      }
-    }
+    const ids:Record<string,string>={'-35,130':'orientation','-70,165':'complex','-100,220':'documentation','70,235':'communications','0,150':'crew','0,355':'observation'};
+    this.colliders.push(...buildTable(this.furniture, (ids[`${x},${z}`] ?? type) as StationKind, x, z));
     this.sign(title, subtitle, x + 0.5, 2.5, z - 2, 0, 5.5);
-    const wide = type === 'panel' || type === 'dishstation';
-    this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : wide ? 2.5 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
+    this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
   }
   private fence(from: number, to: number, z: number): void {
     const metal = this.material('fence', 0x717b79, 0.8, 0.5);
@@ -476,31 +479,24 @@ export class ApolloWorld {
       this.beam(new THREE.Vector3(x, 0.35, z), new THREE.Vector3(x + 6, 2.3, z), 0.025, metal);
     }
   }
-  private sign(title: Txt, sub: Txt, x: number, y: number, z: number, rotation = 0, w = 6): void {
+  private sign(title: string, sub: string, x: number, y: number, z: number, rotation = 0, w = 6): void {
     const group = new THREE.Group(); group.position.set(x, y, z); group.rotation.y = rotation;
-    const plate = this.textPlane(() => txt(title) + '\n' + txt(sub), w, 1.25, '#f2e8cb', true); group.add(plate);
+    const plate = this.textPlane(title + '\n' + sub, w, 1.25, '#f2e8cb', true); group.add(plate);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w, 1.25, .08), this.material('sign-back', 0x243331, .9, .05)); back.position.z = .04; group.add(back);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), -w * 0.36, -y / 2, -0.08, group);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), w * 0.36, -y / 2, -0.08, group);
     this.scene.add(group);
   }
-  private textPlane(text: Txt, w: number, h: number, color: string, background: boolean): THREE.Mesh {
+  private textPlane(text: string, w: number, h: number, color: string, background: boolean): THREE.Mesh {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
+    if (background) { ctx.fillStyle = '#243d3d'; ctx.fillRect(0, 0, 1024, 256); ctx.strokeStyle = '#b8bc9d'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, 1012, 244); }
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lines = text.split('\n');
+    lines.forEach((line, i) => { ctx.font = `${i ? 31 : 58}px Arial`; ctx.fillText(line, 512, lines.length > 1 ? 92 + i * 86 : 128, 940); });
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
-    const draw = () => {
-      ctx.clearRect(0, 0, 1024, 256);
-      if (background) { ctx.fillStyle = '#243d3d'; ctx.fillRect(0, 0, 1024, 256); ctx.strokeStyle = '#b8bc9d'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, 1012, 244); }
-      ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const lines = txt(text).split('\n');
-      lines.forEach((line, i) => { ctx.font = `${i ? 31 : 58}px Arial`; ctx.fillText(line, 512, lines.length > 1 ? 92 + i * 86 : 128, 940); });
-      tex.needsUpdate = true;
-    };
-    draw();
-    if (typeof text === 'function') this.textRepaints.push(draw);
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.DoubleSide }));
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.FrontSide }));
   }
-  /** Repaints all localized 3D signs in the active language (no scene rebuild). */
-  refreshLanguage(): void { for (const repaint of this.textRepaints) repaint(); }
   private buildVegetation(): void {
     const count = 100;
     const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.13, 0.25, 6.8, 6), this.material('palm-trunk', 0x77664d), count);
@@ -528,35 +524,18 @@ export class ApolloWorld {
     trunks.castShadow = true;
   }
   private vehicle(x: number, z: number, crew = false): THREE.Group {
-    const g = new THREE.Group(); g.position.set(x, 0, z);
-    const body = this.material('van-body', crew ? 0xe4e1ca : 0x6a827f, 0.6, 0.28);
-    const chrome = this.material('chrome', 0xaab8b4, 0.3, 0.8);
-    const glass = this.material('vehicle-glass', 0x345463, 0.23, 0.35);
-    this.box(2.4, 1.9, 5.4, body, 0, 1.65, 0, g);
-    this.box(2.2, 0.5, 2.1, body, 0, 2.75, 0.55, g);
-    this.box(2.2, 1.1, 0.1, glass, 0, 2.3, -2.72, g);
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 3; i++) this.box(0.09, 0.8, 1, glass, side * 1.22, 2.2, -1.7 + i * 1.3, g);
-      this.box(0.06, 0.12, 0.35, chrome, side * 1.25, 1.7, -0.7, g);
-      for (const pz of [-1.7, 1.7]) {
-        const wheel = this.cylinder(0.52, 0.52, 0.3, this.material('tire', 0x252a2b), side * 1.17, 0.53, pz, g, 16); wheel.rotation.z = Math.PI / 2;
-        const hub = this.cylinder(0.25, 0.25, 0.32, chrome, side * 1.2, 0.53, pz, g, 16); hub.rotation.z = Math.PI / 2;
-      }
-    }
-    for (const pz of [-2.8, 2.8]) this.box(2.6, 0.2, 0.15, chrome, 0, 0.95, pz, g);
-    this.box(1.3, 0.45, 0.09, this.material('grille', 0x353d3b), 0, 1.4, -2.76, g);
-    for (const side of [-1, 1]) this.box(0.35, 0.35, 0.11, this.material('headlight', 0xf4e5b0), side * 0.9, 1.6, -2.78, g);
-    if (crew) {
-      const label = this.textPlane('NASA', 1.4, 0.4, '#24466a', false); label.position.set(1.26, 1.3, 0.5); label.rotation.y = Math.PI / 2; g.add(label);
-    }
-    this.scene.add(g); return g;
+    const kind: CarKind = crew ? 'van' : (Math.abs(x) > 80 ? 'suv' : 'sedan');
+    const decal = crew ? new THREE.TextureLoader().load('/icon-512.png') : undefined;
+    const group = buildCar(CAR_SPECS[kind], { kind, paint: crew ? 0xd9d6bd : 0x687e7b, decal }, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness));
+    group.position.set(x, 0, z); this.scene.add(group); return group;
   }
   private buildVehicles(): void {
     this.van = this.vehicle(-17, 75, true);
     this.van.visible = false;
     for (const [x, z] of [[-88, 220], [90, 264], [-88, 345], [90, 139]]) {
+      const kind: CarKind = Math.abs(x) > 80 ? 'suv' : 'sedan';
       const car = this.vehicle(x, z); car.rotation.y = Math.PI / 2;
-      this.colliders.push({ x, z, w: 3.1, d: 1.5 });
+      this.colliders.push({ x, z, w: CAR_SPECS[kind].length / 2 + .35, d: CAR_SPECS[kind].width / 2 + .35 });
     }
     // Crawler is parked off the active pad, consistent with launch operations.
     const crawler = new THREE.Group(); crawler.position.set(-235, 0, 52);
@@ -568,15 +547,55 @@ export class ApolloWorld {
     }
     this.scene.add(crawler);
   }
+  private buildServiceDetails():void {
+    const grit=this.material('service-gravel',0x9d967e,.98,0);
+    const curb=this.material('curb',0xb9b69d,.92,.08);
+    const metal=this.material('utility-pipe',0x6d7d76,.65,.5);
+    for(const [x,z] of [[-35,130],[-70,165],[-100,220],[70,235],[0,150],[0,355]]) {
+      this.groundPlane(10,8,x,z,grit,-.015);
+      for(const dx of [-5.1,5.1])this.box(.16,.15,8.3,curb,x+dx,.07,z);
+      this.box(10.3,.15,.16,curb,x,.07,z-4.1);
+      // Low cable tray and conduit follow the back of the station; approach stays open.
+      this.box(7,.09,.28,metal,x,.14,z-3.5);
+      for(let i=0;i<18;i++)this.box(.025,.08,.26,curb,x-3.3+i*.39,.16,z-3.5);
+      this.cylinder(.29, .29, .88, metal, x + 4.3, .48, z - 2.6);
+    }
+    // Repeated foreground grass uses a single authored crossed-blade geometry.
+    const blades:number[]=[];
+    for(let i=0;i<3;i++) {
+      const angle=i*Math.PI/3,c=Math.cos(angle),n=Math.sin(angle);
+      for(const [x,y,z] of [[-.07,0,0],[.07,0,0],[.025,.55,.06]])blades.push(x*c+z*n,y,z*c-x*n);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(blades,3));geometry.computeVertexNormals();
+    const material=new THREE.MeshStandardMaterial({color:0x68774b,roughness:1,side:THREE.DoubleSide});
+    const tufts=new THREE.InstancedMesh(geometry,material,3600);let seed=9231,placed=0;
+    const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+    const stations=[[-35,130],[-70,165],[-100,220],[70,235],[0,150],[0,355]];
+    for(let tries=0;placed<3600 && tries<30000;tries++) {
+      const x=-143+rand()*288,z=102+rand()*300;
+      if(Math.abs(x)<8 || Math.abs(z-145)<7 || Math.abs(z-250)<7 || (x<15&&x>-95&&Math.abs(z-210)<7)||Math.abs(z-365)<7)continue;
+      if(stations.some(([sx,sz])=>Math.hypot(sx-x,sz-z)<8))continue;
+      if(this.colliders.some(c=>Math.abs(x-c.x)<c.w+1&&Math.abs(z-c.z)<c.d+1))continue;
+      this.dummy.position.set(x,0,z);this.dummy.rotation.set(0,rand()*Math.PI*2,0);const scale=.2+rand()*.9;this.dummy.scale.set(scale,scale,scale);this.dummy.updateMatrix();tufts.setMatrixAt(placed++,this.dummy.matrix);
+    }
+    tufts.count=placed;tufts.instanceMatrix.needsUpdate=true;tufts.receiveShadow=true;this.scene.add(tufts);
+    // Low drainage aprons and pipe work give the service buildings a functional edge.
+    for(const [x,z]of[[-125,200],[116,250],[-118,338],[120,130]]) {
+      this.box(25,.12,3,grit,x,.015,z+12);
+      for(let i=0;i<4;i++)this.box(.08,.09,2.8,metal,x-11+i*.4,.13,z+12);
+      this.box(4,.55,.75,metal,x+8,.3,z-10);
+      for(let i=0;i<10;i++)this.box(.12,.6,.8,curb,x+6.1+i*.4,.31,z-10);
+    }
+  }
   private buildClouds(): void {
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.43, depthWrite: false });
-    const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 5), mat, 45);
+    const texture = createSmokeTexture();
+    const mat = new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff, transparent: true, opacity: 0.46, depthWrite: false, side: THREE.DoubleSide });
     for (let i = 0; i < 45; i++) {
       const angle = i * 2.399;
-      this.dummy.position.set(Math.sin(angle) * (1800 + i * 70), 500 + (i % 4) * 80, Math.cos(angle) * (1800 + i * 70));
-      this.dummy.scale.set(190 + i % 5 * 40, 45 + i % 3 * 20, 110 + i % 4 * 30); this.dummy.rotation.set(0, angle, 0); this.dummy.updateMatrix(); mesh.setMatrixAt(i, this.dummy.matrix);
+      const sprite = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); sprite.position.set(Math.sin(angle) * (1800 + i * 70), 500 + (i % 4) * 80, Math.cos(angle) * (1800 + i * 70));
+      sprite.scale.set(190 + i % 5 * 40, 45 + i % 3 * 20, 1); sprite.rotation.y = angle; this.cloudSprites.add(sprite);
     }
-    mesh.instanceMatrix.needsUpdate = true; this.scene.add(mesh);
+    this.scene.add(this.cloudSprites);
   }
   private buildMarker(): void {
     const mat = new THREE.MeshBasicMaterial({ color: 0xecd89e, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
@@ -590,14 +609,6 @@ export class ApolloWorld {
     try {
       const gltf = await loader.loadAsync('/assets/apollo/mercenary-astronaut.glb');
       if (this.disposed) { this.disposeObject(gltf.scene); return; }
-      // The GLB ships Mixamo Walk, Idle and Running (no jump clip). Keep Running in place by removing
-      // horizontal hip drift, so the speed of the character comes only from the game's own movement.
-      const runClip = gltf.animations.find(c => /run/i.test(c.name));
-      const hipTrack = runClip?.tracks.find(track => /^Hips.*\.position$/.test(track.name));
-      if (hipTrack) {
-        const n = hipTrack.values.length / 3;
-        for (const axis of [0, 2]) { let sum = 0; for (let k = 0; k < n; k++) sum += hipTrack.values[k * 3 + axis]; const mean = sum / n; for (let k = 0; k < n; k++) hipTrack.values[k * 3 + axis] = mean; }
-      }
       const bounds = new THREE.Box3().setFromObject(gltf.scene);
       const size = bounds.getSize(new THREE.Vector3());
       this.loadedModel = { source: 'Peter_D / Mercenary Astronaut / CC BY 4.0', url: '/assets/apollo/mercenary-astronaut.glb', originalBounds: size.toArray(), clips: gltf.animations.map(c => ({ name: c.name, duration: c.duration })), characterHeight: 1.85, skeletonClones: 4 };
@@ -642,12 +653,10 @@ export class ApolloWorld {
         const mixer = new THREE.AnimationMixer(model);
         const walking = gltf.animations.find(c => /walk/i.test(c.name));
         const idling = gltf.animations.find(c => /idle/i.test(c.name));
-        const running = gltf.animations.find(c => /run/i.test(c.name));
         const walk = walking ? mixer.clipAction(walking).setEffectiveWeight(i ? 1 : 0).play() : null;
         const idle = idling ? mixer.clipAction(idling).setEffectiveWeight(i ? 0 : 1).play() : null;
-        const run = i === 0 && running ? mixer.clipAction(running).setEffectiveWeight(0).play() : null;
         if (walk) walk.time = i * 0.35;
-        this.people.push({ root: holder, mixer, walk, idle, run }); this.mixers.push(mixer);
+        this.people.push({ root: holder, mixer, walk, idle }); this.mixers.push(mixer);
       }
       this.crewRoot.visible = false;
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
@@ -657,19 +666,33 @@ export class ApolloWorld {
     } catch (error) {
       this.assetErrors.push(`Mercenary Astronaut: ${String(error)}`);
       // Failure remains visible in diagnostics. A local authored suit preserves play.
-      this.facingOffset = 0;
       this.addFallbackSuit(this.playerRoot);
       for (let i = 0; i < 3; i++) { const root = new THREE.Group(); this.addFallbackSuit(root); this.crewRoot.add(root); this.crew.push(root); }
       this.crewRoot.visible = false;
     }
   }
   private addTechnician(x: number, z: number): void {
-    const shirt = this.material('technician-shirt', 0xe0dcc7); const pants = this.material('technician-pants', 0x42585f);
-    this.box(0.5, 0.65, 0.32, shirt, x, 1.13, z);
-    this.cylinder(0.15, 0.16, 0.3, this.material('skin', 0xb98e67), x, 1.64, z);
-    for (const dx of [-0.14, 0.14]) this.box(0.2, 0.8, 0.22, pants, x + dx, 0.41, z);
-    for (const dx of [-0.33, 0.33]) this.box(0.13, 0.58, 0.17, shirt, x + dx, 1.08, z);
-    this.cylinder(0.22, 0.22, 0.13, shirt, x, 1.84, z);
+    const shirt=this.material('technician-shirt',0xd9d4bd,.96,0),pants=this.material('technician-pants',0x42585f,.94,0),skin=this.material('skin',0xb98e67,.85,0),shoe=this.material('worker-shoe',0x303a35,.8,.05);
+    const torso=new THREE.Mesh(new THREE.CylinderGeometry(.25,.22,.6,8),shirt);torso.position.set(x,1.19,z);torso.scale.z=.65;this.addStatic(torso);
+    this.box(.42,.08,.28,this.material('worker-belt',0x4b4d3e),x,.91,z);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.15,12,10),skin);head.scale.set(1,1.2,.93);head.position.set(x,1.69,z);this.addStatic(head);
+    this.cylinder(.074,.074,.13,skin,x,1.48,z);
+    // Period work cap, brim and face cues preserve a human silhouette at station range.
+    const cap=new THREE.Mesh(new THREE.SphereGeometry(.16,12,6,0,Math.PI*2,0,Math.PI*.51),shirt);cap.position.set(x,1.77,z);this.addStatic(cap);
+    this.box(.27,.025,.15,shirt,x,1.77,z+.13);
+    for(const dx of [-.052,.052])this.box(.022,.016,.009,shoe,x+dx,1.71,z+.137);
+    this.box(.13,.1,.012,shirt,x-.11,1.27,z+.168);this.box(.07,.028,.013,this.material('worker-badge',0x718b8d),x-.11,1.29,z+.18);
+    for(const dx of [-.115,.115]) {
+      const thigh=new THREE.Mesh(new THREE.CylinderGeometry(.095,.084,.42,8),pants);thigh.position.set(x+dx,.69,z);this.addStatic(thigh);
+      const shin=new THREE.Mesh(new THREE.CylinderGeometry(.083,.069,.43,8),pants);shin.position.set(x+dx,.29,z);this.addStatic(shin);
+      this.box(.16,.12,.29,shoe,x+dx,.07,z+.055);
+    }
+    // Articulated upper arm/forearm segments instead of a box-person stand-in.
+    for(const side of [-1,1]) {
+      this.beam(new THREE.Vector3(x+side*.24,1.37,z),new THREE.Vector3(x+side*.32,1.09,z+.025),.12,shirt);
+      this.beam(new THREE.Vector3(x+side*.32,1.09,z+.025),new THREE.Vector3(x+side*.29,.96,z+.21),.09,skin);
+      const hand=new THREE.Mesh(new THREE.SphereGeometry(.06,8,6),skin);hand.position.set(x+side*.29,.95,z+.21);hand.scale.y=1.3;this.addStatic(hand);
+    }
   }
   private addFallbackSuit(root: THREE.Group): void {
     const suit = this.material('fallback-suit', 0xd9d8c6);
@@ -682,6 +705,8 @@ export class ApolloWorld {
     this.targetPoint = position; this.target.visible = !!position && !this.mode;
     if (position) this.target.position.set(position.x, 0, position.z);
   }
+  setStationStatus(_completed:string[],_active:string):void { /* station furniture is static; minigame state remains in ApolloScreen. */ }
+  setInspectionTarget(kind:'rocket'|'tower'|'vab'|null):void { this.inspectionTarget=kind; }
   setZoom(value: boolean): void { this.zoomed = value; }
   setSuspended(value: boolean): void { this.suspended = value; if (value) this.keys.clear(); }
   setQuality(value: ApolloQuality): void {
@@ -724,58 +749,37 @@ export class ApolloWorld {
     // Substeps cap wall crossings even after a slow frame.
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.25));
     for (let i = 0; i < steps; i++) { if (this.canMove(this.player.x + dx / steps, this.player.z)) this.player.x += dx / steps; if (this.canMove(this.player.x, this.player.z + dz / steps)) this.player.z += dz / steps; }
-    this.playerRoot.rotation.y = Math.atan2(-dx, -dz) + this.facingOffset;
+    this.playerRoot.rotation.y = Math.atan2(-dx, -dz);
     return true;
-  }
-  /** Simple ballistic jump (about 1.1 m apex); ignored while paused, in cinematics and at the 5.6 km site. */
-  private stepJump(dt: number): void {
-    if (this.suspended || this.mode || this.player.z > 5000) { this.player.y = 0; this.vy = 0; this.jumpQueued = false; return; }
-    if (this.jumpQueued && this.player.y === 0) this.vy = 6.2;
-    this.jumpQueued = false;
-    if (this.vy !== 0 || this.player.y > 0) {
-      this.vy -= 17 * dt; this.player.y = Math.max(0, this.player.y + this.vy * dt);
-      if (this.player.y === 0) this.vy = 0;
-    }
   }
   update(dt: number): void {
     if (this.disposed) return;
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
     dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
-    this.stepJump(dt);
+    this.cloudSprites.position.x += dt * .8;
     const moving = this.move(dt); this.playerRoot.position.copy(this.player);
     // The observation site is genuinely 5.6 km away: keep humid distance haze
     // subtle enough for the long lens instead of hiding the rocket in dense fog.
     if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.density = this.player.z > 5000 || this.mode === 'launch' ? 0.00004 : 0.00038;
     for (let i = 0; i < this.people.length; i++) {
-      const p = this.people[i];
-      if (i === 0) {
-        // Player: idle / walk / run, with Running reused as the airborne pose (the GLB has no jump clip).
-        const sprint = moving && this.keys.has('shift'), air = this.player.y > 0;
-        const goal = { idle: moving || air ? 0 : 1, walk: moving && !sprint && !air ? 1 : 0, run: air || sprint ? 1 : 0 };
-        const k = 1 - Math.exp(-dt * 12);
-        for (const key of ['idle', 'walk', 'run'] as const) { this.animWeights[key] += (goal[key] - this.animWeights[key]) * k; p[key]?.setEffectiveWeight(this.animWeights[key]); }
-        p.run?.setEffectiveTimeScale(air ? 0.55 : 1);
-        p.mixer.update(dt);
-        // Slight forward lean while sprinting or jumping.
-        const model = p.mixer.getRoot() as THREE.Object3D;
-        model.rotation.x += ((air ? 0.2 : sprint ? 0.1 : 0) - model.rotation.x) * k;
-        continue;
-      }
-      const walking = this.mode === 'crew';
+      const p = this.people[i]; const walking = i === 0 ? moving : this.mode === 'crew';
       p.walk?.setEffectiveWeight(walking ? 1 : 0); p.idle?.setEffectiveWeight(walking ? 0 : 1);
-      if (this.mode === 'crew') p.mixer.update(dt);
+      if (i === 0 || this.mode === 'crew') p.mixer.update(dt);
     }
     if (this.target.visible) { this.target.children[1].rotation.y += dt; this.target.children[1].position.y = 3.8 + Math.sin(this.clock * 2) * 0.22; }
     if (this.mode === 'intro') this.introCamera(this.cinematicElapsed);
     else if (this.mode === 'crew') this.crewCamera(this.cinematicElapsed);
     else if (this.mode === 'launch') this.launchCamera(this.cinematicElapsed);
-    else {
-      // Close third-person camera: behind the shoulder, aimed at the upper body.
-      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 4.4, 1.9 + this.pitch * 2.4 + this.player.y * 0.7, this.player.z + Math.cos(this.yaw) * 4.4);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 1.6, 1.45 + this.player.y * 0.8, this.player.z - Math.cos(this.yaw) * 1.6);
+    else if(this.inspectionTarget) {
+      this.camera.position.set(this.player.x,2.15,this.player.z);
+      this.inspectionPosition.set(this.inspectionTarget==='vab'?-1000:this.inspectionTarget==='tower'?-17:0,this.inspectionTarget==='vab'?81:65,this.inspectionTarget==='vab'?-100:0);
+      this.camera.lookAt(this.inspectionPosition);this.camera.fov=this.inspectionTarget==='vab'?18:35;this.camera.updateProjectionMatrix();
+    } else {
+      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 11, 4.5 + this.pitch, this.player.z + Math.cos(this.yaw) * 11);
+      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 12, 6 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 12);
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
-      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
+      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 70; this.camera.updateProjectionMatrix();
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -825,7 +829,7 @@ export class ApolloWorld {
         const spread = age * 110 * ignition;
         this.dummy.position.set(Math.sin(a) * spread, 2 + age * 20 + Math.min(height * 0.5, age * 80), Math.cos(a) * spread * 0.65);
         const scale = (3 + age * 15) * ignition;
-        this.dummy.scale.set(scale, scale * 0.75, scale); this.dummy.rotation.set(age, a, age); this.dummy.updateMatrix(); this.smoke.setMatrixAt(i, this.dummy.matrix);
+        this.dummy.scale.set(scale*1.35, scale, 1);this.dummy.quaternion.copy(this.camera.quaternion);this.dummy.rotateZ(a+age*.3);this.dummy.updateMatrix();this.smoke.setMatrixAt(i,this.dummy.matrix);
       }
       this.smoke.instanceMatrix.needsUpdate = true;
     }
@@ -846,13 +850,12 @@ export class ApolloWorld {
   diagnostics(): Record<string, unknown> {
     const info = this.renderer.info;
     const times = [...this.frameDurations].sort((a, b) => a - b);
-    return { engine: 'Three.js', player: this.player.toArray(), yaw: this.yaw, quality: this.quality, drawCalls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.renderer.getPixelRatio(), shadowMap: this.renderer.shadowMap.enabled ? this.sun.shadow.mapSize.x : 0, shadowLights: this.renderer.shadowMap.enabled ? 1 : 0, samples: times.length, meanFrameMs: times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0, p95FrameMs: times[Math.floor(times.length * 0.95)] ?? 0, rocketHeightMeters: 110.6, colliders: this.colliders.length, launchY: this.rocket.position.y, crew: this.crew.length, loadedModel: { ...this.loadedModel, playerBounds: new THREE.Box3().setFromObject(this.playerRoot).getSize(new THREE.Vector3()).toArray(), modelScale: this.playerRoot.children[0]?.scale.toArray() }, assetErrors: [...this.assetErrors] };
+    return { engine: 'Three.js', player: this.player.toArray(), yaw: this.yaw, quality: this.quality, drawCalls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.renderer.getPixelRatio(), shadowMap: this.renderer.shadowMap.enabled ? this.sun.shadow.mapSize.x : 0, shadowLights: this.renderer.shadowMap.enabled ? 1 : 0, samples: times.length, meanFrameMs: times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0, p95FrameMs: times[Math.floor(times.length * 0.95)] ?? 0, rocketHeightMeters: 110.6, colliders: this.colliders.length, launchY: this.rocket.position.y, crew: this.crew.length, loadedModel: { ...this.loadedModel, playerBounds: new THREE.Box3().setFromObject(this.playerRoot).getSize(new THREE.Vector3()).toArray(), modelScale: this.playerRoot.children[0]?.scale.toArray() }, assetErrors: [...this.assetErrors], originalProps:true, softSmoke:true, stationIndicators:0 };
   }
   private onKeyDown = (event: KeyboardEvent): void => {
     if ((event.target as HTMLElement)?.closest('input,textarea,select,button')) return;
     const key = event.key.toLowerCase();
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', ' '].includes(key)) { if (!this.suspended && !this.mode) this.keys.add(key); event.preventDefault(); }
-    if (key === ' ' && !event.repeat && !this.suspended && !this.mode) this.jumpQueued = true;
     if (key === 'e' && !event.repeat && !this.suspended && !this.mode) this.callbacks.onInteract();
     if (key === 'm' && !event.repeat && !this.mode) this.callbacks.onMap();
   };
@@ -880,4 +883,11 @@ export class ApolloWorld {
     this.disposeObject(this.scene); this.sun.shadow.map?.dispose();
     this.renderer.dispose(); this.renderer.domElement.remove();
   }
+}
+
+function createSmokeTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d')!; const gradient = ctx.createRadialGradient(64, 64, 3, 64, 64, 62);
+  gradient.addColorStop(0, 'rgba(255,255,255,.9)'); gradient.addColorStop(.55, 'rgba(245,243,236,.5)'); gradient.addColorStop(1, 'rgba(230,228,218,0)');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 128, 128); const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; return texture;
 }
