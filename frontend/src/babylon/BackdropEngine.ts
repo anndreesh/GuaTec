@@ -1,5 +1,5 @@
 import { MISSION_1_POIS, THEME } from "@/config/gameConfig";
-import { createGameplayLayer, type GameplayHandle } from "@/babylon/gameplay/GameplayLayer";
+import type { GameplayHandle } from "@/babylon/gameplay/GameplayLayer";
 import type { AbstractMesh, Node } from "@babylonjs/core";
 
 /** Keep shadow submission tied to world-scale silhouettes, not local source bounds. */
@@ -58,6 +58,7 @@ export async function createBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
 
 async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdrop> {
   const BABYLON = await import("@babylonjs/core");
+  const { createGameplayLayer } = await import("@/babylon/gameplay/GameplayLayer");
 
   const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
   const scene = new BABYLON.Scene(engine);

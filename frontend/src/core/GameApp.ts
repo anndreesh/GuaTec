@@ -96,7 +96,6 @@ export class GameApp {
 
   async start(): Promise<void> {
     this.uiRoot.replaceChildren(loadingFeedback(t("Cargando...")));
-    this.backdrop = await createBackdrop(this.canvas);
 
     const handledOAuthCallback = this.consumeOAuthCallbackIfPresent();
 
@@ -214,6 +213,7 @@ export class GameApp {
 
   async showMission1(savedState?: unknown): Promise<void> {
     this.activeView = "mission1";
+    this.backdrop ??= await createBackdrop(this.canvas);
     this.setBackdropMode("mission1-gameplay");
     const { Mission1Screen } = await import("@/screens/Mission1Screen");
     await this.setScreen(new Mission1Screen(this, savedState));
