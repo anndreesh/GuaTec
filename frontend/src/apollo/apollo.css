@@ -19,6 +19,6 @@ body:has(.apollo-screen.ap-playing) #app>.language-menu{display:none}
 .ap-pause-language .language-menu-list{position:absolute;top:calc(100% + 6px);right:0;z-index:5}
 
 /* Lift the checkpoint panel while preserving its existing dimensions. */
-.ap-objective{top:84px}
-@media(max-width:850px){.ap-objective{top:64px}}
-@media(max-width:520px){.ap-objective{top:54px}}
+.ap-objective{top:72px}
+@media(max-width:850px){.ap-objective{top:52px}}
+@media(max-width:520px){.ap-objective{top:42px}}
