@@ -1622,6 +1622,7 @@ export function createGameplayLayer(
       astronaut.update(deltaSeconds);
       for (const worker of fieldCrew) {
         const distToPlayer = Math.hypot(worker.character.root.position.x - astronaut.root.position.x, worker.character.root.position.z - astronaut.root.position.z);
+        worker.character.setAttention(distToPlayer < 4.2);
         if (distToPlayer < 4.2) {
           const lookAngle = Math.atan2(astronaut.root.position.x - worker.character.root.position.x, astronaut.root.position.z - worker.character.root.position.z);
           worker.character.root.rotation.y = lookAngle;

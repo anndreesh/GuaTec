@@ -5,6 +5,7 @@ export type BabylonNamespace = typeof BABYLON;
 export interface AstronautCharacter {
   root: BABYLON.TransformNode;
   setMovementState(walking: boolean, running: boolean): void;
+  setAttention(attending: boolean): void;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -65,6 +66,11 @@ export function createAstronautCharacter(B: BabylonNamespace, scene: BABYLON.Sce
   const pivot = (name: string, x: number, y: number, z: number, parent = root) => {
     const node = new B.TransformNode(name, scene); node.position.set(x, y, z); node.parent = parent; return node;
   };
+  const headPivot = pivot("engineer-head-pivot", 0, 1.61, 0);
+  const headSphere = (name: string, x: number, y: number, z: number, sx: number, sy: number, sz: number, mat: BABYLON.Material) =>
+    sphere(name, x, y - 1.61, z, sx, sy, sz, mat, headPivot);
+  const headBox = (name: string, x: number, y: number, z: number, w: number, h: number, d: number, mat: BABYLON.Material) =>
+    box(name, x, y - 1.61, z, w, h, d, mat, headPivot);
   // Adult proportions: narrow pelvis, tailored waist, shoulders above the rib cage.
   const profile = [[0.17, 0.83], [0.185, 0.91], [0.155, 1.06], [0.185, 1.25], [0.205, 1.36], [0.16, 1.42], [0.078, 1.46]];
   const body = own(B.MeshBuilder.CreateLathe("engineer-tailored-coat", { shape: profile.map(([r, y]) => new B.Vector3(r, y, 0)), tessellation: 20, cap: B.Mesh.CAP_ALL }, scene), coat);
@@ -90,20 +96,22 @@ export function createAstronautCharacter(B: BabylonNamespace, scene: BABYLON.Sce
   box("engineer-satchel-buckle", -0.19, 1.005, 0.098, 0.025, 0.028, 0.011, brass);
   // A seven-and-a-half-head silhouette; cap band touches the brow and hairline.
   sphere("engineer-neck", 0, 1.49, 0, 0.09, 0.12, 0.09, skin);
-  sphere("engineer-head", 0, 1.635, 0.002, 0.16, 0.235, 0.17, skin);
-  sphere("engineer-jaw", 0, 1.565, 0.022, 0.132, 0.095, 0.135, skin);
+  headSphere("engineer-head", 0, 1.635, 0.002, 0.16, 0.235, 0.17, skin);
+  headSphere("engineer-jaw", 0, 1.565, 0.022, 0.132, 0.095, 0.135, skin);
+  const eyeMeshes: BABYLON.Mesh[] = [];
   for (const side of [-1, 1]) {
-    sphere(`engineer-ear-${side}`, side * 0.081, 1.635, 0, 0.027, 0.052, 0.024, skin);
-    sphere(`engineer-eye-${side}`, side * 0.032, 1.654, 0.080, 0.018, 0.008, 0.008, sole);
-    const brow = box(`engineer-brow-${side}`, side * 0.033, 1.673, 0.077, 0.028, 0.005, 0.007, sole); brow.rotation.z = side * 0.07;
+    headSphere(`engineer-ear-${side}`, side * 0.081, 1.635, 0, 0.027, 0.052, 0.024, skin);
+    const eyeSocket = pivot(`engineer-eye-socket-${side}`, side * 0.032, 1.654 - 1.61, 0.080, headPivot);
+    eyeMeshes.push(sphere(`engineer-eye-${side}`, 0, 0, 0, 0.018, 0.008, 0.008, sole, eyeSocket));
+    const brow = headBox(`engineer-brow-${side}`, side * 0.033, 1.673, 0.077, 0.028, 0.005, 0.007, sole); brow.rotation.z = side * 0.07;
   }
-  sphere("engineer-nose-bridge", 0, 1.637, 0.084, 0.021, 0.045, 0.025, skin);
-  sphere("engineer-nose-tip", 0, 1.619, 0.099, 0.028, 0.02, 0.025, skin);
-  own(B.MeshBuilder.CreateTube("engineer-mouth", { path: [new B.Vector3(-0.021, 1.589, 0.087), new B.Vector3(0, 1.587, 0.091), new B.Vector3(0.021, 1.589, 0.087)], radius: 0.0025, tessellation: 5 }, scene), sole);
-  sphere("engineer-flat-cap-crown", 0, 1.744, 0.011, 0.194, 0.105, 0.203, coat);
-  sphere("engineer-flat-cap-visor", 0, 1.716, 0.074, 0.167, 0.013, 0.159, coat);
-  const band = own(B.MeshBuilder.CreateCylinder("engineer-cap-sewn-band", { diameter: 0.176, height: 0.018, tessellation: 16 }, scene), leather);
-  band.position.y = 1.712; band.scaling.z = 0.92;
+  headSphere("engineer-nose-bridge", 0, 1.637, 0.084, 0.021, 0.045, 0.025, skin);
+  headSphere("engineer-nose-tip", 0, 1.619, 0.099, 0.028, 0.02, 0.025, skin);
+  own(B.MeshBuilder.CreateTube("engineer-mouth", { path: [new B.Vector3(-0.021, 1.589 - 1.61, 0.087), new B.Vector3(0, 1.587 - 1.61, 0.091), new B.Vector3(0.021, 1.589 - 1.61, 0.087)], radius: 0.0025, tessellation: 5 }, scene), sole, headPivot);
+  headSphere("engineer-flat-cap-crown", 0, 1.744, 0.011, 0.194, 0.105, 0.203, coat);
+  headSphere("engineer-flat-cap-visor", 0, 1.716, 0.074, 0.167, 0.013, 0.159, coat);
+  const band = own(B.MeshBuilder.CreateCylinder("engineer-cap-sewn-band", { diameter: 0.176, height: 0.018, tessellation: 16 }, scene), leather, headPivot);
+  band.position.y = 1.712 - 1.61; band.scaling.z = 0.92;
 
   const legs = [-1, 1].map(side => {
     const hip = pivot(`engineer-hip-${side}`, side * 0.091, 0.89, 0);
@@ -142,14 +150,15 @@ export function createAstronautCharacter(B: BabylonNamespace, scene: BABYLON.Sce
     merged.name = `${parent.name}-${mat.name}-details`;
   }
 
-  let walking = false; let running = false; let phase = 0; let stride = 0; let disposed = false;
+  let walking = false; let running = false; let attending = false; let phase = 0; let stride = 0; let blinkClock = 0; let blinkAmount = 0; let disposed = false;
   return {
     root,
     setMovementState(nextWalking, nextRunning) { walking = nextWalking; running = nextRunning && nextWalking; },
+    setAttention(value) { attending = value; },
     update(deltaSeconds) {
       const dt = Math.max(0, Math.min(deltaSeconds, 0.05));
       stride += ((walking ? 1 : 0) - stride) * (1 - Math.exp(-11 * dt));
-      if (walking) phase += dt * (running ? 11 : 7.5);
+      phase += dt * (walking ? running ? 11 : 7.5 : 1.6);
       const swing = Math.sin(phase) * stride * (running ? 0.66 : 0.43);
       legs.forEach((leg, i) => {
         const opposite = i === 0 ? 1 : -1;
@@ -158,9 +167,19 @@ export function createAstronautCharacter(B: BabylonNamespace, scene: BABYLON.Sce
         leg.boot.rotation.x = -leg.knee.rotation.x * 0.36;
       });
       arms.forEach((arm, i) => {
-        arm.shoulder.rotation.x = swing * (i === 0 ? -0.68 : 0.68);
-        arm.elbow.rotation.x = -0.12 - (running ? 0.62 : 0.12) * stride;
+        const side = i === 0 ? -1 : 1;
+        const breathing = Math.sin(phase * 0.5 + i * 0.7) * 0.018;
+        arm.shoulder.rotation.x = swing * (side * -0.68) + breathing;
+        arm.shoulder.rotation.z = side * (0.065 + Math.sin(phase * 0.5) * 0.012);
+        arm.elbow.rotation.x = -0.12 - (running ? 0.62 : 0.12) * stride + Math.sin(phase * 0.5 + i) * 0.012;
       });
+      headPivot.rotation.y += ((attending ? Math.sin(phase * 0.42) * 0.055 : Math.sin(phase * 0.3) * 0.025) - headPivot.rotation.y) * (1 - Math.exp(-3 * dt));
+      headPivot.rotation.x += ((attending ? -0.035 : Math.sin(phase * 0.5) * 0.018) - headPivot.rotation.x) * (1 - Math.exp(-2.5 * dt));
+      blinkClock += dt;
+      if (blinkClock > 3.2 + (options.role === "director" ? 0.8 : 0)) { blinkClock = 0; blinkAmount = 0.12; }
+      blinkAmount = Math.max(0, blinkAmount - dt);
+      const eyeOpen = 1 - Math.sin((1 - blinkAmount / 0.12) * Math.PI) * 0.92;
+      for (const eye of eyeMeshes) eye.scaling.y = 0.008 * Math.max(0.08, eyeOpen);
     },
     dispose() {
       if (disposed) return; disposed = true;
