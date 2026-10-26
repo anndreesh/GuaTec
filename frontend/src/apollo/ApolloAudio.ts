@@ -7,7 +7,7 @@ export class ApolloAudio {
   private sources: AudioScheduledSourceNode[] = [];
   muted = false;
   async start() {
-    if (this.ctx) { await this.ctx.resume(); return; }
+    if (this.ctx) { await this.resume(this.ctx); return; }
     const c = this.ctx = new AudioContext();
     this.master = c.createGain(); this.master.gain.value = .38; this.master.connect(c.destination);
     const buffer = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
@@ -27,7 +27,7 @@ export class ApolloAudio {
     const bass = c.createBiquadFilter(); bass.type = 'lowpass'; bass.frequency.value = 180;
     this.roar = c.createGain(); this.roar.gain.value = 0;
     engine.connect(bass).connect(this.roar).connect(this.master); engine.start(); this.sources.push(engine);
-    await c.resume();
+    await this.resume(c);
   }
   launch(elapsed: number, distance: number) {
     if (!this.ctx || !this.roar) return;
@@ -52,6 +52,20 @@ export class ApolloAudio {
     tone.connect(gain).connect(this.master); tone.start(); tone.stop(c.currentTime + .14);
   }
   toggle() { this.muted = !this.muted; if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : .38, this.ctx.currentTime, .08); }
-  pause(paused: boolean) { if (!this.ctx) return; if (paused) void this.ctx.suspend(); else void this.ctx.resume(); }
-  dispose() { this.sources.forEach(s => { try { s.stop(); } catch {} }); this.sources = []; void this.ctx?.close(); this.ctx = null; }
+  private async resume(context: AudioContext) {
+    try { await context.resume(); }
+    catch (error) { if (context.state !== 'closed') throw error; }
+  }
+  pause(paused: boolean) {
+    const context=this.ctx;
+    if(!context || context.state==='closed') return;
+    // A screen can unmount while the browser is still processing this transition.
+    // Always consume the transition promise; intentional teardown is not a game error.
+    void (paused ? context.suspend() : context.resume()).catch(()=>{});
+  }
+  dispose() {
+    this.sources.forEach(s => { try { s.stop(); } catch {} });this.sources=[];
+    const context=this.ctx;this.ctx=null;
+    if(context && context.state!=='closed')void context.close().catch(()=>{});
+  }
 }

@@ -7,7 +7,7 @@ Fecha local:26 de octubre de2026. [Arquitectura y límites](../../docs/APOLLO11_
 Se reconstruyó la Misión01 dentro de la SPA existente con Three.js y guardado Flask. Los ocho checkpoints se completan en orden, con tres Mercenary caminando en la retrospectiva de tripulación, negro de embarque, traslado remoto, cuenta y lanzamiento originales y epílogo. No hay interiores. El modelo Sketchfab solicitado se ofrece mediante su visor oficial separado; no es descargable.
 
 - `npm run typecheck`:aprobado.
-- `npm test`:40 pruebas aprobadas, incluidas9 nuevas del FSM Apollo y31 heredadas.
+- `npm test`:44 pruebas aprobadas, incluidas9 del FSM Apollo,4 de ciclo de vida de audio y31 heredadas.
 - `npm run build`:aprobado. Chunk Apollo~780kB/~208kB gzip, carga diferida; Vite conserva advertencia>500kB, documentada porque incluyeThree.js/cargadores.
 - `backend/test_apollo_progress.py`:7 pruebas aprobadas sobreSQLite en memoria; migración/replay/completado/identidad y conservación de otros estados.
 - `qa-apollo.cjs`:juego compilado, invitado aleatorio y entrada real por teclado a todas las estaciones. Respuesta incorrecta no avanza; guardado parcial `log` se recupera al salir/reentrar;8/8 recuperado al completar; reinicio devuelve0/8. Cero errores de consola/página y cero peticiones fallidas. [JSON completo](qa.json).
@@ -15,6 +15,8 @@ Se reconstruyó la Misión01 dentro de la SPA existente con Three.js y guardado 
 - `qa-apollo-layout.cjs`:390x844 y1440x900, sin solapamiento pausa/selector de idioma tras corrección. Zoom,mapa,pausa,calidad y silencio operan. [JSON](layout-qa.json).
 
 Los fixtures cinematográficos montan un estado válido mediante su FSM dentro del navegador de prueba; no sustituyen la progresión real del primer harness ni agregan hooks públicos.
+
+La comprobación pública posterior completó8/8, recuperación yreinicio, y descubrió una carrera intermitente al cerrarAudioContext conresume pendiente. Se corrigieron las promesas de transición/teardown; cuatro pruebas reproducen el rechazo tardío y ocho ciclos reales de entrar/pausar/continuar/salir/reentrar terminan con cero errores de consola/red. [Regresión de audio](audio-lifecycle-qa.json). La orientación del minimapa también se alineó con el yaw del mundo y se verificó con desplazamiento real hacia la izquierda.
 
 ## Rendimiento medido
 
