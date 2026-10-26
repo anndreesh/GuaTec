@@ -608,12 +608,32 @@ export class ApolloWorld {
     }
   }
   private buildClouds(): void {
-    const texture = createSmokeTexture();
-    const mat = new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff, transparent: true, opacity: 0.46, depthWrite: false, side: THREE.DoubleSide });
-    for (let i = 0; i < 45; i++) {
-      const angle = i * 2.399;
-      const sprite = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); sprite.position.set(Math.sin(angle) * (1800 + i * 70), 500 + (i % 4) * 80, Math.cos(angle) * (1800 + i * 70));
-      sprite.scale.set(190 + i % 5 * 40, 45 + i % 3 * 20, 1); sprite.rotation.y = angle; this.cloudSprites.add(sprite);
+    // The old version used one radial smoke stamp per cloud, which read as a
+    // ring of white circles. A cloud bank is now made from broad, irregular
+    // silhouettes with a darker underside and a few offset layers for depth.
+    const textures = [0, 1, 2, 3].map(seed => createCloudTexture(seed));
+    const materials = textures.map(texture => new THREE.MeshBasicMaterial({
+      map: texture, transparent: true, opacity: 0.74, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    let seed = 1847;
+    const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    for (let i = 0; i < 25; i++) {
+      const angle = i * 2.399 + random() * 0.28;
+      const distance = 1550 + i * 112 + random() * 420;
+      const bank = new THREE.Group();
+      bank.position.set(Math.sin(angle) * distance, 520 + random() * 210, Math.cos(angle) * distance);
+      bank.rotation.y = angle + Math.PI * 0.5;
+      const width = 460 + random() * 260;
+      const height = 100 + random() * 55;
+      for (let layer = 0; layer < 3; layer++) {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), materials[(i + layer) % materials.length]);
+        mesh.position.set((random() - 0.5) * width * 0.24, (layer - 1) * 18, (layer - 1) * 16);
+        mesh.rotation.y = (random() - 0.5) * 0.12;
+        mesh.scale.set(width * (1 - layer * 0.11), height * (1 - layer * 0.08), 1);
+        mesh.renderOrder = -2 + layer;
+        bank.add(mesh);
+      }
+      this.cloudSprites.add(bank);
     }
     this.scene.add(this.cloudSprites);
   }
@@ -910,4 +930,48 @@ function createSmokeTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d')!; const gradient = ctx.createRadialGradient(64, 64, 3, 64, 64, 62);
   gradient.addColorStop(0, 'rgba(255,255,255,.9)'); gradient.addColorStop(.55, 'rgba(245,243,236,.5)'); gradient.addColorStop(1, 'rgba(230,228,218,0)');
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, 128, 128); const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; return texture;
+}
+
+function createCloudTexture(seed: number): THREE.CanvasTexture {
+  const width = 512, height = 256;
+  const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+  const image = ctx.createImageData(width, height);
+  const lobes = [
+    { x: 0.12 + seed * 0.01, y: 0.54, w: 0.24, h: 0.30, strength: 0.72 },
+    { x: 0.31 + seed * 0.013, y: 0.43, w: 0.28, h: 0.42, strength: 0.94 },
+    { x: 0.53 + seed * 0.009, y: 0.36, w: 0.25, h: 0.48, strength: 0.9 },
+    { x: 0.74 + seed * 0.011, y: 0.46, w: 0.31, h: 0.36, strength: 0.82 },
+    { x: 0.91 + seed * 0.007, y: 0.58, w: 0.22, h: 0.25, strength: 0.62 },
+  ];
+  const noise = (x: number, y: number) => (
+    Math.sin(x * 17.3 + seed * 3.1) * 0.45 + Math.sin(y * 23.7 - seed * 1.7) * 0.3 + Math.sin((x + y) * 41.1 + seed) * 0.25
+  );
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const nx = x / width, ny = y / height;
+    let density = 0;
+    for (const lobe of lobes) {
+      const dx = (nx - ((lobe.x % 1) + 1) % 1) / lobe.w;
+      const dy = (ny - lobe.y) / lobe.h;
+      density = Math.max(density, Math.max(0, 1 - Math.hypot(dx, dy)) * lobe.strength);
+    }
+    // A wide, uneven shelf joins the puffs into a cloud bank instead of dots.
+    const shelf = Math.max(0, 1 - Math.abs(ny - 0.67) / 0.23) * (0.52 + noise(nx, ny) * 0.12);
+    density = Math.max(density, shelf);
+    density *= Math.min(1, nx * 12, (1 - nx) * 12, ny * 16, (1 - ny) * 9);
+    density = Math.max(0, Math.min(1, density + noise(nx, ny) * 0.08));
+    const underside = Math.max(0, Math.min(1, (ny - 0.39) * 1.5));
+    const shade = 248 - underside * 54;
+    const index = (y * width + x) * 4;
+    image.data[index] = shade;
+    image.data[index + 1] = shade + 2;
+    image.data[index + 2] = shade + 1;
+    image.data[index + 3] = Math.round(density * 215);
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 4;
+  return texture;
 }
