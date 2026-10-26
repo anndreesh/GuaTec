@@ -132,9 +132,7 @@ export class ApolloScreen implements Screen {
   private buildHud() {
     const top=el('div','ap-topbar');
     const mark=el('div','ap-mark'); mark.innerHTML='<b>APOLLO <span>11</span></b><small>KENNEDY SPACE CENTER · 16 JUL 1969</small>';
-    const actions=el('div','ap-controls');
-    actions.append(this.button('Mapa · M',()=>this.openMap()),this.button('Radio · R',()=>this.dialogue.repeat()),this.button('Zoom',()=>{this.zoom=!this.zoom;this.world.setZoom(this.zoom);}),this.button('Pausa',()=>this.openPause()));
-    top.append(mark,actions); this.root.append(top);
+    top.append(mark); this.root.append(top);
     this.hud=el('section','ap-objective'); this.hud.setAttribute('aria-label','Objetivo actual'); this.root.append(this.hud);
     this.subtitle=el('div','ap-radio'); this.subtitle.setAttribute('aria-live','polite'); this.root.append(this.subtitle);
     this.prompt=this.button('',()=>this.interact(),'ap-interact'); this.root.append(this.prompt);
