@@ -2,6 +2,8 @@
 
 > **Update 2026-10-26:** Mission 01 now uses the project-authored, articulated 1920s field engineer as its player character. The two Mercenary astronaut variants audited below are historical audit records only; they are no longer loaded or included in the production bundle. The NASA shuttle GLB remains unchanged.
 
+The Vite production build also excludes five ignored, high-poly source GLBs from `dist`; their optimized counterparts and local source files remain untouched. Together these source files total 584,504,380 bytes (584.5 MB decimal / 557.4 MiB), including the 500 MB unused astronaut source. They are omitted from the deployment output without modifying any model files.
+
 ## Scope and method
 
 Inspected the Babylon.js scene, local workshop loader, asset registry and GLB JSON/accessor/image chunks. Counts below describe source assets, not visible-frame counters. No external models were downloaded, no existing hero model was replaced, and no production FPS claim follows from these counts.
