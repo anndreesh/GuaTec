@@ -43,7 +43,9 @@ export class ApolloWorld {
   private van = new THREE.Group();
   private arms: THREE.Group[] = [];
   private crew: THREE.Group[] = [];
-  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null }[] = [];
+  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null; run: THREE.AnimationAction | null }[] = [];
+  /** Smoothed blend weights of the player's idle / walk / run(+jump) animations. */
+  private animWeights = { idle: 1, walk: 0, run: 0 };
   private mixers: THREE.AnimationMixer[] = [];
   private colliders: Collider[] = [];
   private sun = new THREE.DirectionalLight(0xfff0d3, 3.2);
@@ -567,6 +569,14 @@ export class ApolloWorld {
     try {
       const gltf = await loader.loadAsync('/assets/apollo/mercenary-astronaut.glb');
       if (this.disposed) { this.disposeObject(gltf.scene); return; }
+      // The GLB ships Mixamo Walk, Idle and Running (no jump clip). Keep Running in place by removing
+      // horizontal hip drift, so the speed of the character comes only from the game's own movement.
+      const runClip = gltf.animations.find(c => /run/i.test(c.name));
+      const hipTrack = runClip?.tracks.find(track => /^Hips.*\.position$/.test(track.name));
+      if (hipTrack) {
+        const n = hipTrack.values.length / 3;
+        for (const axis of [0, 2]) { let sum = 0; for (let k = 0; k < n; k++) sum += hipTrack.values[k * 3 + axis]; const mean = sum / n; for (let k = 0; k < n; k++) hipTrack.values[k * 3 + axis] = mean; }
+      }
       const bounds = new THREE.Box3().setFromObject(gltf.scene);
       const size = bounds.getSize(new THREE.Vector3());
       this.loadedModel = { source: 'Peter_D / Mercenary Astronaut / CC BY 4.0', url: '/assets/apollo/mercenary-astronaut.glb', originalBounds: size.toArray(), clips: gltf.animations.map(c => ({ name: c.name, duration: c.duration })), characterHeight: 1.85, skeletonClones: 4 };
@@ -611,10 +621,12 @@ export class ApolloWorld {
         const mixer = new THREE.AnimationMixer(model);
         const walking = gltf.animations.find(c => /walk/i.test(c.name));
         const idling = gltf.animations.find(c => /idle/i.test(c.name));
+        const running = gltf.animations.find(c => /run/i.test(c.name));
         const walk = walking ? mixer.clipAction(walking).setEffectiveWeight(i ? 1 : 0).play() : null;
         const idle = idling ? mixer.clipAction(idling).setEffectiveWeight(i ? 0 : 1).play() : null;
+        const run = i === 0 && running ? mixer.clipAction(running).setEffectiveWeight(0).play() : null;
         if (walk) walk.time = i * 0.35;
-        this.people.push({ root: holder, mixer, walk, idle }); this.mixers.push(mixer);
+        this.people.push({ root: holder, mixer, walk, idle, run }); this.mixers.push(mixer);
       }
       this.crewRoot.visible = false;
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
@@ -714,9 +726,23 @@ export class ApolloWorld {
     // subtle enough for the long lens instead of hiding the rocket in dense fog.
     if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.density = this.player.z > 5000 || this.mode === 'launch' ? 0.00004 : 0.00038;
     for (let i = 0; i < this.people.length; i++) {
-      const p = this.people[i]; const walking = i === 0 ? moving : this.mode === 'crew';
+      const p = this.people[i];
+      if (i === 0) {
+        // Player: idle / walk / run, with Running reused as the airborne pose (the GLB has no jump clip).
+        const sprint = moving && this.keys.has('shift'), air = this.player.y > 0;
+        const goal = { idle: moving || air ? 0 : 1, walk: moving && !sprint && !air ? 1 : 0, run: air || sprint ? 1 : 0 };
+        const k = 1 - Math.exp(-dt * 12);
+        for (const key of ['idle', 'walk', 'run'] as const) { this.animWeights[key] += (goal[key] - this.animWeights[key]) * k; p[key]?.setEffectiveWeight(this.animWeights[key]); }
+        p.run?.setEffectiveTimeScale(air ? 0.55 : 1);
+        p.mixer.update(dt);
+        // Slight forward lean while sprinting or jumping.
+        const model = p.mixer.getRoot() as THREE.Object3D;
+        model.rotation.x += ((air ? 0.2 : sprint ? 0.1 : 0) - model.rotation.x) * k;
+        continue;
+      }
+      const walking = this.mode === 'crew';
       p.walk?.setEffectiveWeight(walking ? 1 : 0); p.idle?.setEffectiveWeight(walking ? 0 : 1);
-      if (i === 0 || this.mode === 'crew') p.mixer.update(dt);
+      if (this.mode === 'crew') p.mixer.update(dt);
     }
     if (this.target.visible) { this.target.children[1].rotation.y += dt; this.target.children[1].position.y = 3.8 + Math.sin(this.clock * 2) * 0.22; }
     if (this.mode === 'intro') this.introCamera(this.cinematicElapsed);
