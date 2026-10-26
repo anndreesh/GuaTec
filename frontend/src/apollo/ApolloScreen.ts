@@ -148,7 +148,7 @@ export class ApolloScreen implements Screen {
     box.append(el('p','ap-note','Recreación educativa. Daniel Carter y los diálogos son ficticios. Las rutas se han acortado; no hay interiores accesibles. Los trajes Mercenary son una adaptación artística, no réplicas del A7L.'));
     if(this.state.completed.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length} de 8 checkpoints completados.`));
     const start=this.button(this.state.done?'Ver epílogo':this.state.completed.length?'Continuar misión':'Comenzar operaciones',()=>{
-      this.started=true; this.closeModal(); void this.audio.start().catch(()=>this.notify('Audio no disponible; los subtítulos permanecen activos.'));
+      this.started=true; this.root.classList.add('ap-playing'); this.closeModal(); void this.audio.start().catch(()=>this.notify('Audio no disponible; los subtítulos permanecen activos.'));
       if(this.state.done) this.showEnd();
       else if(this.state.completed.length || this.state.checks.length) this.enterCheckpoint();
       else this.beginMovie('intro');
