@@ -1,6 +1,9 @@
 import { DIALOGUES, type ApolloState } from './ApolloState';
 import { ApolloAudio } from './ApolloAudio';
-type Line = { id:string; character:string; text:string; duration:number; channel:string; priority:number };
+import { channelPrefix, dialogueText, txt, type Txt } from './ApolloCopy';
+/** Character and text are resolved lazily so a visible subtitle can be re-rendered when the language changes. */
+type Line = { id:string; character:Txt; text:Txt; duration:number; channel:string; priority:number };
+const toLine = (d: (typeof DIALOGUES)[number]): Line => ({ id:d.id, character:() => dialogueText(d.id).character, text:() => dialogueText(d.id).text, duration:d.duration, channel:d.channel, priority:d.priority });
 /** Single queue owns subtitles. Future-checkpoint speech is discarded, never overlapped. */
 export class ApolloDialogue {
   private queue: Line[] = [];
@@ -14,19 +17,19 @@ export class ApolloDialogue {
     if (this.checkpoint === this.state.checkpoint) return;
     this.checkpoint = this.state.checkpoint; this.queue = []; this.active = null; this.remaining = 0;
     this.host.replaceChildren();
-    for (const d of DIALOGUES) if (d.checkpoint === this.checkpoint && d.trigger === 'enter' && !this.state.dialogues.includes(d.id)) this.queue.push(d);
+    for (const d of DIALOGUES) if (d.checkpoint === this.checkpoint && d.trigger === 'enter' && !this.state.dialogues.includes(d.id)) this.queue.push(toLine(d));
     this.queue.sort((a,b) => b.priority-a.priority);
   }
-  say(character: string, text: string, duration = 9, channel = 'radio') {
+  say(character: Txt, text: Txt, duration = 9, channel = 'radio') {
     this.queue.push({id:'',character,text,duration,channel,priority:0});
   }
   complete(checkpoint:number) {
-    const lines=DIALOGUES.filter(d=>d.checkpoint===checkpoint && d.trigger==='complete' && !this.state.dialogues.includes(d.id));
+    const lines=DIALOGUES.filter(d=>d.checkpoint===checkpoint && d.trigger==='complete' && !this.state.dialogues.includes(d.id)).map(toLine);
     this.queue.unshift(...lines);
   }
   repeat() {
     const d = [...DIALOGUES].reverse().find(d => d.checkpoint === this.state.checkpoint && d.trigger === 'enter');
-    const line = d ?? this.last;
+    const line = d ? toLine(d) : this.last;
     if (line && !this.active) { this.queue.unshift(line); this.replaying = true; }
   }
   update(dt: number) {
@@ -38,11 +41,17 @@ export class ApolloDialogue {
     }
     const line = this.queue.shift(); if (!line) return;
     this.active = this.last = line; this.remaining = line.duration;
-    this.host.replaceChildren();
-    const name = document.createElement('strong'); name.textContent = `${line.channel === 'radio' ? '◉ RADIO · ' : line.channel === 'narrator' ? 'NARRACIÓN · ' : ''}${line.character}`;
-    const text = document.createElement('p'); text.textContent = line.text;
-    this.host.append(name,text); this.host.classList.add('ap-radio-visible');
+    this.render(line);
+    this.host.classList.add('ap-radio-visible');
     if (line.channel === 'radio') this.audio.radio();
   }
+  private render(line: Line) {
+    this.host.replaceChildren();
+    const name = document.createElement('strong'); name.textContent = `${channelPrefix(line.channel)}${txt(line.character)}`;
+    const text = document.createElement('p'); text.textContent = txt(line.text);
+    this.host.append(name,text);
+  }
+  /** Re-renders the subtitle currently on screen in the active language. */
+  refreshLanguage() { if (this.active) this.render(this.active); }
   clear() { this.queue=[]; this.active=null; this.host.replaceChildren(); this.host.classList.remove('ap-radio-visible'); }
 }
