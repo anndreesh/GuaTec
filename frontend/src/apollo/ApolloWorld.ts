@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { txt, world, type Txt } from './ApolloCopy';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -29,6 +30,8 @@ export class ApolloWorld {
   private mode: Mode = null;
   private cinematicElapsed = 0;
   private clock = 0;
+  /** Repaint callbacks for every text sign, so 3D lettering follows the selected language. */
+  private textRepaints: Array<() => void> = [];
   private playerRoot = new THREE.Group();
   private crewRoot = new THREE.Group();
   private rocket = new THREE.Group();
@@ -203,7 +206,7 @@ export class ApolloWorld {
     const grass = new THREE.MeshStandardMaterial({ map: this.texture('grass', 180), roughness: 1 });
     this.groundPlane(16000, 16000, 0, 0, grass, -0.12);
     this.groundPlane(42, 35, 0, 5600, new THREE.MeshStandardMaterial({ map: this.texture('concrete', 3), roughness: 1 }), 0.04);
-    this.sign('OBSERVACIÓN DEL LANZAMIENTO', 'DISTANCIA DE SEGURIDAD · 5,6 KM', -8, 2.2, 5590, 0, 8);
+    this.sign(() => world('launchObs'), () => world('safetyDistance'), -8, 2.2, 5590, 0, 8);
     const concrete = new THREE.MeshStandardMaterial({ map: this.texture('concrete', 7), roughness: 0.95 });
     this.groundPlane(132, 130, 0, 0, concrete, 0.01);
     const asphalt = new THREE.MeshStandardMaterial({ map: this.texture('asphalt', 22), roughness: 0.98 });
@@ -225,8 +228,8 @@ export class ApolloWorld {
       this.groundPlane(30 + (i % 3) * 13, 100 + i * 7, -150 - (i % 3) * 50, 90 + i * 80, water, -0.04);
     }
     this.groundPlane(26, 920, 195, 220, water, -0.03);
-    this.sign('KENNEDY SPACE CENTER', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
-    this.sign('PAD 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
+    this.sign(() => world('kennedy'), () => world('groundOps'), -18, 2.2, 118, 0, 7);
+    this.sign(() => world('pad'), () => world('restricted'), -11, 1.9, 91, 0, 4.5);
   }
   private buildPad(): void {
     const steel = this.material('tower', 0x8f3c30, 0.64, 0.45);
@@ -279,7 +282,7 @@ export class ApolloWorld {
       this.box(5, 0.35, 1.5, silver, x, 45, z);
       for (let i = 0; i < 3; i++) this.box(0.9, 0.9, 0.5, this.material('floodlight', 0xe9e6c9), x - 1.5 + i * 1.5, 44.6, z + 0.5);
     }
-    this.sign('APOLLO 11', 'SATURN V · AS-506 · LC-39A', 22, 4, 47, 0, 11);
+    this.sign('APOLLO 11', () => world('rocket'), 22, 4, 47, 0, 11);
   }
   private buildSaturn(): void {
     const white = this.material('saturn-white', 0xf1f0e5, 0.46, 0.22);
@@ -366,7 +369,7 @@ export class ApolloWorld {
     this.box(160, 2, 136, roof, 0, 161, 0, vab);
     for (let i = 0; i < 6; i++) this.box(13, 130, 0.3, this.material('vab-door', 0x929e9f), -60 + i * 24, 65, 67.2, vab);
     for (let y = 4; y < 155; y += 4) this.box(158, 0.1, 0.2, roof, 0, y, 67.4, vab);
-    const vabSub = this.textPlane('VEHICLE ASSEMBLY BUILDING', 105, 5, '#31434b', false); vabSub.position.set(0, 151, 67.5); vab.add(vabSub);
+    const vabSub = this.textPlane(() => world('vab'), 105, 5, '#31434b', false); vabSub.position.set(0, 151, 67.5); vab.add(vabSub);
     const vabLod = new THREE.LOD();
     vab.position.set(0, 0, 0); this.mergeAuthored(vab);
     const distantVab = new THREE.Group();
@@ -389,12 +392,12 @@ export class ApolloWorld {
     this.fence(-150, -80, 325);
   }
   private buildStations(): void {
-    this.station(-35, 130, 'ORIENTACIÓN', '01 · OPERACIONES DE APOYO', 'map');
-    this.station(-70, 165, 'RECONOCIMIENTO', '02 · OBSERVACIÓN DEL COMPLEJO', 'camera');
-    this.station(-100, 220, 'DOCUMENTACIÓN', '03 · REGISTRO DE COMUNICACIONES', 'desk');
-    this.station(70, 235, 'COMUNICACIONES', '04 · ESTACIÓN DE APOYO', 'radio');
-    this.station(0, 150, 'LA TRIPULACIÓN', '05 · RECREACIÓN HISTÓRICA', 'crew');
-    this.station(0, 355, 'OBSERVACIÓN', '06 · CÁMARA DE SEGUIMIENTO', 'camera');
+    this.station(-35, 130, () => world('s1'), () => world('s1sub'), 'map');
+    this.station(-70, 165, () => world('s2'), () => world('s2sub'), 'camera');
+    this.station(-100, 220, () => world('s3'), () => world('s3sub'), 'desk');
+    this.station(70, 235, () => world('s4'), () => world('s4sub'), 'radio');
+    this.station(0, 150, () => world('s5'), () => world('s5sub'), 'crew');
+    this.station(0, 355, () => world('s6'), () => world('s6sub'), 'camera');
     const steel = this.material('galvanized', 0xa4aaa5, 0.58, 0.7);
     // Deep-space style parabolic dish, original geometry; visual educational approximation.
     const g = new THREE.Group(); g.position.set(82, 0, 236);
@@ -412,7 +415,7 @@ export class ApolloWorld {
     // Tracking tripod at the spectator area is a distinct authored piece.
     for (let i = 0; i < 6; i++) this.box(3.2, 0.14, 0.55, this.material('bench', 0x7b6651), -22 + i * 9, 0.9, 381);
   }
-  private station(x: number, z: number, title: string, subtitle: string, type: string): void {
+  private station(x: number, z: number, title: Txt, subtitle: Txt, type: string): void {
     const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
     const cream = this.material('station-cream', 0xc6c4ad, 0.8);
     this.box(7, 0.12, 5, this.material('station-concrete', 0xb7b3a0), x, 0.05, z);
@@ -445,23 +448,31 @@ export class ApolloWorld {
       this.beam(new THREE.Vector3(x, 0.35, z), new THREE.Vector3(x + 6, 2.3, z), 0.025, metal);
     }
   }
-  private sign(title: string, sub: string, x: number, y: number, z: number, rotation = 0, w = 6): void {
+  private sign(title: Txt, sub: Txt, x: number, y: number, z: number, rotation = 0, w = 6): void {
     const group = new THREE.Group(); group.position.set(x, y, z); group.rotation.y = rotation;
-    const plate = this.textPlane(title + '\n' + sub, w, 1.25, '#f2e8cb', true); group.add(plate);
+    const plate = this.textPlane(() => txt(title) + '\n' + txt(sub), w, 1.25, '#f2e8cb', true); group.add(plate);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), -w * 0.36, -y / 2, -0.08, group);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), w * 0.36, -y / 2, -0.08, group);
     this.scene.add(group);
   }
-  private textPlane(text: string, w: number, h: number, color: string, background: boolean): THREE.Mesh {
+  private textPlane(text: Txt, w: number, h: number, color: string, background: boolean): THREE.Mesh {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
-    if (background) { ctx.fillStyle = '#243d3d'; ctx.fillRect(0, 0, 1024, 256); ctx.strokeStyle = '#b8bc9d'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, 1012, 244); }
-    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const lines = text.split('\n');
-    lines.forEach((line, i) => { ctx.font = `${i ? 31 : 58}px Arial`; ctx.fillText(line, 512, lines.length > 1 ? 92 + i * 86 : 128, 940); });
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+    const draw = () => {
+      ctx.clearRect(0, 0, 1024, 256);
+      if (background) { ctx.fillStyle = '#243d3d'; ctx.fillRect(0, 0, 1024, 256); ctx.strokeStyle = '#b8bc9d'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, 1012, 244); }
+      ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const lines = txt(text).split('\n');
+      lines.forEach((line, i) => { ctx.font = `${i ? 31 : 58}px Arial`; ctx.fillText(line, 512, lines.length > 1 ? 92 + i * 86 : 128, 940); });
+      tex.needsUpdate = true;
+    };
+    draw();
+    if (typeof text === 'function') this.textRepaints.push(draw);
     return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.DoubleSide }));
   }
+  /** Repaints all localized 3D signs in the active language (no scene rebuild). */
+  refreshLanguage(): void { for (const repaint of this.textRepaints) repaint(); }
   private buildVegetation(): void {
     const count = 100;
     const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.13, 0.25, 6.8, 6), this.material('palm-trunk', 0x77664d), count);
