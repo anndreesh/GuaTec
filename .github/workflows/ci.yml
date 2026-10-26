@@ -27,5 +27,8 @@ jobs:
       - name: Typecheck TypeScript
         run: cd frontend && npm run typecheck
 
+      - name: Mission progression and experiment tests
+        run: cd frontend && npm test
+
       - name: Build frontend
         run: cd frontend && npm run build

@@ -1,3 +1,5 @@
+import type { FieldTaskId, MissionMiniGameResult } from "./Mission01FieldTasks";
+
 /** Mission objectives are data so the HUD and saved progress can share one source. */
 export const MISSION_01_OBJECTIVES = [
   { id: "lab", label: "Find the project area", location: "Project Area", required: true, checkpoint: "Arrival" },
@@ -29,7 +31,16 @@ export const MAP_OBJECTIVE_TARGET: Record<MissionObjectiveId, string> = {
   analysis: "analysis-station",
 };
 
-export function mapTargetForObjective(id: MissionObjectiveId, unmetNpc?: string): string {
+export function mapTargetForObjective(id: MissionObjectiveId, unmetNpc?: string,
+  fieldResults?: ReadonlyMap<FieldTaskId, MissionMiniGameResult>, routeChecks?: ReadonlySet<string>): string {
+  if (fieldResults) {
+    const tasks: Partial<Record<MissionObjectiveId, FieldTaskId[]>> = {
+      design: ["assembly", "mass"], testing: ["calibration", "signal"], prepare: ["route", "weather"],
+    };
+    const pending = tasks[id]?.find(task => !fieldResults.has(task));
+    if (pending === "route") return [1, 2, 3].map(n => `route-check-${n}`).find(point => !routeChecks?.has(point)) ?? "launch-window";
+    if (pending) return `field-${pending}`;
+  }
   if (id === "meet-team" && unmetNpc) return unmetNpc;
   return MAP_OBJECTIVE_TARGET[id];
 }

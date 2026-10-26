@@ -1,12 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Mission1State } from '../src/state/Mission1State';
+import { fieldTaskResult } from '../src/state/Mission01FieldTasks';
 
 function designReady() {
   const state = new Mission1State();
   for (const id of ['lab', 'discover'] as const) assert.equal(state.completeObjective(id), true);
   for (const id of ['meet-propulsion', 'meet-structural', 'meet-data']) state.meetNpc(id);
-  for (const id of ['meet-team', 'prototype', 'design'] as const) assert.equal(state.completeObjective(id), true);
+  for (const id of ['meet-team', 'prototype'] as const) assert.equal(state.completeObjective(id), true);
+  state.completeFieldTask(fieldTaskResult('assembly')); state.completeFieldTask(fieldTaskResult('mass'));
+  assert.equal(state.completeObjective('design'), true);
+  state.completeFieldTask(fieldTaskResult('calibration')); state.completeFieldTask(fieldTaskResult('signal'));
   return state;
 }
 function testingReady() {
@@ -48,6 +52,8 @@ test('diagnosis and launch require validated engineering tasks', () => {
   assert.equal(state.completeObjective('diagnose'), true);
   for (const id of ['inspect-vehicle','check-instruments','review-conditions','confirm-observation','confirm-telemetry']) state.markChecklist(id);
   state.engineering.launchDecision = 'proceed';
+  for (const n of [1,2,3]) state.inspectRoute(`route-check-${n}`);
+  state.completeFieldTask(fieldTaskResult('route')); state.completeFieldTask(fieldTaskResult('weather'));
   assert.equal(state.completeObjective('prepare'), false);
   assert.equal(state.completeEngineeringTask('launch'), true);
   assert.equal(state.completeObjective('prepare'), true);

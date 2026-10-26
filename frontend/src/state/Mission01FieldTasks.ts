@@ -15,6 +15,7 @@ export interface MissionMiniGameResult {
   id: FieldTaskId;
   completed: boolean;
   inherited?: boolean;
+  conditions?: "CLEAR" | "CLOUDY" | "LIGHT MIST" | "WINDY";
   score: number;
   attempts: number;
   mistakes: number;
@@ -25,7 +26,8 @@ export function isFieldTaskId(value: unknown): value is FieldTaskId {
   return typeof value === "string" && (FIELD_TASK_IDS as readonly string[]).includes(value);
 }
 
-export function fieldTaskResult(id: FieldTaskId, attempts = 1, mistakes = 0): MissionMiniGameResult {
+export function fieldTaskResult(id: FieldTaskId, attempts = 1, mistakes = 0, conditions?: MissionMiniGameResult["conditions"]): MissionMiniGameResult {
+  if (!( ["CLEAR", "CLOUDY", "LIGHT MIST", "WINDY"] as unknown[]).includes(conditions)) conditions = undefined;
   attempts = Math.max(1, Math.min(999, Math.floor(Number.isFinite(attempts) ? attempts : 1)));
   mistakes = Math.max(0, Math.min(999, Math.floor(Number.isFinite(mistakes) ? mistakes : 0)));
   const score = Math.max(40, 100 - mistakes * 8 - (attempts - 1) * 2);
@@ -34,11 +36,11 @@ export function fieldTaskResult(id: FieldTaskId, attempts = 1, mistakes = 0): Mi
     mass: { stability: score >= 80 ? 4 : 2, mass: -2 },
     calibration: { dataQuality: score >= 80 ? 6 : 3 },
     route: { launchReadiness: 60 },
-    weather: { launchReadiness: 40, stability: mistakes === 0 ? 2 : 1 },
+    weather: { launchReadiness: 40, stability: conditions === "WINDY" ? -3 : conditions === "LIGHT MIST" ? -1 : conditions === "CLOUDY" ? 0 : 2 },
     signal: { dataQuality: score >= 80 ? 5 : 2 },
     recovery: { dataQuality: score >= 80 ? 7 : 3 },
   };
-  return { id, completed: true, score, attempts, mistakes,
+  return { id, completed: true, score, attempts, mistakes, ...(id === "weather" && conditions ? { conditions } : {}),
     effects: { ...effects[id], time: Math.min(3, mistakes), budget: -Math.min(3, mistakes) } };
 }
 

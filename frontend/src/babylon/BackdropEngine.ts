@@ -1,6 +1,31 @@
 import { MISSION_1_POIS, THEME } from "@/config/gameConfig";
 import { createGameplayLayer, type GameplayHandle } from "@/babylon/gameplay/GameplayLayer";
-import type { Node } from "@babylonjs/core";
+import type { AbstractMesh, Node } from "@babylonjs/core";
+
+/** Keep shadow submission tied to world-scale silhouettes, not local source bounds. */
+export function isMissionShadowCaster(mesh: AbstractMesh): boolean {
+  let node: Node | null = mesh;
+  let belongsToGameplay = false;
+  let crew = false;
+  while (node) {
+    if (node.name === "gameplay-root") belongsToGameplay = true;
+    if (node.name === "field-engineer-root") crew = true;
+    if (node.name === "field-station-kit" || node.name === "1926-launch-frame"
+      || node.name === "nasa-shuttle-model" || node.name === "mercenary-avatar-model"
+      || /^field-(adjustable_wrench|vintage_oil_lamp|metal_toolbox)-/.test(node.name)) return false;
+    node = node.parent;
+  }
+  if (!belongsToGameplay || !mesh.isVisible || mesh.getTotalVertices() === 0) return false;
+  const name = mesh.name;
+  if (name === "mars-ground" || name === "auburn-distant-ground" || name === "auburn-sky-dome"
+    || name === "player-contact-shadow" || name === "nearby-activity-focus-ring" || name === "rocket-exhaust-emitter"
+    || /^(auburn-star-|field-surface-patch-|dry-grass-|rocket-engine-)/.test(name)
+    || /^shed-(roof-standing-seam-|floor-board-|back-siding-|siding-nail-)/.test(name)) return false;
+  mesh.computeWorldMatrix(true);
+  const extent = mesh.getBoundingInfo().boundingBox.extendSizeWorld;
+  const largestDimension = 2 * Math.max(extent.x, extent.y, extent.z);
+  return Number.isFinite(largestDimension) && largestDimension > (crew ? 0.3 : 0.6);
+}
 
 export type BackdropMode = "starfield" | "mars-orbit" | "mars-surface" | "mission1-gameplay";
 
@@ -90,6 +115,21 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
 
   let fieldEnvironment: InstanceType<typeof BABYLON.HDRCubeTexture> | null = null;
   let currentMode: BackdropMode = "starfield";
+  let shadowBudgetDirty = true;
+  const shadowMeshObserver = scene.onNewMeshAddedObservable.add(() => { shadowBudgetDirty = true; });
+  const updateShadowBudget = () => {
+    if (currentMode !== "mission1-gameplay" || !shadowBudgetDirty) return;
+    shadowBudgetDirty = false;
+    for (const mesh of scene.meshes) {
+      if (isMissionShadowCaster(mesh)) {
+        shadowGenerator.addShadowCaster(mesh, false);
+        const receiver = mesh instanceof BABYLON.InstancedMesh ? mesh.sourceMesh : mesh;
+        receiver.receiveShadows = true;
+      } else {
+        shadowGenerator.removeShadowCaster(mesh, false);
+      }
+    }
+  };
 
   engine.runRenderLoop(() => {
     if (currentMode !== "mission1-gameplay") {
@@ -97,6 +137,9 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
     } else {
       gameplayLayer?.update(engine.getDeltaTime() / 1000);
     }
+    // Async GLBs and rebuilt gantry parts receive the same policy after their
+    // transforms are assigned, without scanning every mesh on unchanged frames.
+    updateShadowBudget();
     scene.render();
   });
 
@@ -165,30 +208,11 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
           scene.imageProcessingConfiguration.contrast = 1.06;
           const layer = ensureGameplayLayer();
           layer.enable();
-          let savedQuality: "high" | "balanced" = "high";
-          try { if (localStorage.getItem("guatec-graphics-quality") === "balanced") savedQuality = "balanced"; } catch { /* storage can be unavailable */ }
+          let savedQuality: "high" | "balanced" = "balanced";
+          try { if (localStorage.getItem("guatec-graphics-quality") === "high") savedQuality = "high"; } catch { /* storage can be unavailable */ }
           layer.handle.setQuality(savedQuality);
-          scene.meshes.forEach((mesh) => {
-            let node: Node | null = mesh;
-            let belongsToGameplay = false;
-            let castsSceneBlockingShadow = false;
-            while (node) {
-              if (node.name === "gameplay-root") belongsToGameplay = true;
-              if (node.name === "1926-launch-frame" || node.name === "nasa-shuttle-model" || node.name === "mercenary-avatar-model") {
-                castsSceneBlockingShadow = true;
-              }
-              node = node.parent;
-            }
-            const excludedFromShadow = mesh.name === "mars-ground" || mesh.name === "auburn-distant-ground"
-              || mesh.name === "auburn-sky-dome" || mesh.name === "player-contact-shadow" || mesh.name === "nearby-activity-focus-ring"
-              || mesh.name.startsWith("auburn-star-") || mesh.name.startsWith("field-surface-patch-") || mesh.name.startsWith("dry-grass-")
-              || mesh.name.startsWith("rocket-engine-") || mesh.name === "rocket-exhaust-emitter";
-            const significantCaster = mesh.getTotalVertices() > 0 && mesh.getBoundingInfo().boundingBox.extendSize.length() > 0.15;
-            if (belongsToGameplay && !castsSceneBlockingShadow && !excludedFromShadow && significantCaster) {
-              shadowGenerator.addShadowCaster(mesh, true);
-              mesh.receiveShadows = true;
-            }
-          });
+          shadowBudgetDirty = true;
+          updateShadowBudget();
           break;
       }
     },
@@ -197,6 +221,7 @@ async function createBabylonBackdrop(canvas: HTMLCanvasElement): Promise<Backdro
     },
     dispose() {
       window.removeEventListener("resize", onResize);
+      scene.onNewMeshAddedObservable.remove(shadowMeshObserver);
       gameplayLayer?.dispose();
       engine.dispose();
     },

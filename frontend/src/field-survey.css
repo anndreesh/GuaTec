@@ -1,0 +1,16 @@
+.field-task__weather-track{position:relative;min-height:48px;margin:20px 4px 8px;border-block:1px solid #b09d6c80;background:linear-gradient(90deg,#455846,#bdad73,#9b5845);border-radius:3px}
+.field-task__weather-mark{position:absolute;top:-7px;bottom:-7px;width:12%;transform:translateX(-50%);border:2px solid #e6ddaf;border-radius:3px;background:#fff1b025}
+.field-task__weather-needle{position:absolute;top:-10px;bottom:-10px;width:3px;background:#f0ebe0;box-shadow:0 0 0 1px #1d2b26;transform:translateX(-50%);transition:left .18s ease}
+.field-task--weather input[type=range]{display:block;width:100%;min-height:44px;accent-color:#d9b36f}
+.field-task__weather-categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-block:14px}
+.field-task__weather-categories button{min-height:48px;overflow-wrap:anywhere}
+.field-task__weather-categories button[aria-pressed=true]{border-color:#d9b36f;background:#635536}
+.field-task--weather input:focus-visible{outline:3px solid #d9b36f;outline-offset:4px}
+.modal-overlay.mission-field-task-overlay{justify-content:flex-end;align-items:center;padding:20px 3vw;background:linear-gradient(90deg,transparent 20%,#09150c35 55%,#09150c90);backdrop-filter:none;-webkit-backdrop-filter:none}
+.mission-field-task-overlay .mission-task-card{width:min(640px,48vw);max-width:640px;max-height:92dvh;margin:0;overflow:auto;background:#17231ff5}
+.language-menu.language-menu--field-task{position:relative;inset:auto;display:flex;justify-content:flex-end;width:100%;margin-bottom:8px;z-index:50}
+.language-menu--field-task .language-menu-list{top:100%;right:0;bottom:auto;left:auto}
+@media(max-width:900px){.mission-field-task-overlay .mission-task-card{width:min(640px,68vw)}}
+@media(max-width:600px){.modal-overlay.mission-field-task-overlay{padding:12px}.mission-field-task-overlay .mission-task-card{width:100%;max-height:94dvh}}
+@media(max-width:480px){.field-task__weather-categories{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.field-task__weather-needle{transition:none}}

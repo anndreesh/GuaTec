@@ -1,3 +1,5 @@
+import { FIELD_STATION_LOCATIONS, FIELD_ROUTE_POINTS } from "../babylon/gameplay/FieldStations";
+
 /**
  * Central configuration for the whole frontend.
  *
@@ -260,6 +262,14 @@ export interface MissionPointOfInterest {
 }
 
 export const MISSION_1_POIS: MissionPointOfInterest[] = [
+  ...Object.entries(FIELD_STATION_LOCATIONS).filter(([id]) => id !== "recovery").map(([id, position]) => ({
+    id: `field-${id}`, label: `field-task:${id}`, prompt: `field-task:${id}`,
+    flavorText: "Abstract outdoor field experiment.", position,
+  })),
+  ...FIELD_ROUTE_POINTS.map(point => ({
+    id: point.id, label: `route-point:${point.id.slice(-1)}`, prompt: "route-inspect",
+    flavorText: "A route marker to inspect in the field.", position: { x: point.x, z: point.z },
+  })),
   {
     id: "storage-exterior",
     label: "Field equipment shelter",

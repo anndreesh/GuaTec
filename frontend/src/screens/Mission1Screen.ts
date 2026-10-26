@@ -25,6 +25,12 @@ import { getLanguage, t } from "@/core/i18n";
 import { missionAudio } from "@/core/MissionAudio";
 import { mountEngineeringTask, type EngineeringTaskKind } from "@/screens/EngineeringMinigames";
 import "@/mission-field-hud.css";
+import { mountFieldTask } from "./FieldMinigames";
+import { fieldTaskLabel } from "./FieldTaskCopy";
+import { mountWeatherTask, surveyText } from "./FieldSurveyTasks";
+import { mountFlightRecordRecovery } from "./FlightRecordRecovery";
+import { mountLaunchTransition, type LaunchTransitionController } from "./LaunchTransition";
+import { FIELD_TASK_IDS, fieldTaskResult, isFieldTaskId, type FieldTaskId, type MissionMiniGameResult } from "../state/Mission01FieldTasks";
 
 const MISSION_SLUG = MISSION_SLUGS.mission1;
 const REQUIRED_POI_OBJECTIVES: Partial<Record<string, MissionObjectiveId>> = {
@@ -42,6 +48,7 @@ export class Mission1Screen implements Screen {
   private tickTimer: number | undefined;
   private autosaveTimer: number | undefined;
   private toastTimer: number | undefined;
+  private draftSaveTimer: number | undefined;
   private launchTimer: number | undefined;
   private flightTimer: number | undefined;
   private launchKeyHandler: ((event: KeyboardEvent) => void) | null = null;
@@ -53,6 +60,10 @@ export class Mission1Screen implements Screen {
     this.gameplay?.setInputSuspended(value);
     if (value && document.pointerLockElement) document.exitPointerLock();
   }
+  private activeFieldTask: FieldTaskId | null = null;
+  private pendingFieldResult: MissionMiniGameResult | null = null;
+  private cinematicTransition: LaunchTransitionController | null = null;
+  private cinematicHost: HTMLElement | null = null;
   private activeTaskDispose: (() => void) | null = null;
   private fieldHud: HTMLElement | null = null;
   private minimap: HTMLCanvasElement | null = null;
@@ -102,6 +113,7 @@ export class Mission1Screen implements Screen {
   private mapPanelSlot: HTMLElement | null = null;
   private languageMenu: HTMLElement | null = null;
   private languageMenuParent: HTMLElement | null = null;
+  private taskLanguageParent: HTMLElement | null = null;
   private mapState: GameplayMapState | null = null;
   private routeVisible = false;
   private renderedMapObjectiveId = "";
@@ -127,7 +139,7 @@ export class Mission1Screen implements Screen {
   constructor(private app: GameApp, private initialState?: unknown) {}
 
   languageRefreshState(): unknown {
-    return this.state?.toSaveState();
+    return { ...this.state.toSaveState(), resumeFieldTask: this.activeFieldTask };
   }
 
   async mount(container: HTMLElement): Promise<void> {
@@ -180,8 +192,17 @@ export class Mission1Screen implements Screen {
       backButton,
     );
 
-    backButton.addEventListener("click", () => this.stopTimers());
-    backButton.addEventListener("click", () => void this.app.showMissionSelect());
+    backButton.addEventListener("click", async () => {
+      backButton.disabled = true;
+      try {
+        await this.autosave(true);
+        this.stopTimers();
+        await this.app.showMissionSelect();
+      } catch {
+        backButton.disabled = false;
+        this.showToast(t("Could not restart the mission. Check the connection and try again."));
+      }
+    });
 
     for (const def of RESOURCE_DEFINITIONS) {
       const bar = el("div", { className: "resource-row" });
@@ -206,6 +227,8 @@ export class Mission1Screen implements Screen {
 
     this.modalRoot = el("div", { className: "modal-overlay modal-overlay--hidden" });
     container.append(this.modalRoot);
+    this.cinematicHost = el("div");
+    container.append(this.cinematicHost);
 
     // Floating HUD elements that sit over the 3D scene rather than inside
     // the scrollable narrative card.
@@ -236,7 +259,9 @@ export class Mission1Screen implements Screen {
       this.showOpeningSequence(container);
     }
 
-    this.checkPendingDecisionOrResume();
+    const resume = (this.initialState as { resumeFieldTask?: unknown } | undefined)?.resumeFieldTask;
+    if (isFieldTaskId(resume)) this.openFieldTask(resume);
+    else this.checkPendingDecisionOrResume();
     // Story progress is driven by objectives and interactions, never by elapsed time.
     this.tickTimer = undefined;
     this.autosaveTimer = window.setInterval(() => void this.autosave(), AUTOSAVE_INTERVAL_MS);
@@ -279,6 +304,7 @@ export class Mission1Screen implements Screen {
     this.gameplay.setMissionProgress(this.state.progressPercent() / 100);
     this.gameplay.setInputSuspended(this.paused);
     this.restoreEngineeringFeedback();
+    this.restoreFieldFeedback();
   }
 
   private createMobileControls(container: HTMLElement): void {
@@ -413,7 +439,7 @@ export class Mission1Screen implements Screen {
       this.mapLocations?.append(el("h3", { className: "mission-map-locations-title", text: t("ALL LOCATIONS") }));
       for (const [index, point] of state.points.entries()) {
         const discovered = point.discovered !== false;
-        const label = discovered ? t(point.label) : t("Unexplored area");
+        const label = discovered ? this.poiLabel(point.label) : t("Unexplored area");
         const number = String(index + 1);
         const marker = el("span", {
           className: discovered ? "mission-map-point" : "mission-map-point mission-map-point--unexplored",
@@ -425,7 +451,7 @@ export class Mission1Screen implements Screen {
         marker.dataset.label = label;
         this.mapGrid.append(marker);
         if (point.navigable === false) {
-          this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--landmark", text: `${number} · ${t(point.label)}` }));
+          this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--landmark", text: `${number} · ${this.poiLabel(point.label)}` }));
         } else if (!discovered) {
           this.mapLocations?.append(el("div", { className: "mission-map-location mission-map-location--unexplored", text: `${number} · ${t("Unexplored area")}` }));
         } else {
@@ -493,6 +519,13 @@ export class Mission1Screen implements Screen {
     this.fieldHud.querySelector(".field-hud-next")!.textContent = next && pending
       ? `${this.fieldText("Después", "Next", "Ensuite")} · ${t(next.label)}`
       : pending ? this.fieldText("Última actividad · compila el informe", "Final activity · compile the report", "Dernière activité · rédigez le rapport") : t("Mission complete");
+    if (pending) {
+      const targetId = mapTargetForObjective(pending.id, this.state.unmetNpc(), this.state.fieldResults, this.state.routeChecks);
+      const target = MISSION_1_POIS.find(point => point.id === targetId);
+      if (target && (targetId.startsWith("field-") || targetId.startsWith("route-check-"))) {
+        this.fieldHud.querySelector(".field-hud-next")!.textContent = `${t("LOCATION")} · ${this.poiLabel(target.label)}`;
+      }
+    }
     this.fieldHud.querySelector(".field-hud-checkpoint")!.textContent = `◇ ${t(this.state.checkpoint)}`;
     this.drawMinimap();
   }
@@ -507,7 +540,7 @@ export class Mission1Screen implements Screen {
     ctx.strokeStyle = "#293739"; ctx.lineWidth = 1;
     for (let i = 18; i < 180; i += 18) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 180); ctx.moveTo(0, i); ctx.lineTo(180, i); ctx.stroke(); }
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
-    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc(), this.state.fieldResults, this.state.routeChecks) : null;
     for (const entry of this.mapState.points) {
       const [x, y] = point(entry.x, entry.z);
       const active = entry.id === targetId;
@@ -525,14 +558,14 @@ export class Mission1Screen implements Screen {
     if (!objective) return;
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
     this.renderedMapObjectiveId = pending?.id ?? "complete";
-    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc(), this.state.fieldResults, this.state.routeChecks) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     objective.innerHTML = "";
     this.mapDistance = el("p", { className: "mission-map-distance" });
     objective.append(
       el("p", { className: "mission-map-kicker", text: t("CURRENT OBJECTIVE") }),
       el("strong", { className: "mission-map-current", text: t(pending?.label ?? "Mission complete") }),
-      el("p", { className: "mission-map-location", text: `${t("LOCATION")}\n${t(pending?.location ?? target?.label ?? "Project area")}` }),
+      el("p", { className: "mission-map-location", text: `${t("LOCATION")}\n${this.poiLabel(target?.label ?? pending?.location ?? "Project area")}` }),
       this.mapDistance,
     );
     const routeButton = el("button", { className: "btn btn-secondary mission-map-route-button", text: t(this.routeVisible ? "HIDE ROUTE" : "SHOW ROUTE"), attrs: { type: "button" } });
@@ -544,10 +577,11 @@ export class Mission1Screen implements Screen {
     objective.append(routeButton);
     if (targetId) {
       const walkButton = el("button", { className: "btn btn-primary mission-map-route-button", text: t("WALK TO LOCATION"), attrs: { type: "button" } });
+      walkButton.dataset.poiId = targetId;
       walkButton.addEventListener("click", () => {
         this.gameplay?.navigateTo(targetId);
         this.toggleMap(false);
-        this.showToast(`FOLLOWING ROUTE · ${target?.label ?? "Outdoor station"}`);
+        this.showToast(`${t("FOLLOWING ROUTE")} · ${this.poiLabel(target?.label ?? "Outdoor station")}`);
       });
       objective.append(walkButton);
     }
@@ -580,7 +614,7 @@ export class Mission1Screen implements Screen {
 
   private updateMapDistance(): void {
     const pending = MISSION_01_OBJECTIVES.find((entry) => !this.state.objectives.has(entry.id));
-    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc()) : null;
+    const targetId = pending ? mapTargetForObjective(pending.id, this.state.unmetNpc(), this.state.fieldResults, this.state.routeChecks) : null;
     const target = targetId ? this.mapState?.points.find((point) => point.id === targetId) : null;
     const distance = target && this.mapState
       ? Math.round(Math.hypot(target.x - this.mapState.player.x, target.z - this.mapState.player.z))
@@ -604,14 +638,15 @@ export class Mission1Screen implements Screen {
   private updateInteractionPrompt(poi: NearbyPoi | null): void {
     this.nearbyPoi = poi;
     this.mobileInteractButton?.classList.toggle("mobile-interact-button--hidden", !poi);
-    const poiLabel = poi ? t(poi.label) : "";
+    const poiLabel = poi ? this.poiLabel(poi.label) : "";
     if (this.mobileInteractButton) this.mobileInteractButton.textContent = poi ? `${t("Examinar")} · ${poiLabel}` : t("Examinar");
     if (!this.interactionPrompt) return;
     if (!poi) {
       this.interactionPrompt.classList.add("interaction-prompt--hidden");
       return;
     }
-    const action = t(poi.prompt ?? "E · EXAMINE OUTDOOR STATION");
+    const action = poi.id.startsWith("field-") || poi.id.startsWith("route-check-")
+      ? `${t("Examinar")} · ${poiLabel}` : t(poi.prompt ?? "E · EXAMINE OUTDOOR STATION");
     const prerequisite = REQUIRED_POI_OBJECTIVES[poi.id];
     const locked = prerequisite && !this.state.objectives.has(prerequisite);
     this.interactionPrompt.textContent = locked
@@ -631,7 +666,12 @@ export class Mission1Screen implements Screen {
 
     let speaker = "DIRECTOR";
     let text = "";
-    if (pending.id === "lab" || pending.id === "discover") {
+    const targetId = mapTargetForObjective(pending.id, this.state.unmetNpc(), this.state.fieldResults, this.state.routeChecks);
+    if (targetId.startsWith("field-") && isFieldTaskId(targetId.slice(6))) {
+      text = `${fieldTaskLabel(targetId.slice(6) as FieldTaskId)} · ${surveyText("radio.field")}`;
+    } else if (targetId.startsWith("route-check-")) {
+      text = surveyText("route.next");
+    } else if (pending.id === "lab" || pending.id === "discover") {
       speaker = "INGENIERO ANDRES L · DIRECTOR";
       text = "Head to the outdoor work area. Today we see if our machine can leave the ground.";
     } else if (pending.id === "meet-team") {
@@ -682,6 +722,12 @@ export class Mission1Screen implements Screen {
   /** World interactions advance mission objectives and persist meaningful choices. */
   private handleInteract(poiId: string): void {
     if (this.paused || this.ended) return;
+    if (poiId.startsWith("field-")) {
+      const id = poiId.slice(6);
+      if (isFieldTaskId(id)) this.openFieldTask(id);
+      return;
+    }
+    if (poiId.startsWith("route-check-")) { this.inspectRoutePoint(poiId); return; }
     const poi = MISSION_1_POIS.find((p) => p.id === poiId);
     if (!poi) return;
 
@@ -1068,7 +1114,10 @@ export class Mission1Screen implements Screen {
 
   private showChoice(title: string, description: string, options: { label: string; run: () => void; disabled?: boolean }[]): void {
     if (!this.modalRoot) return;
+    this.restoreTaskLanguageMenu();
     this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.modalRoot?.classList.remove("mission-field-task-overlay");
+    this.gameplay?.setFieldFocus(null);
     this.modalFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
@@ -1106,8 +1155,13 @@ export class Mission1Screen implements Screen {
   }
 
   private closeModal(): void {
+    this.restoreTaskLanguageMenu();
     this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.activeFieldTask = null;
+    this.modalRoot?.classList.remove("mission-field-task-overlay");
+    this.gameplay?.setFieldFocus(null);
     this.restoreEngineeringFeedback();
+    this.restoreFieldFeedback();
     this.modalRoot?.classList.add("modal-overlay--hidden");
     this.paused = false;
     this.modalFocus?.focus();
@@ -1120,6 +1174,92 @@ export class Mission1Screen implements Screen {
       this.gameplay?.setEngineeringFeedback(task === "diagnosis" ? "diagnostic" : task, earned ? 1 : 0,
         task === "antenna" ? (earned ? 0.42 : 0.12) : task === "propulsion" ? (earned ? 0.6 : 0.2) : undefined);
     }
+  }
+
+  private poiLabel(label: string): string {
+    if (label.startsWith("field-task:")) {
+      const id = label.slice(11);
+      if (isFieldTaskId(id)) return fieldTaskLabel(id);
+    }
+    if (label.startsWith("route-point:")) return `${fieldTaskLabel("route")} · ${label.slice(12)}/3`;
+    return t(label);
+  }
+
+  private restoreFieldFeedback(): void {
+    for (const id of FIELD_TASK_IDS) {
+      this.gameplay?.setFieldFeedback(id, this.state.fieldResults.has(id) ? 1 : 0);
+      if (!this.state.fieldResults.has(id) && this.state.fieldDrafts[id]) this.gameplay?.setFieldDraftFeedback(id, this.state.fieldDrafts[id]!);
+    }
+    this.gameplay?.setRouteInspections([...this.state.routeChecks]);
+  }
+
+  private attachTaskLanguageMenu(): void {
+    const card = this.modalRoot?.querySelector(".mission-task-card");
+    if (!card || !this.languageMenu) return;
+    this.taskLanguageParent = this.languageMenu.parentElement;
+    this.languageMenu.classList.add("language-menu--field-task");
+    card.prepend(this.languageMenu);
+  }
+
+  private restoreTaskLanguageMenu(): void {
+    if (this.taskLanguageParent && this.languageMenu) this.taskLanguageParent.append(this.languageMenu);
+    this.languageMenu?.classList.remove("language-menu--field-task");
+    this.taskLanguageParent = null;
+  }
+
+  private inspectRoutePoint(id: string): void {
+    if (!this.state.inspectRoute(id)) { this.showToast(surveyText("common.required")); return; }
+    if (this.state.routeChecks.size === 3) this.state.completeFieldTask(fieldTaskResult("route"));
+    this.gameplay?.setRouteInspections([...this.state.routeChecks]);
+    missionAudio.feedback("success");
+    this.showToast(this.state.routeChecks.size === 3 ? surveyText("route.done")
+      : `${surveyText("route.checked")} · ${this.state.routeChecks.size}/3. ${surveyText("route.next")}`);
+    this.renderObjectives(); this.renderResources(); this.renderLog();
+    void this.autosave();
+  }
+
+  private openFieldTask(id: FieldTaskId): void {
+    if (id === "route") return;
+    if (id === "recovery") { this.runAnalysisTask("Smoked Drum Flight Record"); return; }
+    const prerequisite: MissionObjectiveId = id === "assembly" || id === "mass" ? "prototype"
+      : id === "weather" ? "diagnose" : "design";
+    if (!this.state.objectives.has(prerequisite)) { this.showToast(surveyText("common.required")); return; }
+    if (this.state.fieldResults.has(id)) { this.showToast(surveyText("common.recorded")); return; }
+    if ((id === "assembly" || id === "mass") && this.state.testsRun.size > 0) return;
+    let result: MissionMiniGameResult | null = null;
+    this.showTaskModal(fieldTaskLabel(id), "", setReady => {
+      const host = el("div");
+      const callbacks = {
+        onValidated: (next: MissionMiniGameResult) => { result = next; setReady(true, surveyText("common.ready")); },
+        onDraft: (draft: import("../state/Mission01FieldTasks").FieldTaskDraft) => { this.state.setFieldDraft(id, draft); this.gameplay?.setFieldDraftFeedback(id, draft); this.scheduleDraftSave(); },
+        onFeedback: (type: "input" | "error" | "success") => missionAudio.feedback(type),
+        onProgress: (progress: number, value?: number) => this.gameplay?.setFieldFeedback(id, progress, value),
+      };
+      this.activeTaskDispose = id === "weather"
+        ? mountWeatherTask(host, this.gameplay?.getWeather() ?? "CLEAR", callbacks, this.state.fieldDrafts[id])
+        : mountFieldTask(id, host, callbacks, this.state.fieldDrafts[id]);
+      return host;
+    }, () => {
+      if (result && this.state.completeFieldTask(result)) {
+        this.showToast(`${fieldTaskLabel(id)} · ${result.score}/100`);
+        this.restoreFieldFeedback();
+      }
+    }, surveyText("common.record"), undefined, surveyText("common.retryCost"));
+    this.activeFieldTask = id;
+    this.modalRoot?.classList.add("mission-field-task-overlay");
+    this.gameplay?.setFieldFocus(id);
+    if (this.state.fieldDrafts[id]) this.gameplay?.setFieldDraftFeedback(id, this.state.fieldDrafts[id]!);
+    this.attachTaskLanguageMenu();
+  }
+
+  private buildRecoveryTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
+    const host = el("div"); this.pendingFieldResult = null;
+    this.activeTaskDispose = mountFlightRecordRecovery(host, {
+      onValidated: result => { this.pendingFieldResult = result; setReady(true, surveyText("common.ready")); this.gameplay?.setFieldFeedback("recovery", 1); },
+      onDraft: draft => { this.state.setFieldDraft("recovery", draft); this.gameplay?.setFieldDraftFeedback("recovery", draft); this.scheduleDraftSave(); },
+      onFeedback: type => missionAudio.feedback(type),
+    }, this.state.fieldDrafts.recovery);
+    return host;
   }
 
   private buildInstrumentTask(kind: EngineeringTaskKind, setReady: (ready: boolean, message: string) => void): HTMLElement {
@@ -1144,9 +1284,13 @@ export class Mission1Screen implements Screen {
     onComplete: () => void,
     confirmLabel: string,
     secondaryAction?: { label: string; run: () => void },
+    initialMessage = "Sigue la indicación. Puedes volver a intentarlo sin penalización.",
   ): void {
     if (!this.modalRoot) return;
+    this.restoreTaskLanguageMenu();
     this.activeTaskDispose?.(); this.activeTaskDispose = null;
+    this.modalRoot?.classList.remove("mission-field-task-overlay");
+    this.gameplay?.setFieldFocus(null);
     this.modalFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.paused = true;
     this.modalRoot.classList.remove("modal-overlay--hidden");
@@ -1183,8 +1327,10 @@ export class Mission1Screen implements Screen {
     const close = el("button", { className: "btn btn-ghost", text: t("Cerrar tarea"), attrs: { type: "button", "data-modal-dismiss": "" } });
     close.addEventListener("click", () => {
       this.closeModal();
+      void this.autosave();
     });
     controls.append(close);
+    setReady(false, initialMessage);
     card.append(
       el("p", { className: "mission-task-kicker", text: t("TAREA DE CAMPO · CONSOLA ANALÓGICA") }),
       el("h3", { className: "modal-title", text: t(title) }),
@@ -1195,7 +1341,6 @@ export class Mission1Screen implements Screen {
     );
     this.modalRoot.append(card);
     card.focus();
-    setReady(false, "Sigue la indicación. Puedes volver a intentarlo sin penalización.");
   }
 
   private buildPressureCalibrationTask(setReady: (ready: boolean, message: string) => void): HTMLElement {
@@ -1355,6 +1500,10 @@ export class Mission1Screen implements Screen {
     if (!this.state.objectives.has("prototype")) { this.showToast("INSPECT THE PROTOTYPE AT THE OUTDOOR PROJECT AREA FIRST."); return; }
     if (this.state.testsRun.size > 0) { this.showToast(t("ENGINEERING LOCKED · The design is frozen after testing begins.")); return; }
 
+    if (!this.state.fieldResults.has("assembly") || !this.state.fieldResults.has("mass")) {
+      this.showToast(surveyText("common.required")); this.renderObjectives(); return;
+    }
+
     let draft: EngineeringProfile = { ...this.state.engineering };
     this.showTaskModal(
       "BANCO DE INGENIERÍA · CONFIGURA EL PROTOTIPO",
@@ -1511,6 +1660,9 @@ export class Mission1Screen implements Screen {
       this.showToast("CONFIGURE THE VEHICLE AT THE OUTDOOR ENGINEERING BENCH BEFORE TESTING.");
       return;
     }
+    if (!this.state.fieldResults.has("calibration") || !this.state.fieldResults.has("signal")) {
+      this.showToast(surveyText("common.required")); this.renderObjectives(); return;
+    }
     const metrics = calculateEngineering(this.state.engineering);
     const systemDone = this.state.testsRun.has("system");
     const instDone = this.state.testsRun.has("instrumentation");
@@ -1646,6 +1798,9 @@ export class Mission1Screen implements Screen {
   }
 
   private openLaunchPreparation(): void {
+    if (this.state.objectives.has("diagnose") && (!this.state.fieldResults.has("route") || !this.state.fieldResults.has("weather"))) {
+      this.showToast(surveyText("route.missing")); this.renderObjectives(); return;
+    }
     if (!this.state.objectives.has("diagnose")) {
       this.showToast(t("DIAGNOSE AND RESOLVE THE TEST ANOMALY BEFORE PREPARING LAUNCH."));
       return;
@@ -1798,7 +1953,7 @@ export class Mission1Screen implements Screen {
         : {
           title: "REGISTRO DE VUELO · RECONSTRUYE EL TAMBOR",
           description: "Las marcas del papel quedaron fuera de orden. Restáuralas para confirmar cuándo salió el vehículo, dónde llegó y qué distancia observó el equipo.",
-          build: (setReady: (ready: boolean, message: string) => void) => this.buildFlightRecordTask(setReady),
+          build: (setReady: (ready: boolean, message: string) => void) => this.buildRecoveryTask(setReady),
           confirm: "Archivar registro histórico",
         };
     this.showTaskModal(
@@ -1806,6 +1961,8 @@ export class Mission1Screen implements Screen {
       task.description,
       task.build,
       () => {
+        if (topic === "Smoked Drum Flight Record" && this.pendingFieldResult) this.state.completeFieldTask(this.pendingFieldResult);
+        this.pendingFieldResult = null;
         this.state.analyzeData(topic);
         if (topic === "Smoked Drum Flight Record") this.state.collectRecord("1926 Smoked Paper Flight Trace");
         this.showToast(topic === "Smoked Drum Flight Record"
@@ -1815,6 +1972,12 @@ export class Mission1Screen implements Screen {
       },
       task.confirm,
     );
+    if (topic === "Smoked Drum Flight Record") {
+      this.activeFieldTask = "recovery";
+      this.modalRoot?.classList.add("mission-field-task-overlay");
+      this.gameplay?.setFieldFocus("recovery");
+      this.attachTaskLanguageMenu();
+    }
   }
 
   private runLaunchSequence(): void {
@@ -1876,6 +2039,7 @@ export class Mission1Screen implements Screen {
       status.textContent = t("The vehicle leaves the frame. Record the flight, then review the result.");
       missionAudio.ignition();
       missionAudio.setWindLevel(0.25);
+      this.gameplay?.onLaunchExit(() => this.beginLaunchTransition());
       this.gameplay?.playLaunch();
       const startedAt = performance.now();
       this.flightTimer = window.setInterval(() => {
@@ -1892,25 +2056,36 @@ export class Mission1Screen implements Screen {
           : 3.85 + 0.09 * continuingAscentTime);
         const signal = Math.max(24, Math.round(this.state.resources.telemetry - Math.max(0, seconds - 2) * 5));
         updateReadings(altitude, velocity, signal);
-        if (seconds >= 18) {
-          window.removeEventListener("keydown", onKey);
-          this.launchKeyHandler = null;
-          if (this.flightTimer) window.clearInterval(this.flightTimer);
-          this.flightTimer = undefined;
-          this.modalRoot?.classList.add("modal-overlay--hidden");
-          this.modalRoot?.classList.remove("mission-launch-overlay--cinematic");
-          this.paused = false;
-          this.togglePanel(true);
-          this.state.completeObjective("flight");
-          this.state.addLogEntry(`FLIGHT OBSERVATION — ${this.state.flightResult ?? "recorded"}. The vehicle continued climbing throughout the observation window; displayed altitude and velocity are abstract game values. Historical reference: 41 ft / 12.5 m and 184 ft / 56 m.`);
-          this.renderLog();
-          this.renderFlightMetrics();
-          this.renderObjectives();
-          this.showToast(t("The crew is quiet for a moment. ‘It flew.’ Head to the outdoor analysis station."));
-          void this.autosave();
-        }
+        if (!this.gameplay && seconds >= 18) this.beginLaunchTransition();
       }, 200);
     }, 1000);
+  }
+
+  private beginLaunchTransition(): void {
+    if (this.cinematicTransition || !this.cinematicHost) return;
+    if (this.flightTimer) window.clearInterval(this.flightTimer);
+    this.flightTimer = undefined;
+    if (this.launchKeyHandler) window.removeEventListener("keydown", this.launchKeyHandler);
+    this.launchKeyHandler = null;
+    this.gameplay?.onLaunchExit(null);
+    this.modalRoot?.classList.add("modal-overlay--hidden");
+    missionAudio.setWindLevel(0.14);
+    this.cinematicTransition = mountLaunchTransition(this.cinematicHost, {
+      onSave: async () => {
+        this.state.completeObjective("flight");
+        this.state.addLogEntry(`FLIGHT OBSERVATION — ${this.state.flightResult ?? "recorded"}.`);
+        await this.autosave(true);
+      },
+      onComplete: () => {
+        this.gameplay?.finishLaunch();
+        this.cinematicTransition?.dispose(); this.cinematicTransition = null;
+        this.modalRoot?.classList.remove("mission-launch-overlay--cinematic");
+        this.paused = false; this.togglePanel(true);
+        this.renderLog(); this.renderFlightMetrics(); this.renderObjectives();
+        this.showToast(t("The crew is quiet for a moment. ‘It flew.’ Head to the outdoor analysis station."));
+      },
+    });
+    this.cinematicTransition.start();
   }
 
   private runMissionEnding(): void {
@@ -2202,16 +2377,24 @@ export class Mission1Screen implements Screen {
     this.renderMapObjective();
     this.renderFieldHud();
     this.restoreEngineeringFeedback();
+    this.restoreFieldFeedback();
     this.renderPhase();
     this.updateInteractionPrompt(this.nearbyPoi);
     this.gameplay?.setMissionProgress(this.state.progressPercent() / 100);
   }
 
-  private autosave(): Promise<void> {
+  private scheduleDraftSave(): void {
+    if (this.draftSaveTimer) window.clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = window.setTimeout(() => { this.draftSaveTimer = undefined; void this.autosave(); }, 800);
+  }
+
+  private autosave(strict = false): Promise<void> {
+    if (this.draftSaveTimer) window.clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = undefined;
     if (this.ended || this.restarting) return Promise.resolve();
     const snapshot = structuredClone(this.state.toSaveState());
     const progress = this.state.persistenceProgressPercent();
-    const pending = this.saveQueue.then(() => this.persistCurrentState(snapshot, progress));
+    const pending = this.saveQueue.then(() => this.persistCurrentState(snapshot, progress, strict));
     this.saveQueue = pending.catch(() => {});
     this.pendingAutosaves.add(pending);
     void pending.then(
@@ -2221,7 +2404,7 @@ export class Mission1Screen implements Screen {
     return pending;
   }
 
-  private async persistCurrentState(snapshot: MissionSaveState, progress: number): Promise<void> {
+  private async persistCurrentState(snapshot: MissionSaveState, progress: number, strict = false): Promise<void> {
     // Accepted writes drain before mission completion; restart supersedes them.
     if (this.restarting) return;
     try {
@@ -2237,6 +2420,7 @@ export class Mission1Screen implements Screen {
       );
     } catch (err) {
       console.warn("[Mission1Screen] autosave failed", err);
+      if (strict) throw err;
     }
   }
 
@@ -2265,6 +2449,7 @@ export class Mission1Screen implements Screen {
   }
 
   private stopTimers(): void {
+    if (this.draftSaveTimer) window.clearTimeout(this.draftSaveTimer);
     if (this.tickTimer) window.clearInterval(this.tickTimer);
     if (this.autosaveTimer) window.clearInterval(this.autosaveTimer);
     if (this.toastTimer) window.clearTimeout(this.toastTimer);
@@ -2272,6 +2457,9 @@ export class Mission1Screen implements Screen {
     if (this.flightTimer) window.clearInterval(this.flightTimer);
     if (this.launchKeyHandler) window.removeEventListener("keydown", this.launchKeyHandler);
     this.launchKeyHandler = null;
+    this.cinematicTransition?.dispose(); this.cinematicTransition = null;
+    this.gameplay?.onLaunchExit(null);
+    this.gameplay?.finishLaunch();
   }
 
   private togglePanel(forceOpen?: boolean): void {
@@ -2299,11 +2487,15 @@ export class Mission1Screen implements Screen {
   }
 
   unmount(): void {
+    this.restoreTaskLanguageMenu();
     this.stopTimers();
     this.activeTaskDispose?.();
     this.activeTaskDispose = null;
     if (this.openingTimer) window.clearTimeout(this.openingTimer);
     this.paused = false;
+    this.gameplay?.onLaunchExit(null);
+    this.gameplay?.setFieldFocus(null);
+    this.cinematicHost?.remove(); this.cinematicHost = null;
     this.gameplay?.onInteract(() => {});
     this.gameplay?.onNearestPoiChange(() => {});
     this.gameplay?.onMapStateChange(() => {});

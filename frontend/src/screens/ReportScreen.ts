@@ -6,6 +6,8 @@ import type { GameApp } from "@/core/GameApp";
 import type { Screen } from "@/screens/Screen";
 import type { MissionReport, SampleDTO } from "@/types";
 import { t } from "@/core/i18n";
+import { fieldTaskLabel } from "./FieldTaskCopy";
+import { surveyText } from "./FieldSurveyTasks";
 
 const OUTCOME_LABEL: Record<MissionReport["outcome"], string> = {
   success: "Éxito",
@@ -73,6 +75,14 @@ export class ReportScreen implements Screen {
         const records = el("ul", { className: "mission-objective-list" });
         report.historicalRecords.forEach((record) => records.append(el("li", { text: t(record) })));
         panel.append(records);
+      }
+      if (report.fieldResults?.length) {
+        panel.append(el("h3", { className: "report-subtitle", text: surveyText("report.title") }));
+        const experiments = el("ul", { className: "mission-objective-list report-field-results" });
+        for (const result of report.fieldResults) experiments.append(el("li", { text: result.inherited
+          ? `${fieldTaskLabel(result.id)} · ${surveyText("report.inherited")}`
+          : `${fieldTaskLabel(result.id)} · ${result.score}/100 · ${result.attempts} ${surveyText("report.attempts")} · ${result.mistakes} ${surveyText("report.mistakes")}` }));
+        panel.append(experiments, el("p", { text: `${surveyText("report.readiness")}: ${report.launchReadiness ?? 0}%` }));
       }
       panel.append(
         el("h3", { className: "report-subtitle", text: t("Historical reference · March 16, 1926") }),

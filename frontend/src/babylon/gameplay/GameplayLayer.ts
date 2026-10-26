@@ -5,6 +5,7 @@ import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 import { createLaunchSupport } from "./LaunchSupport";
 import { createEngineeringInstruments, type EngineeringFeedbackKind } from "./EngineeringInstruments";
 import { createWorkshopAssets, type WorkshopAsset } from "./WorkshopAssets";
+import { createFieldStations, FIELD_STATION_LOCATIONS, type FieldStationId } from "./FieldStations";
 
 export interface NearbyPoi {
   id: string;
@@ -29,6 +30,12 @@ export interface GameplayHandle {
   navigateTo(poiId: string): void;
   setDesign(structure: "light" | "balanced" | "reinforced", instrumentation: "basic" | "balanced" | "advanced"): void;
   playLaunch(): void;
+  onLaunchExit(cb: (() => void) | null): void;
+  finishLaunch(): void;
+  setFieldDraftFeedback(id: FieldStationId, draft: import("../../state/Mission01FieldTasks").FieldTaskDraft): void;
+  setFieldFocus(id: Exclude<FieldStationId, "route"> | null): void;
+  setFieldFeedback(id: FieldStationId, progress: number, value?: number): void;
+  setRouteInspections(ids: string[]): void;
   playOpeningCinematic(onDone?: () => void): void;
   setPeakAltitude(meters: number): void;
   setMissionProgress(progress: number): void;
@@ -93,8 +100,11 @@ export function createGameplayLayer(
   const instrumentation = new BABYLONNS.SceneInstrumentation(scene);
   let disposed = false;
   let inputSuspended = false;
-  let quality: "high" | "balanced" = "high";
+  let quality: "high" | "balanced" = "balanced";
+  try { if (localStorage.getItem("guatec-graphics-quality") === "high") quality = "high"; } catch { /* optional storage */ }
   let pressureFeedback = 0;
+  let fieldFocus: Exclude<FieldStationId, "route"> | null = null;
+  let fieldCameraBackup: { alpha: number; beta: number; radius: number } | null = null;
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
   createAuburnStars(BABYLONNS, scene, root);
@@ -155,7 +165,7 @@ export function createGameplayLayer(
   async function loadAnimatedAvatar(): Promise<void> {
     try {
       await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", "mercenary_astronaut_optimized.glb", scene);
+      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", quality === "balanced" ? "mercenary_astronaut_balanced.glb" : "mercenary_astronaut_optimized.glb", scene);
       if (disposed) { result.animationGroups.forEach(group => group.dispose()); result.skeletons.forEach(skeleton => skeleton.dispose()); result.meshes.forEach(mesh => mesh.dispose(false, true)); return; }
       const avatarRoot = new BABYLONNS.TransformNode("mercenary-avatar-model", scene);
       avatarRoot.parent = astronaut.root;
@@ -441,6 +451,9 @@ export function createGameplayLayer(
   ambientDust.start();
 
   let launchElapsed = -1;
+  let launchStartedAt = 0;
+  let launchExitNotified = false;
+  let launchExitCallback: (() => void) | null = null;
   let launchPeakAltitude = 12.5;
   let openingElapsed = -1;
   let openingDone: (() => void) | null = null;
@@ -611,7 +624,9 @@ export function createGameplayLayer(
     steel: propMat, dark: darkMetalMat, paint: markerMat, pad: saddleLeatherMat, hardware: brassMat, foundation: launchPadMat,
   }, shadowGenerator);
   const instruments = createEngineeringInstruments(BABYLONNS, scene, root, terrain.getHeightAt(-6, 10.6));
-  const collisionObstacles = [launchSupport.footprint, { minX: -6.55, maxX: -5.45, minZ: 10.05, maxZ: 11.15 }];
+  const fieldKit = createFieldStations(BABYLONNS, scene, root, terrain.getHeightAt);
+  fieldKit.setWeather(weather.label);
+  const collisionObstacles = [launchSupport.footprint, { minX: -6.55, maxX: -5.45, minZ: 10.05, maxZ: 11.15 }, ...fieldKit.colliders];
 
   function resolveObjectCollisions(position: BABYLON.Vector3): { x: boolean; z: boolean } {
     let blockedX = false;
@@ -853,6 +868,19 @@ export function createGameplayLayer(
     }
   }
   shedBox("shed-ridge-cap", 4.02, 0.07, 0.19, 0, 2.94, 0, roofMat);
+  // The corrugated roof is static and shares one material: preserve every seam
+  // while drawing the two panels, 64 ribs and ridge as one authored surface.
+  const roofParts = shed.getChildMeshes().filter((mesh): mesh is BABYLON.Mesh => mesh instanceof BABYLONNS.Mesh && mesh.material === roofMat);
+  for (const mesh of roofParts) shadowGenerator.removeShadowCaster(mesh, false);
+  const mergedRoof = BABYLONNS.Mesh.MergeMeshes(roofParts, true, true, undefined, false, false);
+  if (mergedRoof) {
+    mergedRoof.name = "shed-zinc-corrugated-roof-batch";
+    mergedRoof.parent = root;
+    mergedRoof.receiveShadows = true;
+    mergedRoof.isPickable = false;
+    mergedRoof.freezeWorldMatrix();
+    shadowGenerator.addShadowCaster(mergedRoof, false);
+  }
   void workshopAssets.place("worn_metal_rack", shed, new BABYLONNS.Vector3(-0.69, 0.22, -0.64), { width: 1.5, height: 1.7, depth: 0.48 });
   void workshopAssets.place("metal_toolbox", shed, new BABYLONNS.Vector3(0.93, 0.22, 0.18), { width: 0.86 }, -0.14);
   collisionObstacles.push({ minX: 12.73, maxX: 14.26, minZ: -3.71, maxZ: -3.19 });
@@ -1261,7 +1289,29 @@ export function createGameplayLayer(
       onInteract(cb) {
         interactCallback = cb;
       },
+      setFieldDraftFeedback(id, draft) { fieldKit.setDraft(id, draft); },
+      setFieldFocus(id) {
+        if (id && !fieldFocus) fieldCameraBackup = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius };
+        fieldFocus = id;
+        if (id) camera.lockedTarget = null;
+        else {
+          if (fieldCameraBackup) { camera.alpha = fieldCameraBackup.alpha; camera.beta = fieldCameraBackup.beta; camera.radius = fieldCameraBackup.radius; }
+          fieldCameraBackup = null;
+          followAstronaut();
+        }
+      },
+      setFieldFeedback(id, progress, value) { fieldKit.setProgress(id, progress, value); },
+      setRouteInspections(ids) { fieldKit.setRouteInspection(ids); },
+      onLaunchExit(cb) { launchExitCallback = cb; },
+      finishLaunch() {
+        launchElapsed = -1; launchExitCallback = null;
+        launchSmoke.stop(); launchFlame.stop();
+        outerFlame.setEnabled(false); innerFlame.setEnabled(false);
+        camera.radius = cameraOffsetRadius; camera.checkCollisions = false; followAstronaut();
+      },
       reset() {
+        fieldFocus = null; fieldKit.reset(); fieldKit.setWeather(weather.label);
+        launchExitNotified = false; launchExitCallback = null;
         inputSuspended = false;
         keysDown.clear();
         for (const kind of ["circuits", "antenna", "propulsion", "diagnostic", "launch"] as const) instruments.setFeedback(kind, 0);
@@ -1306,6 +1356,8 @@ export function createGameplayLayer(
         navigationPath = target ? findWalkPath(astronaut.root.position, target.position) : [];
       },
       playLaunch() {
+        launchStartedAt = performance.now(); launchExitNotified = false;
+        activeCameraMode = "cinematic";
         launchElapsed = 0;
         launchSupport.setRelease(0);
         rocketRoot.position.copyFrom(rocketStart);
@@ -1434,6 +1486,7 @@ export function createGameplayLayer(
       deltaSeconds = Math.max(0, Math.min(deltaSeconds, 1 / 30));
       elapsed += deltaSeconds;
       instruments.update(deltaSeconds);
+      fieldKit.update(deltaSeconds, enabled && openingElapsed < 0, reducedMotion);
       const contactY = terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z);
       playerContact.position.set(astronaut.root.position.x, contactY + 0.012, astronaut.root.position.z);
       playerContact.visibility = Math.max(0, 1 - Math.max(0, astronaut.root.position.y - contactY) / 2);
@@ -1470,7 +1523,7 @@ export function createGameplayLayer(
       gaugeNeedles.forEach((needle, index) => { needle.rotation.z = -0.43 + pressureFeedback * 1.5 + Math.sin(elapsed * 1.4 + index) * 0.025; });
       cupHead.rotation.y += deltaSeconds * (weather.label === "WINDY" ? 9 : 4.5);
       if (launchElapsed >= 0) {
-        launchElapsed += deltaSeconds;
+        launchElapsed = Math.max(launchElapsed + deltaSeconds, (performance.now() - launchStartedAt) / 1000);
         // Contact jacks withdraw completely before the vehicle rises. Keep the
         // climb vertical until the tail clears the rear gantry and its deck.
         launchSupport.setRelease(launchElapsed / 0.85);
@@ -1588,7 +1641,9 @@ export function createGameplayLayer(
         worker.character.update(deltaSeconds);
       }
 
-      const cameraTracksRocket = launchElapsed >= 0 && launchElapsed < 18 && openingElapsed < 0;
+      // Every camera returns to the fixed observation frame for the final departure.
+      if (launchElapsed >= 12) activeCameraMode = "cinematic";
+      const cameraTracksRocket = launchElapsed >= 0 && !launchExitNotified && openingElapsed < 0;
       if (cameraTracksRocket) {
         camera.lockedTarget = null;
         if (activeCameraMode === "cinematic" && launchElapsed >= 4) {
@@ -1613,10 +1668,28 @@ export function createGameplayLayer(
             camera.target.y += (Math.random() - 0.5) * 0.04;
           }
         }
-      } else if (openingElapsed < 0) {
-        followAstronaut();
+      } else if (openingElapsed < 0 && launchElapsed < 0) {
+        if (fieldFocus) {
+          const point = FIELD_STATION_LOCATIONS[fieldFocus];
+          camera.lockedTarget = null;
+          const blend = reducedMotion ? 1 : 1 - Math.exp(-8 * deltaSeconds);
+          camera.target.x += (point.x + 1.1 - camera.target.x) * blend;
+          camera.target.y += (terrain.getHeightAt(point.x, point.z) + (fieldFocus === "weather" ? 1.9 : 1.05) - camera.target.y) * blend;
+          camera.target.z += (point.z - camera.target.z) * blend;
+          camera.alpha += Math.atan2(Math.sin(-Math.PI / 2 - camera.alpha), Math.cos(-Math.PI / 2 - camera.alpha)) * blend;
+          camera.beta += (1.05 - camera.beta) * blend; camera.radius += (6 - camera.radius) * blend;
+        } else followAstronaut();
       }
-      if (launchElapsed >= 18) { camera.radius = cameraOffsetRadius; camera.checkCollisions = false; }
+      if (launchElapsed >= 4 && !launchExitNotified) {
+        camera.getViewMatrix(true);
+        const visibleVehicle = vehicleMeshes.some(mesh => mesh.getTotalVertices() > 0 && camera.isInFrustum(mesh));
+        if ((!visibleVehicle && vehicleMeshes.length > 0) || (vehicleMeshes.length === 0 && launchElapsed >= 18)) {
+          launchExitNotified = true;
+          launchSmoke.stop(); launchFlame.stop();
+          outerFlame.setEnabled(false); innerFlame.setEnabled(false);
+          launchExitCallback?.();
+        }
+      }
 
       updateNearestPoi();
       mapStateCallback?.({
@@ -1628,6 +1701,7 @@ export function createGameplayLayer(
       instrumentation.dispose();
       disposed = true;
       this.disable();
+      fieldKit.dispose();
       instruments.dispose();
       focusRing.dispose(); focusMaterial.dispose();
       playerContact.dispose(); contactMaterial.dispose(); contactTexture.dispose();

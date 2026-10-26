@@ -102,14 +102,14 @@ export class Mission1State {
           if (result && isFieldTaskId(result.id) && result.completed && Number.isFinite(result.attempts) && Number.isFinite(result.mistakes)) {
             this.fieldResults.set(result.id, result.inherited
               ? { ...fieldTaskResult(result.id), inherited: true, score: 0, effects: {} }
-              : fieldTaskResult(result.id, result.attempts, result.mistakes));
+              : fieldTaskResult(result.id, result.attempts, result.mistakes, result.conditions));
           }
         }
         for (const id of FIELD_TASK_IDS) {
           if (extra.fieldDrafts?.[id]) this.fieldDrafts[id] = restoreFieldDraft(extra.fieldDrafts[id]);
         }
         // Earned legacy checkpoints remain earned. New/uncompleted phases use the field tasks.
-        if (!extra.fieldVersion) {
+        if (extra.fieldVersion !== 2) {
           const earned: Array<[boolean, FieldTaskId[]]> = [
             [this.objectives.has("design"), ["assembly", "mass"]],
             [this.objectives.has("testing"), ["calibration", "signal"]],
@@ -118,11 +118,13 @@ export class Mission1State {
           ];
           for (const [completed, ids] of earned) if (completed) for (const id of ids) {
             // Compatibility records explain migration and award no retroactive effects.
-            this.fieldResults.set(id, { ...fieldTaskResult(id), inherited: true, score: 0, effects: {} });
+            if (!this.fieldResults.has(id)) this.fieldResults.set(id, { ...fieldTaskResult(id), inherited: true, score: 0, effects: {} });
           }
           if (this.fieldResults.has("route")) for (const n of [1, 2, 3]) this.routeChecks.add(`route-check-${n}`);
         }
         this.refreshFieldModifiers();
+        this.objectives = this.validateSavedObjectives(Array.isArray(extra.objectives) ? extra.objectives as MissionObjectiveId[] : [], true);
+        this.checkpoint = this.checkpointForObjectives();
       }
     }
   }
@@ -178,6 +180,7 @@ export class Mission1State {
     if (index < 0 || MISSION_01_OBJECTIVES.slice(0, index).some((item) => item.required && !this.objectives.has(item.id))) {
       return false;
     }
+    if (!this.fieldPrerequisitesMet(id)) return false;
     if (id === "meet-team" && !this.teamMet()) return false;
     if (id === "prototype" && !this.objectives.has("meet-team")) return false;
     if (id === "testing" && !this.testsComplete()) return false;
@@ -207,11 +210,12 @@ export class Mission1State {
   }
 
   setEngineering(patch: Partial<EngineeringProfile>): void {
+    const before = calculateEngineering(this.engineering);
     this.engineering = { ...this.engineering, ...patch };
     this.refreshFieldModifiers();
     const metrics = calculateEngineering(this.engineering);
-    this.resources.stability = metrics.stability;
-    this.resources.telemetry = metrics.data;
+    this.resources.stability = this.objectives.has("design") ? clamp(this.resources.stability + metrics.stability - before.stability, 0, 100) : metrics.stability;
+    this.resources.telemetry = this.objectives.has("design") ? clamp(this.resources.telemetry + metrics.data - before.data, 0, 100) : metrics.data;
   }
 
   setFieldDraft(id: FieldTaskId, draft: FieldTaskDraft): void {
@@ -234,7 +238,7 @@ export class Mission1State {
     if (result.id === "route" && this.routeChecks.size !== 3) return false;
     if ((result.id === "assembly" || result.id === "mass") && this.testsRun.size > 0) return false;
     if (!Number.isFinite(result.attempts) || !Number.isFinite(result.mistakes)) return false;
-    const accepted = fieldTaskResult(result.id, result.attempts, result.mistakes);
+    const accepted = fieldTaskResult(result.id, result.attempts, result.mistakes, result.conditions);
     this.fieldResults.set(accepted.id, accepted);
     delete this.fieldDrafts[accepted.id];
     this.refreshFieldModifiers();
@@ -389,7 +393,7 @@ export class Mission1State {
         metNpcs: [...this.metNpcs], testsRun: [...this.testsRun], checklist: [...this.checklist],
         inspectedCauses: [...this.inspectedCauses], diagnosis: this.diagnosis, riskAccepted: this.riskAccepted,
         engineeringTasks: [...this.engineeringTasks], taskVersion: 1,
-        fieldVersion: 1, fieldResults: [...this.fieldResults.values()],
+        fieldVersion: 2, fieldResults: [...this.fieldResults.values()],
         fieldDrafts: structuredClone(this.fieldDrafts), routeChecks: [...this.routeChecks],
       },
     };
@@ -430,12 +434,21 @@ export class Mission1State {
     };
   }
 
-  private validateSavedObjectives(saved: MissionObjectiveId[]): Set<MissionObjectiveId> {
+  private fieldPrerequisitesMet(id: MissionObjectiveId): boolean {
+    const requirements: Partial<Record<MissionObjectiveId, FieldTaskId[]>> = {
+      design: ["assembly", "mass"], testing: ["calibration", "signal"],
+      prepare: ["route", "weather"], analysis: ["recovery"],
+    };
+    return (requirements[id] ?? []).every(task => this.fieldResults.has(task));
+  }
+
+  private validateSavedObjectives(saved: MissionObjectiveId[], includeField = false): Set<MissionObjectiveId> {
     const valid = new Set<MissionObjectiveId>();
     for (const item of MISSION_01_OBJECTIVES) {
       if (!item.required || !saved.includes(item.id)) continue;
       const index = MISSION_01_OBJECTIVES.indexOf(item);
       if (MISSION_01_OBJECTIVES.slice(0, index).some((prior) => prior.required && !valid.has(prior.id))) break;
+      if (includeField && !this.fieldPrerequisitesMet(item.id)) break;
       if (item.id === "meet-team" && !this.teamMet()) break;
       if (item.id === "prototype" && !valid.has("meet-team")) break;
       if (item.id === "testing" && !this.testsComplete()) break;
