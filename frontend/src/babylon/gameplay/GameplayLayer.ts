@@ -288,6 +288,96 @@ export function createGameplayLayer(
     bolt.parent = parent;
   };
 
+  /**
+   * A field sign needs two independently oriented faces. Reusing one plane
+   * with back-face culling disabled makes its UVs read backwards from behind;
+   * the second plane keeps the lettering legible from either approach.
+   */
+  const addDoubleSidedFieldSign = (
+    id: string,
+    label: string,
+    x: number,
+    z: number,
+    groundY: number,
+    width = 2.2,
+  ): void => {
+    const signRoot = new BABYLONNS.TransformNode(`${id}-root`, scene);
+    signRoot.parent = root;
+    signRoot.position.set(x, groundY, z);
+
+    const signWood = new BABYLONNS.PBRMaterial(`${id}-wood`, scene);
+    signWood.albedoColor = BABYLONNS.Color3.FromHexString("#493b2b");
+    signWood.roughness = 0.92;
+    const post = (postX: number) => {
+      const mesh = BABYLONNS.MeshBuilder.CreateBox(`${id}-post-${postX}`, {
+        width: 0.1, height: 1.82, depth: 0.1,
+      }, scene);
+      mesh.position.set(postX, 0.91, 0);
+      mesh.material = signWood;
+      mesh.parent = signRoot;
+      mesh.checkCollisions = true;
+      mesh.receiveShadows = true;
+      shadowGenerator.addShadowCaster(mesh, false);
+    };
+    post(-width * 0.34);
+    post(width * 0.34);
+
+    const boardHeight = 0.42;
+    const board = BABYLONNS.MeshBuilder.CreateBox(`${id}-board`, {
+      width, height: boardHeight, depth: 0.1,
+    }, scene);
+    board.position.set(0, 1.72, 0);
+    board.material = signWood;
+    board.parent = signRoot;
+    board.checkCollisions = true;
+    board.receiveShadows = true;
+    shadowGenerator.addShadowCaster(board, false);
+
+    const texture = new BABYLONNS.DynamicTexture(`${id}-lettering`, { width: 768, height: 144 }, scene, true);
+    const context = texture.getContext() as unknown as CanvasRenderingContext2D;
+    context.fillStyle = "#493b2b";
+    context.fillRect(0, 0, 768, 144);
+    context.strokeStyle = "#b59a68";
+    context.lineWidth = 7;
+    context.strokeRect(10, 10, 748, 124);
+    context.fillStyle = "#e0cda5";
+    context.font = "bold 42px Georgia";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(label, 384, 72, 710);
+    texture.update(false);
+
+    const faceMaterial = new BABYLONNS.StandardMaterial(`${id}-face-material`, scene);
+    faceMaterial.diffuseTexture = texture;
+    faceMaterial.emissiveColor = BABYLONNS.Color3.FromHexString("#211c14");
+    faceMaterial.backFaceCulling = true;
+    const faceOffset = 0.056;
+    const front = BABYLONNS.MeshBuilder.CreatePlane(`${id}-front-face`, {
+      width: width - 0.12, height: boardHeight - 0.08,
+    }, scene);
+    front.position.set(0, 1.72, faceOffset);
+    front.material = faceMaterial;
+    front.parent = signRoot;
+    front.isPickable = false;
+    const back = BABYLONNS.MeshBuilder.CreatePlane(`${id}-back-face`, {
+      width: width - 0.12, height: boardHeight - 0.08,
+    }, scene);
+    back.position.set(0, 1.72, -faceOffset);
+    back.rotation.y = Math.PI;
+    back.material = faceMaterial;
+    back.parent = signRoot;
+    back.isPickable = false;
+
+    // Movement is resolved in the X/Z plane, so include the whole board and
+    // posts in the explicit obstacle list even though the sign is elevated.
+    collisionObstacles.push({
+      minX: x - width / 2,
+      maxX: x + width / 2,
+      minZ: z - 0.11,
+      maxZ: z + 0.11,
+    });
+  };
+
   const poiMeshes: { poi: MissionPointOfInterest; position: BABYLON.Vector3 }[] = [];
   // Locations become "discovered" once the player has been near them (see updateNearestPoi).
   const discoveredPoiIds = new Set<string>();
@@ -617,6 +707,12 @@ export function createGameplayLayer(
   }
   fieldKit.setWeather(weather.label);
   const collisionObstacles = [launchSupport.footprint, { minX: -6.55, maxX: -5.45, minZ: 10.05, maxZ: 11.15 }, ...fieldKit.colliders];
+
+  // Orientation signs mark the main field landmarks and remain solid from
+  // either approach, just like the structures they identify.
+  addDoubleSidedFieldSign("range-sign", "AUBURN TEST RANGE", 0, -8.4, terrain.getHeightAt(0, -8.4), 2.7);
+  addDoubleSidedFieldSign("service-sign", "FIELD SERVICE", 14.2, -1.55, terrain.getHeightAt(14.2, -1.55), 2.15);
+  addDoubleSidedFieldSign("observation-sign", "OBSERVATION AREA", 8.2, -21.65, terrain.getHeightAt(8.2, -21.65), 2.35);
 
   function resolveObjectCollisions(position: BABYLON.Vector3): { x: boolean; z: boolean } {
     let blockedX = false;
