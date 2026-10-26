@@ -486,11 +486,26 @@ export class ApolloWorld {
   }
   private sign(title: string, sub: string, x: number, y: number, z: number, rotation = 0, w = 6): void {
     const group = new THREE.Group(); group.position.set(x, y, z); group.rotation.y = rotation;
-    const plate = this.textPlane(title + '\n' + sub, w, 1.25, '#f2e8cb', true); group.add(plate);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(w, 1.25, .08), this.material('sign-back', 0x243331, .9, .05)); back.position.z = .04; group.add(back);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, 1.25, .08), this.material('sign-back', 0x243331, .9, .05)); group.add(board);
+    // Use a separate, rotated plane for the rear face. Rendering one plane
+    // with DoubleSide would expose the same UVs from behind and mirror the
+    // lettering instead of giving the player a readable sign.
+    const front = this.textPlane(title + '\n' + sub, w - .12, 1.13, '#f2e8cb', true);
+    front.position.z = .046;
+    group.add(front);
+    const rear = this.textPlane(title + '\n' + sub, w - .12, 1.13, '#f2e8cb', true);
+    rear.position.z = -.046;
+    rear.rotation.y = Math.PI;
+    group.add(rear);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), -w * 0.36, -y / 2, -0.08, group);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), w * 0.36, -y / 2, -0.08, group);
     this.scene.add(group);
+    const angle = Math.abs(rotation);
+    const halfWidth = (w * Math.cos(angle) + .08 * Math.sin(angle)) / 2 + .12;
+    const halfDepth = (w * Math.sin(angle) + .08 * Math.cos(angle)) / 2 + .12;
+    // Player movement is resolved on the ground plane, so the whole sign
+    // footprint is solid even though the board itself is elevated on posts.
+    this.colliders.push({ x, z, w: halfWidth, d: halfDepth });
   }
   private textPlane(text: string, w: number, h: number, color: string, background: boolean): THREE.Mesh {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
