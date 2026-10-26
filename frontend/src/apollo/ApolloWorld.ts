@@ -133,6 +133,11 @@ export class ApolloWorld {
     this.ready = Promise.all([this.loadAstronauts(), this.loadProps()]).then(() => undefined);
   }
 
+  /** The world has no localized DOM labels, but keeps the screen refresh contract. */
+  refreshLanguage(): void {
+    // Scene geometry and materials are language-independent.
+  }
+
   private async loadProps(): Promise<void> {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     this.lateProps.name = 'Apollo late-loaded GLB props'; this.scene.add(this.lateProps);
