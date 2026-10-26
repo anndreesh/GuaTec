@@ -331,6 +331,8 @@ export class ApolloScreen implements Screen {
     tools.append(mute,this.iconButton(PAUSE_ICONS.restart,'Reiniciar misión',()=>this.confirmReset()),this.iconButton(PAUSE_ICONS.back,'Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
     box.append(tools);
     box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
+    const mapBox=el('div','ap-pause-map'); const mapCanvas=el('canvas','ap-large-map'); mapCanvas.width=720; mapCanvas.height=540; this.drawMap(mapCanvas);
+    mapBox.append(el('small','ap-kicker','MAPA DE OPERACIONES'),mapCanvas); box.append(mapBox);
   }
   private confirmReset() {
     const box=this.openModal('REINICIAR MISIÓN 01','Volver al comienzo');
