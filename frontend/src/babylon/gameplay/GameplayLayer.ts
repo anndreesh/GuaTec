@@ -105,7 +105,9 @@ export function createGameplayLayer(
   try { if (localStorage.getItem("guatec-graphics-quality") === "high") quality = "high"; } catch { /* optional storage */ }
   let pressureFeedback = 0;
   let fieldFocus: Exclude<FieldStationId, "route"> | null = null;
-  let fieldCameraBackup: { alpha: number; beta: number; radius: number } | null = null;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let fieldCameraBackup: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 } | null = null;
+  let cameraReturnPose: { from: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 }; to: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 }; elapsed: number } | null = null;
   const sky = createAuburnSky(BABYLONNS, scene);
   sky.parent = root;
   const terrain = createMarsTerrain(BABYLONNS, scene);
@@ -457,6 +459,25 @@ export function createGameplayLayer(
   let openingElapsed = -1;
   let openingDone: (() => void) | null = null;
   let activeCameraMode: "cinematic" | "observation" | "telemetry" = "cinematic";
+  let cameraModeFrom: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 } | null = null;
+  let cameraModeElapsed = 1;
+
+  function requestCameraMode(mode: "cinematic" | "observation" | "telemetry"): void {
+    if (activeCameraMode === mode) return;
+    cameraModeFrom = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone() };
+    cameraModeElapsed = 0;
+    activeCameraMode = mode;
+    camera.lockedTarget = null;
+  }
+
+  function blendCameraPose(from: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 }, to: { alpha: number; beta: number; radius: number; target: BABYLON.Vector3 }, amount: number): void {
+    const blend = reducedMotion ? 1 : amount * amount * (3 - 2 * amount);
+    const angleDelta = Math.atan2(Math.sin(to.alpha - from.alpha), Math.cos(to.alpha - from.alpha));
+    camera.alpha = from.alpha + angleDelta * blend;
+    camera.beta = from.beta + (to.beta - from.beta) * blend;
+    camera.radius = from.radius + (to.radius - from.radius) * blend;
+    BABYLONNS.Vector3.LerpToRef(from.target, to.target, blend, camera.target);
+  }
 
   // Pressurized nitrogen bottle and pressure regulator
   const nitrogenBottle = BABYLONNS.MeshBuilder.CreateCapsule("launch-nitrogen-tank", { height: 1.35, radius: 0.15 }, scene);
@@ -1213,8 +1234,6 @@ export function createGameplayLayer(
   focusMaterial.disableLighting = true; focusMaterial.alpha = 0.4;
   const focusRing = BABYLONNS.MeshBuilder.CreateTorus("nearby-activity-focus-ring", { diameter: 1.1, thickness: 0.025, tessellation: 40 }, scene);
   focusRing.parent = root; focusRing.material = focusMaterial; focusRing.isPickable = false; focusRing.setEnabled(false);
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
   let nearestPoi: { poi: MissionPointOfInterest; position: BABYLON.Vector3 } | null = null;
   let nearestPoiCallback: ((poi: NearbyPoi | null) => void) | null = null;
   let interactCallback: ((poiId: string) => void) | null = null;
@@ -1290,13 +1309,20 @@ export function createGameplayLayer(
       },
       setFieldDraftFeedback(id, draft) { fieldKit.setDraft(id, draft); },
       setFieldFocus(id) {
-        if (id && !fieldFocus) fieldCameraBackup = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius };
+        if (id && !fieldFocus) fieldCameraBackup = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone() };
         fieldFocus = id;
-        if (id) camera.lockedTarget = null;
+        if (id) { cameraReturnPose = null; camera.lockedTarget = null; }
         else {
-          if (fieldCameraBackup) { camera.alpha = fieldCameraBackup.alpha; camera.beta = fieldCameraBackup.beta; camera.radius = fieldCameraBackup.radius; }
+          if (fieldCameraBackup) {
+            cameraReturnPose = {
+              from: { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone() },
+              to: fieldCameraBackup,
+              elapsed: 0,
+            };
+            camera.lockedTarget = null;
+          }
           fieldCameraBackup = null;
-          followAstronaut();
+          if (!cameraReturnPose) followAstronaut();
         }
       },
       setFieldFeedback(id, progress, value) { fieldKit.setProgress(id, progress, value); },
@@ -1309,7 +1335,8 @@ export function createGameplayLayer(
         camera.radius = cameraOffsetRadius; camera.checkCollisions = false; followAstronaut();
       },
       reset() {
-        fieldFocus = null; fieldKit.reset(); fieldKit.setWeather(weather.label);
+        fieldFocus = null; fieldCameraBackup = null; cameraReturnPose = null; cameraModeFrom = null; cameraModeElapsed = 1;
+        fieldKit.reset(); fieldKit.setWeather(weather.label);
         launchExitNotified = false; launchExitCallback = null;
         inputSuspended = false;
         keysDown.clear();
@@ -1357,6 +1384,7 @@ export function createGameplayLayer(
       playLaunch() {
         launchStartedAt = performance.now(); launchExitNotified = false;
         activeCameraMode = "cinematic";
+        cameraModeFrom = null; cameraModeElapsed = 1; cameraReturnPose = null;
         launchElapsed = 0;
         launchSupport.setRelease(0);
         rocketRoot.position.copyFrom(rocketStart);
@@ -1372,24 +1400,7 @@ export function createGameplayLayer(
         innerFlame.setEnabled(true);
       },
       setCameraMode(mode) {
-        activeCameraMode = mode;
-        camera.lockedTarget = null;
-        if (mode === "observation") {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.alpha = -Math.PI * 0.45;
-          camera.beta = 1.25;
-          camera.radius = 16;
-        } else if (mode === "telemetry") {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.alpha = -Math.PI / 3;
-          camera.beta = 1.45;
-          camera.radius = 4.2;
-        } else {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.alpha = Math.PI * 0.35;
-          camera.beta = 1.2;
-          camera.radius = 18;
-        }
+        requestCameraMode(mode);
       },
       playOpeningCinematic(onDone) {
         openingElapsed = 0;
@@ -1643,31 +1654,36 @@ export function createGameplayLayer(
       }
 
       // Every camera returns to the fixed observation frame for the final departure.
-      if (launchElapsed >= 12) activeCameraMode = "cinematic";
+      if (launchElapsed >= 12 && activeCameraMode !== "cinematic") requestCameraMode("cinematic");
       const cameraTracksRocket = launchElapsed >= 0 && !launchExitNotified && openingElapsed < 0;
       if (cameraTracksRocket) {
         camera.lockedTarget = null;
-        if (activeCameraMode === "cinematic" && launchElapsed >= 4) {
-          camera.target.set(rocketStart.x, rocketStart.y + 2, rocketStart.z);
-          camera.radius = 12;
-        } else if (activeCameraMode === "observation") {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.target.y += 4.2 * rocketRoot.scaling.y;
-          camera.alpha = -Math.PI * 0.45;
-          camera.beta = 1.25;
-          camera.radius = 16;
+        cameraModeElapsed = Math.min(1, cameraModeElapsed + deltaSeconds / 0.58);
+        const target = rocketRoot.position.clone();
+        let alpha = Math.PI * 0.35;
+        let beta = 1.2;
+        let radius = 18;
+        if (activeCameraMode === "observation") {
+          target.y += 4.2 * rocketRoot.scaling.y;
+          alpha = -Math.PI * 0.45; beta = 1.25; radius = 16;
         } else if (activeCameraMode === "telemetry") {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.alpha = -Math.PI / 3;
-          camera.beta = 1.45;
-          camera.radius = 4.2;
+          alpha = -Math.PI / 3; beta = 1.45; radius = 4.2;
+        } else if (launchElapsed >= 4) {
+          target.set(rocketStart.x, rocketStart.y + 2, rocketStart.z);
+          radius = 12;
         } else {
-          camera.target.copyFrom(rocketRoot.position);
-          camera.target.y += 4.2 * rocketRoot.scaling.y;
+          target.y += 4.2 * rocketRoot.scaling.y;
           if (launchElapsed < 2.5 && !reducedMotion) {
-            camera.target.x += (Math.random() - 0.5) * 0.04;
-            camera.target.y += (Math.random() - 0.5) * 0.04;
+            target.x += (Math.random() - 0.5) * 0.04;
+            target.y += (Math.random() - 0.5) * 0.04;
           }
+        }
+        const desired = { alpha, beta, radius, target };
+        if (cameraModeFrom && cameraModeElapsed < 1) blendCameraPose(cameraModeFrom, desired, cameraModeElapsed);
+        else {
+          camera.alpha = alpha; camera.beta = beta; camera.radius = radius;
+          camera.target.copyFrom(target);
+          cameraModeFrom = null;
         }
       } else if (openingElapsed < 0 && launchElapsed < 0) {
         if (fieldFocus) {
@@ -1679,6 +1695,13 @@ export function createGameplayLayer(
           camera.target.z += (point.z - camera.target.z) * blend;
           camera.alpha += Math.atan2(Math.sin(-Math.PI / 2 - camera.alpha), Math.cos(-Math.PI / 2 - camera.alpha)) * blend;
           camera.beta += (1.05 - camera.beta) * blend; camera.radius += (6 - camera.radius) * blend;
+        } else if (cameraReturnPose) {
+          cameraReturnPose.elapsed += deltaSeconds;
+          blendCameraPose(cameraReturnPose.from, cameraReturnPose.to, Math.min(1, cameraReturnPose.elapsed / 0.58));
+          if (cameraReturnPose.elapsed >= 0.58) {
+            cameraReturnPose = null;
+            followAstronaut();
+          }
         } else followAstronaut();
       }
       if (launchElapsed >= 4 && !launchExitNotified) {
