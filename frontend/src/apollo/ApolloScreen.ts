@@ -51,6 +51,8 @@ export class ApolloScreen implements Screen {
   private hudTime=0;
   private activeIndex=-1;
   private quality:Quality='high';
+  private languageMenu:HTMLElement|null=null;
+  private languageParent:HTMLElement|null=null;
   private zoom=false;
   private stepDistance=0;
   private audio=new ApolloAudio();
@@ -301,8 +303,12 @@ export class ApolloScreen implements Screen {
     },'ap-button ap-primary'));
     box.append(this.button('Fuentes históricas y créditos',()=>this.openCredits()));
   }
+  private restoreLanguageMenu() {
+    if(this.languageMenu && this.languageParent) this.languageParent.append(this.languageMenu);
+    this.languageMenu=null; this.languageParent=null;
+  }
   private openModal(kicker:string,title:string) {
-    this.modal?.remove(); this.previousFocus=document.activeElement as HTMLElement|null;
+    this.restoreLanguageMenu(); this.modal?.remove(); this.previousFocus=document.activeElement as HTMLElement|null;
     const overlay=el('div','ap-modal'); const box=el('section','ap-dialog');
     box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label',title); box.tabIndex=-1;
     box.append(el('small','ap-kicker',kicker),el('h1','',title)); overlay.append(box); this.root.append(overlay); this.modal=overlay;
@@ -317,7 +323,7 @@ export class ApolloScreen implements Screen {
     box.focus(); return box;
   }
   private closeModal() {
-    this.modal?.remove();this.modal=null;this.paused=false;
+    this.restoreLanguageMenu(); this.modal?.remove();this.modal=null;this.paused=false;
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
   }
@@ -330,6 +336,8 @@ export class ApolloScreen implements Screen {
     const paintMute=()=>{const label=this.audio.muted?'Activar audio':'Silenciar audio';mute.setAttribute('aria-label',label);mute.title=label;mute.querySelector('.ap-icon')!.innerHTML=this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume;mute.querySelector('small')!.textContent=label;};
     tools.append(mute,this.iconButton(PAUSE_ICONS.restart,'Reiniciar misión',()=>this.confirmReset()),this.iconButton(PAUSE_ICONS.back,'Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
     box.append(tools);
+    const languageMenu=document.querySelector<HTMLElement>('.language-menu');
+    if(languageMenu){this.languageMenu=languageMenu;this.languageParent=languageMenu.parentElement;const languageSlot=el('div','ap-pause-language');languageSlot.append(languageMenu);box.append(languageSlot);}
     box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
     const mapBox=el('div','ap-pause-map'); const mapCanvas=el('canvas','ap-large-map'); mapCanvas.width=720; mapCanvas.height=540; this.drawMap(mapCanvas);
     mapBox.append(el('small','ap-kicker','MAPA DE OPERACIONES'),mapCanvas); box.append(mapBox);
@@ -460,6 +468,6 @@ export class ApolloScreen implements Screen {
     this.disposed=true;cancelAnimationFrame(this.raf);clearTimeout(this.flashTimer);
     document.removeEventListener('keydown',this.onKey);document.removeEventListener('visibilitychange',this.onVisibility);
     window.removeEventListener('resize',this.onResize);window.removeEventListener('pagehide',this.onPageHide);
-    this.audio.dispose();this.world?.dispose();this.modal?.remove();this.root?.remove();
+    this.audio.dispose();this.world?.dispose();this.restoreLanguageMenu();this.modal?.remove();this.root?.remove();
   }
 }
