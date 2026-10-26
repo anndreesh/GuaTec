@@ -1158,6 +1158,11 @@ export function createGameplayLayer(
   let leftShiftDown = false;
   let touchMoveX = 0;
   let touchMoveY = 0;
+  let gamepadMoveX = 0;
+  let gamepadMoveY = 0;
+  let gamepadSprintDown = false;
+  let activeGamepadIndex: number | null = null;
+  let previousGamepadButtons: boolean[] = [];
   let elapsed = 0;
   let navigationPath: BABYLON.Vector3[] = [];
   let navigationTargetPoiId: string | null = null;
@@ -1197,7 +1202,69 @@ export function createGameplayLayer(
     if (ev.code === "ShiftLeft") leftShiftDown = false;
   }
 
-  const onBlur = () => { keysDown.clear(); leftShiftDown = false; touchMoveX = 0; touchMoveY = 0; velocity.set(0, 0, 0); navigationPath = []; navigationTargetPoiId = null; };
+  function applyDeadzone(value: number, deadzone = 0.14): number {
+    const magnitude = Math.abs(value);
+    if (magnitude <= deadzone) return 0;
+    return Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
+  }
+
+  /** Reads the standard browser Gamepad mapping once per frame. Keeping this
+   * here (instead of using Babylon's camera input) lets keyboard, touch and
+   * controller input share the same collision and interaction code. */
+  function pollGamepad(deltaSeconds: number): void {
+    gamepadMoveX = 0;
+    gamepadMoveY = 0;
+    gamepadSprintDown = false;
+    if (inputSuspended || !navigator.getGamepads) {
+      activeGamepadIndex = null;
+      previousGamepadButtons = [];
+      return;
+    }
+    const pads = navigator.getGamepads();
+    let gamepad = activeGamepadIndex === null ? null : pads[activeGamepadIndex];
+    if (!gamepad || !gamepad.connected) {
+      gamepad = Array.from(pads).find((candidate) => candidate?.connected) ?? null;
+      activeGamepadIndex = gamepad ? gamepad.index : null;
+      previousGamepadButtons = [];
+    }
+    if (!gamepad) return;
+
+    const axis = (index: number) => applyDeadzone(gamepad!.axes[index] ?? 0);
+    gamepadMoveX = axis(0);
+    gamepadMoveY = -axis(1);
+    gamepadSprintDown = !!(gamepad.buttons[4]?.pressed || gamepad.buttons[5]?.pressed);
+
+    // Right stick orbit: standard pads expose it on axes 2/3. Do not orbit
+    // while looking at an instrument or during a cinematic camera shot.
+    if (!fieldFocus && openingElapsed < 0 && launchElapsed < 0) {
+      const lookX = axis(2);
+      const lookY = axis(3);
+      if (lookX || lookY) {
+        camera.alpha -= lookX * deltaSeconds * 3.2;
+        camera.beta = Math.max(camera.lowerBetaLimit ?? 0.35, Math.min(camera.upperBetaLimit ?? 1.5, camera.beta + lookY * deltaSeconds * 2.2));
+      }
+    }
+
+    const pressed = (index: number) => !!gamepad!.buttons[index]?.pressed;
+    const justPressed = (index: number) => pressed(index) && !previousGamepadButtons[index];
+    if (justPressed(0) && grounded && enabled) {
+      verticalVelocity = JUMP_SPEED;
+      grounded = false;
+    }
+    if (justPressed(2) && nearestPoi) {
+      navigationPath = [];
+      interactCallback?.(nearestPoi.poi.id);
+      navigationTargetPoiId = null;
+    }
+    previousGamepadButtons = gamepad.buttons.map((button) => button.pressed);
+  }
+
+  const onBlur = () => {
+    keysDown.clear(); leftShiftDown = false; touchMoveX = 0; touchMoveY = 0;
+    gamepadMoveX = 0; gamepadMoveY = 0; gamepadSprintDown = false;
+    previousGamepadButtons = [];
+    velocity.set(0, 0, 0); navigationPath = []; navigationTargetPoiId = null;
+  };
 
   const focusMaterial = new BABYLONNS.StandardMaterial("nearby-activity-ground-highlight", scene);
   focusMaterial.diffuseColor = BABYLONNS.Color3.Black(); focusMaterial.emissiveColor = BABYLONNS.Color3.FromHexString("#b6c7ad");
@@ -1246,7 +1313,8 @@ export function createGameplayLayer(
       },
       setInputSuspended(suspended) {
         inputSuspended = suspended;
-        keysDown.clear(); touchMoveX = 0; touchMoveY = 0; leftShiftDown = false;
+        keysDown.clear(); touchMoveX = 0; touchMoveY = 0; gamepadMoveX = 0; gamepadMoveY = 0; gamepadSprintDown = false; previousGamepadButtons = [];
+        if (suspended) activeGamepadIndex = null;
         velocity.set(0, 0, 0); navigationPath = []; navigationTargetPoiId = null;
         if (suspended) camera.detachControl();
         else if (enabled) camera.attachControl(canvas, true);
@@ -1320,6 +1388,11 @@ export function createGameplayLayer(
         grounded = true;
         touchMoveX = 0;
         touchMoveY = 0;
+        gamepadMoveX = 0;
+        gamepadMoveY = 0;
+        gamepadSprintDown = false;
+        activeGamepadIndex = null;
+        previousGamepadButtons = [];
         leftShiftDown = false;
         navigationPath = [];
         rocketRoot.position.copyFrom(rocketStart);
@@ -1464,6 +1537,7 @@ export function createGameplayLayer(
       if (!enabled) return;
       deltaSeconds = Math.max(0, Math.min(deltaSeconds, 1 / 30));
       elapsed += deltaSeconds;
+      pollGamepad(deltaSeconds);
       instruments.update(deltaSeconds);
       fieldKit.update(deltaSeconds, enabled && openingElapsed < 0, reducedMotion);
       const contactY = terrain.getHeightAt(astronaut.root.position.x, astronaut.root.position.z);
@@ -1534,6 +1608,8 @@ export function createGameplayLayer(
       let moveZ = 0;
       moveX -= right.x * touchMoveX - forward.x * touchMoveY;
       moveZ -= right.z * touchMoveX - forward.z * touchMoveY;
+      moveX -= right.x * gamepadMoveX - forward.x * gamepadMoveY;
+      moveZ -= right.z * gamepadMoveX - forward.z * gamepadMoveY;
       if (keysDown.has("w") || keysDown.has("arrowup")) {
         // W / ↑ moves forward, away from the camera behind the astronaut.
         moveX += forward.x;
@@ -1570,7 +1646,7 @@ export function createGameplayLayer(
         const invLen = 1 / Math.sqrt(moveLenSq);
         moveX *= invLen;
         moveZ *= invLen;
-        const speed = (leftShiftDown ? RUN_SPEED : MOVE_SPEED) * movementStrength;
+        const speed = ((leftShiftDown || gamepadSprintDown) ? RUN_SPEED : MOVE_SPEED) * movementStrength;
         const targetX = moveX * speed;
         const targetZ = moveZ * speed;
         velocity.x += (targetX - velocity.x) * (1 - Math.exp(-MOVE_ACCELERATION * deltaSeconds));
@@ -1597,9 +1673,9 @@ export function createGameplayLayer(
         verticalVelocity = 0;
         grounded = true;
       }
-      missionAudio.updateFootsteps(walking && grounded, leftShiftDown, deltaSeconds, onShedDeck ? "wood" : "earth");
+      missionAudio.updateFootsteps(walking && grounded, leftShiftDown || gamepadSprintDown, deltaSeconds, onShedDeck ? "wood" : "earth");
       if (walking) astronaut.root.rotation.y = Math.atan2(velocity.x, velocity.z);
-      astronaut.setMovementState(walking, walking && leftShiftDown);
+      astronaut.setMovementState(walking, walking && (leftShiftDown || gamepadSprintDown));
       astronaut.update(deltaSeconds);
       for (const worker of fieldCrew) {
         const distToPlayer = Math.hypot(worker.character.root.position.x - astronaut.root.position.x, worker.character.root.position.z - astronaut.root.position.z);

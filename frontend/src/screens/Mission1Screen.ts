@@ -2151,6 +2151,7 @@ export class Mission1Screen implements Screen {
       el("li", { className: "tutorial-control-desktop", text: t("Arrastra el mouse — Orbitar la cámara") }),
       el("li", { className: "tutorial-control-desktop", text: t("E — Examinar instrumentos, planos y plataforma") }),
       el("li", { className: "tutorial-control-desktop", text: t("H — Minimizar o restaurar el panel de misión") }),
+      el("li", { className: "tutorial-control-desktop", text: t("Mando — Stick izquierdo: mover · stick derecho: cámara · A: saltar · X: examinar · LB/RB: correr") }),
       el("li", { className: "tutorial-control-mobile", text: t("Joystick — Desplazarte por el campo") }),
       el("li", { className: "tutorial-control-mobile", text: t("Correr / Saltar — Botones de acción") }),
       el("li", { className: "tutorial-control-mobile", text: t("Acércate a una estación y pulsa Examinar") }),
