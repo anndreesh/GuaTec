@@ -82,7 +82,7 @@ const PLAYER_COLLISION_RADIUS = 0.48;
 
 /**
  * Builds the full third-person exploration layer for a playable mission:
- * mercenary astronaut, level Auburn field terrain with rural props, a small
+ * period field engineer, level Auburn field terrain with rural props, a small
  * 1920s experimental range, fixed points of interest, WASD
  * camera-relative movement and an ArcRotateCamera-based follow camera.
  *
@@ -138,7 +138,6 @@ export function createGameplayLayer(
   cameraFollowAnchor.position.y = 1.12;
   cameraFollowAnchor.isVisible = false;
   cameraFollowAnchor.isPickable = false;
-  const proceduralAvatarMeshes = astronaut.root.getChildMeshes(false);
   astronaut.root.position = new BABYLONNS.Vector3(
     PLAYER_START.x,
     terrain.getHeightAt(PLAYER_START.x, PLAYER_START.z),
@@ -154,52 +153,6 @@ export function createGameplayLayer(
   contactMaterial.disableLighting = true; contactMaterial.emissiveColor = BABYLONNS.Color3.Black();
   const playerContact = BABYLONNS.MeshBuilder.CreateGround("player-contact-shadow", { width: 0.95, height: 0.72 }, scene);
   playerContact.material = contactMaterial; playerContact.parent = root; playerContact.isPickable = false;
-  let avatarAnimationGroups: BABYLON.AnimationGroup[] = [];
-  let activeAvatarAnimation: BABYLON.AnimationGroup | null = null;
-  const playAvatarAnimation = (walking: boolean, running: boolean, jumping = false): void => {
-    if (!avatarAnimationGroups.length) return;
-    const hasJumpAnimation = jumping && avatarAnimationGroups.some((group) => group.name.toLowerCase().includes("jump"));
-    const wanted = hasJumpAnimation ? "jump" : running ? "running" : walking ? "walk" : "idle";
-    const next = avatarAnimationGroups.find((group) => group.name.toLowerCase().includes(wanted));
-    if (!next || next === activeAvatarAnimation) return;
-    activeAvatarAnimation?.stop();
-    activeAvatarAnimation = next;
-    next.start(true);
-  };
-  async function loadAnimatedAvatar(): Promise<void> {
-    try {
-      await import("@babylonjs/loaders/glTF");
-      const result = await BABYLONNS.SceneLoader.ImportMeshAsync(null, "/assets/models/", quality === "balanced" ? "mercenary_astronaut_balanced.glb" : "mercenary_astronaut_optimized.glb", scene);
-      if (disposed) { result.animationGroups.forEach(group => group.dispose()); result.skeletons.forEach(skeleton => skeleton.dispose()); result.meshes.forEach(mesh => mesh.dispose(false, true)); return; }
-      const avatarRoot = new BABYLONNS.TransformNode("mercenary-avatar-model", scene);
-      avatarRoot.parent = astronaut.root;
-      for (const mesh of result.meshes) {
-        if (!mesh.parent) mesh.parent = avatarRoot;
-        mesh.receiveShadows = true;
-        // Imported rig bounds include animation extents; casting their shadow
-        // produces a field-long black wedge at the low dawn sun angle.
-      }
-      avatarRoot.computeWorldMatrix(true);
-      let bounds = avatarRoot.getHierarchyBoundingVectors(true);
-      const height = Math.max(0.01, bounds.max.y - bounds.min.y);
-      avatarRoot.scaling.setAll(1.78 / height);
-      avatarRoot.computeWorldMatrix(true);
-      bounds = avatarRoot.getHierarchyBoundingVectors(true);
-      avatarRoot.position.x += astronaut.root.position.x - (bounds.min.x + bounds.max.x) / 2;
-      avatarRoot.position.y += astronaut.root.position.y - bounds.min.y;
-      avatarRoot.position.z += astronaut.root.position.z - (bounds.min.z + bounds.max.z) / 2;
-      proceduralAvatarMeshes.forEach((mesh) => mesh.setEnabled(false));
-      avatarAnimationGroups = result.animationGroups;
-      avatarAnimationGroups.forEach((group) => { group.stop(); group.enableBlending = true; group.blendingSpeed = 0.08; });
-      playAvatarAnimation(false, false);
-      if (!enabled) activeAvatarAnimation?.pause();
-      console.info("[Mission 01] Mercenary astronaut loaded; idle, walk, and run animations ready.", { height, center: [bounds.min.x, bounds.min.y, bounds.min.z] });
-    } catch (error) {
-      console.warn("[Mission 01] Could not load mercenary astronaut; procedural engineer remains active.", error);
-    }
-  }
-  void loadAnimatedAvatar();
-
   // --- Set dressing: a small 1920s test vehicle, launch frame and field stations ---
   const propMat = new BABYLONNS.PBRMaterial("gameplay-aged-steel", scene);
   propMat.albedoColor = BABYLONNS.Color3.FromHexString("#69716d");
@@ -1383,7 +1336,6 @@ export function createGameplayLayer(
         camera.radius = cameraOffsetRadius;
         camera.checkCollisions = false;
         followAstronaut();
-        playAvatarAnimation(false, false);
         this.setDesign("balanced", "basic");
       },
       setDesign(structure, _instrumentation) {
@@ -1473,7 +1425,6 @@ export function createGameplayLayer(
       verticalVelocity = 0;
       grounded = true;
       root.setEnabled(true);
-      activeAvatarAnimation?.play(true);
       // Movement uses the explicit obstacle resolver below. Disable Babylon's
       // broad collision pass so the static floor and camera cannot fight it.
       scene.collisionsEnabled = false;
@@ -1495,7 +1446,6 @@ export function createGameplayLayer(
     disable() {
       if (!enabled) return;
       enabled = false;
-      activeAvatarAnimation?.pause();
       keysDown.clear();
       leftShiftDown = false;
       touchMoveX = 0;
@@ -1650,7 +1600,6 @@ export function createGameplayLayer(
       missionAudio.updateFootsteps(walking && grounded, leftShiftDown, deltaSeconds, onShedDeck ? "wood" : "earth");
       if (walking) astronaut.root.rotation.y = Math.atan2(velocity.x, velocity.z);
       astronaut.setMovementState(walking, walking && leftShiftDown);
-      playAvatarAnimation(walking, walking && leftShiftDown, !grounded);
       astronaut.update(deltaSeconds);
       for (const worker of fieldCrew) {
         const distToPlayer = Math.hypot(worker.character.root.position.x - astronaut.root.position.x, worker.character.root.position.z - astronaut.root.position.z);
@@ -1749,7 +1698,6 @@ export function createGameplayLayer(
       focusRing.dispose(); focusMaterial.dispose();
       playerContact.dispose(); contactMaterial.dispose(); contactTexture.dispose();
       camera.lockedTarget = null;
-      avatarAnimationGroups.forEach(group => group.dispose());
       astronaut.dispose();
       for (const worker of fieldCrew) worker.character.dispose();
       launchSmoke.dispose();

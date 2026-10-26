@@ -36,7 +36,7 @@ export function createAstronautCharacter(B: BabylonNamespace, scene: BABYLON.Sce
     entry.users++; acquired.push(key);
     return entry.material;
   };
-  const colors = { director: "#232931", propulsion: "#4e3825", structural: "#3e4752", data: "#2e3b33", engineer: "#f2f2ef" };
+  const colors = { director: "#232931", propulsion: "#4e3825", structural: "#3e4752", data: "#2e3b33", engineer: "#675744" };
   const coat = material("field-wool", options.coatColor ?? colors[options.role ?? "engineer"], 0.95, 0, true);
   const shirt = material("field-cotton", "#c9c1ae", 0.96);
   const trousers = material("field-trousers", options.trouserColor ?? "#3c443f", 0.97);

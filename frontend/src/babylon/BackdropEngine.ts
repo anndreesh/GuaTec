@@ -11,7 +11,7 @@ export function isMissionShadowCaster(mesh: AbstractMesh): boolean {
     if (node.name === "gameplay-root") belongsToGameplay = true;
     if (node.name === "field-engineer-root") crew = true;
     if (node.name === "field-station-kit" || node.name === "1926-launch-frame"
-      || node.name === "nasa-shuttle-model" || node.name === "mercenary-avatar-model"
+      || node.name === "nasa-shuttle-model"
       || /^field-(adjustable_wrench|vintage_oil_lamp|metal_toolbox)-/.test(node.name)) return false;
     node = node.parent;
   }

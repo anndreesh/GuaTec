@@ -1,5 +1,7 @@
 # Field stations and 3D asset audit — 2026-10-25
 
+> **Update 2026-10-26:** Mission 01 now uses the project-authored, articulated 1920s field engineer as its player character. The two Mercenary astronaut variants audited below are historical audit records only; they are no longer loaded or included in the production bundle. The NASA shuttle GLB remains unchanged.
+
 ## Scope and method
 
 Inspected the Babylon.js scene, local workshop loader, asset registry and GLB JSON/accessor/image chunks. Counts below describe source assets, not visible-frame counters. No external models were downloaded, no existing hero model was replaced, and no production FPS claim follows from these counts.
@@ -83,9 +85,9 @@ Raw captures and browser data are outside the repository at `/Users/andres/.code
 
 The same directory contains `station-assembly.png`, `station-mass.png`, `station-calibration.png`, `station-signal.png`, `station-weather.png`, `station-recovery.png` and `station-visual-qa.json`. These six inspected Chrome views show the isolated kit under neutral directional/environment lighting. Their measured counters were respectively 9, 12, 14, 6, 10 and 7 draw calls, including one ground mesh. This confirms hardware batching in that fixture; it does not measure the integrated game, promise a frame rate or certify the production field's budget.
 
-## Highest-value further model improvements
+## Historical follow-up assessment (superseded for the player avatar)
 
-1. **Avatar:** create a compatible LOD and reduce texture dimensions/material complexity before adding more costume detail. At its 1.78 m gameplay height, one 4096 image and 52 2048 images merit inspection at the actual camera scale. Do not remove its animation clips or silently replace the character. The current avatar intentionally receives shadows without casting its problematic rig-extents shadow.
+1. **Avatar:** this audit's proposed LOD work applied to the Mercenary model is no longer relevant: it contradicted Mission 01's 1920s character brief. The procedural period engineer is now active and carries the existing walk/run, idle, attention, breathing and blink behavior.
 2. **NASA vehicle:** reduce material/submesh fragmentation, atlas compatible panels while retaining the NASA artwork, and author a distant LOD. It has substantially fewer triangles than the avatar but many more material regions.
 3. **Workshop geometry LOD:** real instancing and smaller shadow lists are now implemented. Next, simplify the 10,946-triangle stool and 14,228-triangle toolbox when they are distant, and keep navigation proxies independent of visual detail. Preserve the measured placement logic.
 4. **Shelter geometry:** its standing-seam roof still has 64 separately created raised ribs. The new shadow policy removes their shadow submissions; merging or instancing their static visible geometry remains a separate future optimization.

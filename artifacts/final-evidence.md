@@ -22,7 +22,7 @@ World changes: authored copper/porcelain training instruments, moving antenna/re
 
 Chrome headless, Apple M5, 16 GB, 1440×900, DPR 1, warmed production preview at project table. 120 requestAnimationFrame samples per quality profile. Balanced: ~60 FPS, median 16.7 ms, p95 16.7 ms. High: ~60 FPS, median 16.7 ms, p95 16.7 ms. This is a small measured sample, not a universal performance guarantee. At DPR 1 the profile comparison primarily changes shadows, not pixel density.
 
-Representative frame: 1,597 draw calls including shadow passes, 286 active meshes, 734,621 active vertices, 153 scene materials, 197 scene textures. These are Babylon counters; vertices are not triangles and texture count is not GPU byte usage. Draw-call/texture totals exceed the skill's advisory desktop/mobile budgets. Existing imported avatar (~77 MB / 538,589 vertices) and shuttle (~18 MB), their materials and shadows remain major costs; preserving these detailed assets was intentional. No broad mobile FPS or GPU-memory claim is made. No new postprocessing dependency/pipeline was added.
+Historical representative frame before 2026-10-26: 1,597 draw calls including shadow passes, 286 active meshes, 734,621 active vertices, 153 scene materials, 197 scene textures. These are Babylon counters; vertices are not triangles and texture count is not GPU byte usage. On 2026-10-26 the imported Mercenary player was removed in favor of the project-authored period engineer; the 18.6 MB NASA shuttle is unchanged. These prior frame counters must be remeasured before they are used to describe the current scene. No broad mobile FPS or GPU-memory claim is made. No new postprocessing dependency/pipeline was added.
 
 ## Evidence
 
