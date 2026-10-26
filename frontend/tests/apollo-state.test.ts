@@ -28,7 +28,7 @@ test('all required actions must be recorded once before a checkpoint advances', 
   assert.equal(state.act('arrive'), false);
 });
 
-test('the thirteen-checkpoint journey only completes after launch and epilogue', () => {
+test('the eight-checkpoint journey only completes after launch and epilogue', () => {
   const state = new ApolloState();
   CHECKPOINTS.forEach((checkpoint, index) => {
     assert.equal(state.checkpoint, index);
@@ -38,7 +38,7 @@ test('the thirteen-checkpoint journey only completes after launch and epilogue',
     assert.equal(state.completed.length, index + 1);
   });
   assert.equal(state.done, true);
-  assert.equal(state.checkpoint, CHECKPOINTS.length - 1);
+  assert.equal(state.checkpoint, 7);
   assert.deepEqual(state.completed, CHECKPOINTS.map(checkpoint => checkpoint.id));
   const completed = state.toJSON();
   assert.equal(state.act('finish'), false);
@@ -98,24 +98,19 @@ test('legacy engineering progress starts the historical Apollo mission fresh', (
 
 test('dependent documentation, communication and authorization actions require their evidence', () => {
   const state = new ApolloState();
-  completeCheckpoint(state); completeCheckpoint(state); completeCheckpoint(state);
+  completeCheckpoint(state); completeCheckpoint(state);
   assert.equal(state.current.id, 'documentation');
   assert.equal(state.act('report'), false);
   assert.equal(state.act('log'), true);
   assert.equal(state.act('report'), true);
   assert.equal(state.act('identify'), true);
-  assert.equal(state.current.id, 'tracking');
-  completeCheckpoint(state);
   assert.equal(state.current.id, 'communications');
   assert.equal(state.act('ready'), false);
   assert.equal(state.act('antenna'), true);
   assert.equal(state.act('ready'), false);
   assert.equal(state.act('signal'), true);
   assert.equal(state.act('ready'), true);
-  for (const id of ['crew', 'card', 'sequence', 'telemetry']) {
-    assert.equal(state.current.id, id);
-    completeCheckpoint(state);
-  }
+  completeCheckpoint(state);
   assert.equal(state.current.id, 'observation');
   assert.equal(state.act('authorize'), false);
   assert.equal(state.act('audio'), true);
@@ -127,7 +122,7 @@ test('dependent documentation, communication and authorization actions require t
 
 test('restoring checks without prerequisites cannot grant an earned checkpoint', () => {
   const state = new ApolloState();
-  completeCheckpoint(state); completeCheckpoint(state); completeCheckpoint(state);
+  completeCheckpoint(state); completeCheckpoint(state);
   const documentation = state.toJSON();
   assert.equal(new ApolloState({ ...documentation, checks: ['report'] }).checkpoint, 0);
   assert.equal(new ApolloState({ ...documentation, checks: ['report', 'log'] }).checkpoint, 0);
@@ -135,13 +130,12 @@ test('restoring checks without prerequisites cannot grant an earned checkpoint',
   assert.deepEqual(new ApolloState(state.toJSON()).checks, ['log', 'report']);
   state.act('identify');
   assert.equal(new ApolloState({ ...state.toJSON(), checks: ['ready'] }).checkpoint, 0);
-  for (let i = 0; i < 6; i++) completeCheckpoint(state);
-  assert.equal(state.current.id, 'observation');
+  completeCheckpoint(state); completeCheckpoint(state);
   assert.equal(new ApolloState({ ...state.toJSON(), checks: ['authorize'] }).checkpoint, 0);
 });
 
 test('checkpoint and dialogue data are internally consistent', () => {
-  assert.equal(new Set(CHECKPOINTS.map(checkpoint => checkpoint.id)).size, CHECKPOINTS.length);
+  assert.equal(new Set(CHECKPOINTS.map(checkpoint => checkpoint.id)).size, 8);
   assert.equal(new Set(DIALOGUES.map(dialogue => dialogue.id)).size, DIALOGUES.length);
   CHECKPOINTS.forEach((checkpoint, index) => {
     assert.deepEqual(checkpoint.requirements, index ? [CHECKPOINTS[index - 1].id] : []);
@@ -151,25 +145,8 @@ test('checkpoint and dialogue data are internally consistent', () => {
     assert.ok(DIALOGUES.some(dialogue => dialogue.checkpoint === index && dialogue.trigger === 'enter'));
   });
   for (const dialogue of DIALOGUES) {
-    assert.ok(dialogue.checkpoint >= 0 && dialogue.checkpoint < CHECKPOINTS.length);
+    assert.ok(dialogue.checkpoint >= 0 && dialogue.checkpoint < 8);
     assert.ok(dialogue.duration >= 1 && dialogue.text.length > 20);
     assert.ok(!['Neil Armstrong', 'Buzz Aldrin', 'Michael Collins'].includes(dialogue.character));
   }
-});
-
-test('minigame checkpoints sit in the route order and each completes with its single skill action', () => {
-  const ids = CHECKPOINTS.map(checkpoint => checkpoint.id);
-  assert.deepEqual(ids, ['orientation', 'complex', 'wiring', 'documentation', 'tracking', 'communications', 'crew', 'card', 'sequence', 'telemetry', 'observation', 'launch', 'epilogue']);
-  for (const id of ['wiring', 'tracking', 'card', 'sequence', 'telemetry']) {
-    const checkpoint = CHECKPOINTS.find(entry => entry.id === id)!;
-    assert.equal(checkpoint.actions.length, 1);
-    assert.ok(DIALOGUES.some(dialogue => dialogue.checkpoint === ids.indexOf(id) && dialogue.trigger === 'enter'));
-    assert.ok(DIALOGUES.some(dialogue => dialogue.checkpoint === ids.indexOf(id) && dialogue.trigger === 'complete'));
-  }
-  const state = new ApolloState();
-  completeCheckpoint(state); completeCheckpoint(state);
-  assert.equal(state.current.id, 'wiring');
-  assert.equal(state.act('stabilize-signal'), false);
-  assert.equal(state.act('wire-panel'), true);
-  assert.equal(state.current.id, 'documentation');
 });

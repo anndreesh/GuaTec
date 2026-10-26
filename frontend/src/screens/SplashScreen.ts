@@ -2,6 +2,7 @@ import { el } from "@/core/dom";
 import type { GameApp } from "@/core/GameApp";
 import type { Screen } from "@/screens/Screen";
 import { t } from "@/core/i18n";
+import { apolloText } from "@/apollo/ApolloLocale";
 
 /** First screen shown: title card + "Comenzar" entry point into auth flow. */
 export class SplashScreen implements Screen {
@@ -15,7 +16,7 @@ export class SplashScreen implements Screen {
       el("h1", { className: "splash-title", text: "GuaTec: NASA Space 2026" }),
       el("p", {
         className: "splash-subtitle",
-        text: t("Simulador educativo de exploración marciana: gestiona recursos, toma decisiones y recolecta ciencia real."),
+        text: apolloText("Explora la historia espacial: observa, experimenta y vive el lanzamiento del Apollo 11."),
       }),
       el("button", {
         className: "btn btn-primary btn-large",

@@ -466,11 +466,11 @@ export class ApolloWorld {
     // Tracking tripod at the spectator area is a distinct authored piece.
     for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
   }
-  private station(x: number, z: number, title: string, subtitle: string, type: string): void {
+  private station(x: number, z: number, title: string, subtitle: string, type: StationKind): void {
     const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
     const cream = this.material('station-cream', 0xc6c4ad, 0.8);
     this.box(7, 0.12, 5, this.material('station-concrete', 0xb7b3a0), x, 0.05, z);
-    const ids:Record<string,string>={'-35,130':'orientation','-70,165':'complex','-100,220':'documentation','70,235':'communications','0,150':'crew','0,355':'observation'};
+    const ids:Record<string,StationKind>={'-35,130':'map','-70,165':'camera','-100,220':'desk','70,235':'radio','0,150':'crew','0,355':'camera'};
     this.colliders.push(...buildTable(this.furniture, (ids[`${x},${z}`] ?? type) as StationKind, x, z));
     this.sign(title, subtitle, x + 0.5, 2.5, z - 2, 0, 5.5);
     this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });

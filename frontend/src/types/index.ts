@@ -84,6 +84,7 @@ export interface MissionSaveState {
   /** Apollo reconstruction uses an isolated, versioned payload; legacy snapshots remain readable. */
   apollo11?: import("@/apollo/ApolloState").ApolloSave;
   apollo11SavedAt?: number;
+  apollo11Drafts?: import("@/apollo/ApolloFieldProgress").FieldDrafts;
   tick: number;
   resources: Record<ResourceKey, number>;
   resolvedDecisionIds: string[];

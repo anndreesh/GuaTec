@@ -285,6 +285,7 @@ export function buildTable(k: Kit, kind: StationKind, x: number, z: number): Fur
     case 'sequence': sequenceTable(k, x, z); return [];
     case 'telemetry': telemetryTable(k, x, z); return [];
     case 'camera': cameraSide(k, x + 1.6, z); return [{ x: x + 1.6, z, w: 0.45, d: 0.3 }];
+    default: return [];
   }
 }
 

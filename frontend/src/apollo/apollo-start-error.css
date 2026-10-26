@@ -1,0 +1,58 @@
+.ap-loading--error {
+  place-content: center;
+  overflow: auto;
+  padding: 24px;
+  letter-spacing: normal;
+}
+
+.ap-start-error {
+  width: min(640px, 100%);
+  background: #11252bf5;
+  border: 1px solid #607c7e66;
+  border-top: 2px solid #d9b77d;
+  padding: 32px;
+  box-shadow: 0 30px 110px #0005;
+}
+
+.ap-start-error h1 {
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 450;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  margin: 8px 0 12px;
+}
+
+.ap-start-error p {
+  font-size: 15px;
+  color: #d6e1dd;
+  line-height: 1.7;
+  margin: 0 0 18px;
+  letter-spacing: normal;
+}
+
+.ap-start-error-steps {
+  margin: 0 0 24px;
+  padding-left: 20px;
+  color: #b9ccca;
+  font-size: 13px;
+  line-height: 1.8;
+  letter-spacing: normal;
+}
+
+.ap-start-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  letter-spacing: normal;
+}
+
+.ap-start-error-actions .ap-button {
+  min-width: 170px;
+}
+
+@media (max-width: 520px) {
+  .ap-loading--error { padding: 12px; }
+  .ap-start-error { padding: 22px; }
+  .ap-start-error p { font-size: 13px; }
+  .ap-start-error-steps { font-size: 12px; line-height: 1.65; }
+}
