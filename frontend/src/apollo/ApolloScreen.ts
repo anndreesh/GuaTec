@@ -43,7 +43,7 @@ export class ApolloScreen implements Screen {
   private syncTime=0;
   private hudTime=0;
   private activeIndex=-1;
-  private quality:Quality='medium';
+  private quality:Quality='high';
   private zoom=false;
   private stepDistance=0;
   private audio=new ApolloAudio();
@@ -313,10 +313,6 @@ export class ApolloScreen implements Screen {
     if(!this.world || !this.started || this.modal)return;
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
     box.append(this.button('Continuar',()=>this.closeModal(),'ap-button ap-primary'));
-    const select=el('select'); select.setAttribute('aria-label','Calidad gráfica');
-    ([['low','Baja'],['medium','Media'],['high','Alta']] as const).forEach(([value,text])=>{const o=el('option','',text);o.value=value;o.selected=value===this.quality;select.append(o);});
-    select.addEventListener('change',()=>{this.quality=select.value as Quality;this.world.setQuality(this.quality);});
-    const label=el('label','ap-quality','Calidad gráfica ');label.append(select);box.append(label);
     const mute=this.button(this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();mute.textContent=this.audio.muted?'Activar audio':'Silenciar audio';});box.append(mute);
     box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
     box.append(this.button('Reiniciar solo Misión 01',()=>this.confirmReset()),this.button('Guardar y volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
