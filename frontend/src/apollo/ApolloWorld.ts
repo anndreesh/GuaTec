@@ -231,10 +231,6 @@ export class ApolloWorld {
     this.groundPlane(3200, 10000, 3000, 0, water, -0.09);
     const sand = this.material('sand', 0xcdbd91);
     this.groundPlane(100, 10000, 1375, 0, sand, -0.07);
-    for (let i = 0; i < 11; i++) {
-      this.groundPlane(30 + (i % 3) * 13, 100 + i * 7, -150 - (i % 3) * 50, 90 + i * 80, water, -0.04);
-    }
-    this.groundPlane(26, 920, 195, 220, water, -0.03);
     this.sign(() => world('kennedy'), () => world('groundOps'), -18, 2.2, 118, 0, 7);
     this.sign(() => world('pad'), () => world('restricted'), -11, 1.9, 91, 0, 4.5);
   }
