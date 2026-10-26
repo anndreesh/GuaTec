@@ -265,6 +265,11 @@ export class GameApp {
         await this.showMissionSelect();
         break;
       case "mission1":
+        // Mission 01 re-renders its own text in place: no loading screen, no scene rebuild.
+        if (this.currentScreen?.refreshLanguage) {
+          this.currentScreen.refreshLanguage();
+          break;
+        }
         await this.showMission1(this.currentScreen?.languageRefreshState?.());
         break;
       case "report":
