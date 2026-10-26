@@ -330,7 +330,6 @@ export class ApolloScreen implements Screen {
   private openPause() {
     if(!this.world || !this.started || this.modal)return;
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
-    box.append(this.button('Continuar',()=>this.closeModal(),'ap-button ap-primary'));
     const tools=el('div','ap-pause-tools');
     const mute=this.iconButton(this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume,this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();paintMute();});
     const paintMute=()=>{const label=this.audio.muted?'Activar audio':'Silenciar audio';mute.setAttribute('aria-label',label);mute.title=label;mute.querySelector('.ap-icon')!.innerHTML=this.audio.muted?PAUSE_ICONS.muted:PAUSE_ICONS.volume;mute.querySelector('small')!.textContent=label;};
