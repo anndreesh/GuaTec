@@ -1,4 +1,4 @@
-import { createBackdrop, type Backdrop, type BackdropMode } from "@/babylon/BackdropEngine";
+import { type Backdrop, type BackdropMode } from "@/babylon/BackdropEngine";
 import type { GameplayHandle } from "@/babylon/gameplay/GameplayLayer";
 import { AuthStore } from "@/core/AuthStore";
 import { loadingFeedback } from "@/core/dom";
@@ -213,10 +213,9 @@ export class GameApp {
 
   async showMission1(savedState?: unknown): Promise<void> {
     this.activeView = "mission1";
-    this.backdrop ??= await createBackdrop(this.canvas);
     this.setBackdropMode("mission1-gameplay");
-    const { Mission1Screen } = await import("@/screens/Mission1Screen");
-    await this.setScreen(new Mission1Screen(this, savedState));
+    const { ApolloScreen } = await import("@/apollo/ApolloScreen");
+    await this.setScreen(new ApolloScreen(this, savedState));
   }
 
   /** Interactive handle (WASD player, POI proximity/interact callbacks) for

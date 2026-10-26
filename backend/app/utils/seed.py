@@ -7,13 +7,13 @@ MISSION_SEED = [
     {
         "slug": "mission-1-arrival",
         "order_index": 1,
-        "title": "Misión 1: The Beginning",
-        "subtitle": "El primer vuelo de combustible líquido",
+        "title": "Misión 01: Apollo 11",
+        "subtitle": "El comienzo de una nueva era · 1969",
         "description": (
-            "Auburn, Massachusetts, 16 de marzo de 1926. Interpreta a un "
-            "ingeniero ficticio del equipo experimental: prepara un cohete "
-            "no tripulado, prueba sus sistemas y decide si la evidencia "
-            "basta para demostrar que el combustible líquido puede volar."
+            "16 de julio de 1969, Centro Espacial Kennedy. Como técnico ficticio "
+            "de apoyo terrestre, reconoce el complejo 39A, documenta los "
+            "preparativos, observa a Armstrong, Collins y Aldrin y presencia "
+            "el lanzamiento del Saturn V desde una ubicación segura."
         ),
         "is_locked_by_default": False,
     },

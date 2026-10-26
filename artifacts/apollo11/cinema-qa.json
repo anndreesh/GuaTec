@@ -1,0 +1,91 @@
+{
+  "errors": [],
+  "audioState": {
+    "state": "running",
+    "muted": false
+  },
+  "boundary": {
+    "x": 25,
+    "z": 100.00100000000012
+  },
+  "building": {
+    "x": -125,
+    "z": 211.6659999999999
+  },
+  "introComplete": true,
+  "crewBlackout": true,
+  "languageControlRestored": true,
+  "diagnostics": {
+    "engine": "Three.js",
+    "player": [
+      0,
+      0,
+      150
+    ],
+    "yaw": 0,
+    "quality": "medium",
+    "drawCalls": 374,
+    "triangles": 924710,
+    "geometries": 177,
+    "textures": 206,
+    "pixelRatio": 1,
+    "shadowMap": 1024,
+    "shadowLights": 1,
+    "samples": 300,
+    "meanFrameMs": 16.66600000000001,
+    "p95FrameMs": 16.70000000001164,
+    "rocketHeightMeters": 110.6,
+    "colliders": 15,
+    "launchY": 8.5,
+    "crew": 3,
+    "loadedModel": {
+      "source": "Peter_D / Mercenary Astronaut / CC BY 4.0",
+      "url": "/assets/apollo/mercenary-astronaut.glb",
+      "originalBounds": [
+        2.005907155560653,
+        2.6487141456044774,
+        1.2012081080048351
+      ],
+      "clips": [
+        {
+          "name": "Mixamo Walk",
+          "duration": 1.899999976158142
+        },
+        {
+          "name": "Mixamo Idle",
+          "duration": 13.933333396911621
+        },
+        {
+          "name": "Mixamo Running",
+          "duration": 0.8333333134651184
+        }
+      ],
+      "characterHeight": 1.85,
+      "skeletonClones": 4,
+      "playerBounds": [
+        1.40103009754581,
+        1.8499999999999996,
+        0.8389863449390305
+      ],
+      "modelScale": [
+        0.6984521161221048,
+        0.6984521161221048,
+        0.6984521161221048
+      ]
+    },
+    "assetErrors": [],
+    "checkpoint": 5,
+    "checks": [],
+    "completed": [
+      "orientation",
+      "complex",
+      "documentation",
+      "communications",
+      "crew"
+    ],
+    "movie": null,
+    "movieTime": 28.015499999999623,
+    "frameMs": 16.66600000000001,
+    "fps": 60.002400096003804
+  }
+}

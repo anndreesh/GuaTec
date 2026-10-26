@@ -1,0 +1,20 @@
+Mercenary Astronaut
+Author: Peter_D (https://sketchfab.com/better_peter)
+Source: https://sketchfab.com/3d-models/mercenary-astronaut-7fd399d488ae4576a0fc62715892956c
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+This derivative was optimized from the authorized GLB already present in this project.
+Changes: geometry simplification (target 15%, error 0.002); deduplication and welding;
+resampled animations; maximum 512 px textures compressed to WebP; Meshopt geometry
+and animation compression. The three original animation clips, skeleton and embedded
+source/license metadata are retained. Original 500,419,044 bytes; derivative 4,900,616 bytes.
+
+In-game scale: 1.85 m per character. Four skeleton-safe instances share geometry and
+materials. Three play fictional visual stand-ins for Neil Armstrong, Michael Collins,
+and Buzz Aldrin. This science-fiction character is an artistic adaptation, not an
+accurate reconstruction of Apollo A7L pressure suits. No historical dialogue is
+attributed to these visual stand-ins. Some attached cargo/crate meshes are hidden.
+
+Rocket and launch infrastructure: original project-authored geometry. This asset does
+not contain the Sketchfab LEGO Saturn V model and does not extract it from a viewer.

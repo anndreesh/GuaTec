@@ -81,6 +81,9 @@ export interface MissionProgressDTO {
 
 /** Opaque-to-the-backend gameplay snapshot used for autosave/resume. */
 export interface MissionSaveState {
+  /** Apollo reconstruction uses an isolated, versioned payload; legacy snapshots remain readable. */
+  apollo11?: import("@/apollo/ApolloState").ApolloSave;
+  apollo11SavedAt?: number;
   tick: number;
   resources: Record<ResourceKey, number>;
   resolvedDecisionIds: string[];

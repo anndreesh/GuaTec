@@ -1,0 +1,42 @@
+{
+  "active-desktop.png": {
+    "width": 1440,
+    "height": 900,
+    "colorEntropyBits": 3.917020846644512,
+    "dominantColorShare": 0.41681944444444446,
+    "edgeDensity": 0.051631944444444446,
+    "luminanceContrast": 242.13639999999998
+  },
+  "active-high.png": {
+    "width": 1440,
+    "height": 900,
+    "colorEntropyBits": 3.8826464797575047,
+    "dominantColorShare": 0.4193125,
+    "edgeDensity": 0.04565277777777778,
+    "luminanceContrast": 241.06419999999997
+  },
+  "crew-transfer.png": {
+    "width": 1440,
+    "height": 900,
+    "colorEntropyBits": 3.5672917255058954,
+    "dominantColorShare": 0.2947777777777778,
+    "edgeDensity": 0.03390972222222222,
+    "luminanceContrast": 240.576
+  },
+  "launch.png": {
+    "width": 1440,
+    "height": 900,
+    "colorEntropyBits": 3.0534472720744836,
+    "dominantColorShare": 0.4152152777777778,
+    "edgeDensity": 0.028875,
+    "luminanceContrast": 254.99999999999997
+  },
+  "active-narrow.png": {
+    "width": 390,
+    "height": 844,
+    "colorEntropyBits": 4.616038226658592,
+    "dominantColorShare": 0.2642389525368249,
+    "edgeDensity": 0.11707583196944898,
+    "luminanceContrast": 239.576
+  }
+}

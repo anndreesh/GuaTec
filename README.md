@@ -1,22 +1,39 @@
 # GuaTec: NASA Space 2026
 
-Simulador educativo de exploración espacial. El jugador se autentica (Google,
-GitHub o modo Invitado), elige un nombre de usuario, y juega exclusivamente la
-**Misión 1: The Beginning**. La misión transcurre al aire libre en un campo
-experimental procedural de Auburn, Massachusetts. La escena conserva un único
-refugio abierto para el equipo de campo; no hay casas ni interiores jugables.
-Las actividades ocurren en mesas de proyecto, bancos de ingeniería, una zona
-de pruebas y estaciones de lanzamiento y observación. Incluye decisiones,
-recolección de registros, guardado automático, telemetría y un informe final.
-Las Misiones 2 y 3 permanecen bloqueadas y no se desarrollan todavía.
+La **Misión 01 — Apollo 11: El comienzo de una nueva era** reconstruye el
+16 de julio de 1969 en exteriores del Centro Espacial Kennedy. El jugador es
+un técnico ficticio de apoyo terrestre: reconoce LC-39A, comprueba registros
+y comunicaciones, observa una retrospectiva del traslado de la tripulación
+y presencia el lanzamiento desde un punto remoto a 5,6 km.
 
-> **Nota de alcance:** este repositorio se generó a partir de la descripción
-> detallada de requisitos del encargo (frontend TS+Vite+Babylon.js con
-> fallback, backend Flask con rutas REST/OAuth/SQLAlchemy, orquestación
-> raíz, docker-compose, etc.). Ningún archivo de especificación adicional
-> llegó adjunto a la sesión; si tienes un documento de diseño más detallado,
-> compártelo para refinar contenido narrativo, arte y balance de las
-> misiones 2 y 3.
+La aplicación existente conserva TypeScript/Vite, autenticación, modo
+Invitado, backend Flask, catálogo y guardado. La misión nueva usa Three.js;
+el antiguo código Babylon.js de 1926 permanece como fuente heredada inactiva.
+La base original no usaba React: no se ha creado otro proyecto ni se ha
+introducido un segundo router. Las misiones posteriores permanecen como estaban.
+
+- Ocho checkpoints ordenados, comprobaciones educativas, diálogos en cola y
+  guardado local por usuario sincronizado con el backend existente.
+- Saturn V original a escala de 110,6 m, torre umbilical, VAB exterior,
+  crawlerway, costa, vegetación y estaciones de apoyo.
+- Tres NPC Mercenary Astronaut de Peter_D (CC BY 4.0), optimizados a 4,9 MB
+  desde el archivo autorizado de 500 MB, con animaciones preservadas.
+- Traslado retrospectivo de las 06:27, elipsis a negro de embarque y
+  cinematográfica de lanzamiento de las 09:32 EDT; epílogo del 20 de julio.
+- El LEGO Saturn V de HUuser2024 no permite descarga: se ofrece en su visor
+  oficial educativo, separado del cohete original integrado en el mundo.
+- Sonido y música sintetizados originales; subtítulos en español. Calidad
+  Baja/Media/Alta, zoom, mapa, pausa, audio y reinicio aislado de Misión 01.
+
+Controles: **WASD/flechas**, **Shift**, arrastrar el ratón, **E** interactuar,
+**M** mapa, **R** repetir radio, **Escape** pausa. El botón Zoom permite
+examinar la plataforma. La versión jugable se orienta a escritorio; la
+interfaz se adapta a pantallas estrechas, sin prometer controles táctiles completos.
+
+Fuentes, licencias y adaptaciones: [historia y assets](docs/APOLLO11_HISTORY_ASSETS.md).
+Arquitectura y verificación: [entrega Apollo 11](docs/APOLLO11_IMPLEMENTATION.md).
+Las secciones heredadas posteriores describen la infraestructura y algunos
+sistemas del prototipo de 1926; la descripción activa de Misión 01 es esta.
 
 ## Estructura del proyecto
 

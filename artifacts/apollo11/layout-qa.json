@@ -1,0 +1,19 @@
+{
+  "errors": [],
+  "pause": {
+    "x": 259.71875,
+    "y": 16,
+    "width": 42.28125,
+    "height": 44
+  },
+  "language": {
+    "x": 310,
+    "y": 18,
+    "width": 58,
+    "height": 38
+  },
+  "noOverlap": true,
+  "map": true,
+  "zoom": true,
+  "qualityAndMute": true
+}

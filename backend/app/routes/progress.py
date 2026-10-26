@@ -51,6 +51,15 @@ def autosave_progress(mission_slug: str):
         progress.started_at = datetime.now(timezone.utc)
 
     if state is not None:
+        # Apollo replaces the 1926 mission on the same catalogue slug. Reset only
+        # this row's legacy completion, preserving campaign unlocks and other rows.
+        apollo = state.get("apollo11") if isinstance(state, dict) else None
+        previous = progress.state_json or {}
+        if (isinstance(apollo, dict) and apollo.get("version") == "apollo11-v1"
+                and "apollo11" not in previous and progress.status == "completed"):
+            progress.status = "in_progress"
+            progress.completed_at = None
+            progress.report_json = None
         progress.state_json = state
     if progress_percent is not None:
         progress.progress_percent = float(progress_percent)
