@@ -65,9 +65,9 @@ export class MissionSelectScreen implements Screen {
       const locked = mission.status === "locked";
       const card = el("div", { className: `mission-card ${locked ? "mission-card--locked" : ""}` });
       card.append(
-        el("h3", { className: "mission-card-title", text: mission.slug === MISSION_SLUGS.mission1 ? "Misión 01: Apollo 11" : t(mission.title) }),
-        el("p", { className: "mission-card-subtitle", text: mission.slug === MISSION_SLUGS.mission1 ? "El comienzo de una nueva era · 16 de julio de 1969" : t(mission.subtitle ?? "") }),
-        el("p", { className: "mission-card-description", text: mission.slug === MISSION_SLUGS.mission1 ? "Kennedy Space Center. Completa operaciones de apoyo, observa el traslado de la tripulación y presencia el lanzamiento del Saturn V." : t(mission.description ?? "") }),
+        el("h3", { className: "mission-card-title", text: mission.slug === MISSION_SLUGS.mission1 ? t("Misión 01: Apollo 11") : t(mission.title) }),
+        el("p", { className: "mission-card-subtitle", text: mission.slug === MISSION_SLUGS.mission1 ? t("El comienzo de una nueva era · 16 de julio de 1969") : t(mission.subtitle ?? "") }),
+        el("p", { className: "mission-card-description", text: mission.slug === MISSION_SLUGS.mission1 ? t("Kennedy Space Center. Completa operaciones de apoyo, observa el traslado de la tripulación y presencia el lanzamiento del Saturn V.") : t(mission.description ?? "") }),
         el("div", { className: "mission-card-status", text: t(STATUS_LABEL[mission.status]) }),
       );
 
