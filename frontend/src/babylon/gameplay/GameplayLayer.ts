@@ -1,5 +1,6 @@
 import type * as BABYLON from "@babylonjs/core";
 import type { MissionPointOfInterest } from "@/config/gameConfig";
+import { missionAudio } from "@/core/MissionAudio";
 import { createAstronautCharacter, type BabylonNamespace } from "@/babylon/gameplay/AstronautCharacter";
 import { createMarsTerrain } from "@/babylon/gameplay/MarsTerrain";
 import { createLaunchSupport } from "./LaunchSupport";
@@ -1616,6 +1617,7 @@ export function createGameplayLayer(
         verticalVelocity = 0;
         grounded = true;
       }
+      missionAudio.updateFootsteps(walking && grounded, leftShiftDown, deltaSeconds, onShedDeck ? "wood" : "earth");
       if (walking) astronaut.root.rotation.y = Math.atan2(velocity.x, velocity.z);
       astronaut.setMovementState(walking, walking && leftShiftDown);
       playAvatarAnimation(walking, walking && leftShiftDown, !grounded);
