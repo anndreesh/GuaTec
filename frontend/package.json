@@ -19,7 +19,8 @@
     "qa:legal-locales": "node scripts/qa-legal-locales.mjs",
     "qa:apollo-report": "node scripts/qa-apollo-report.mjs",
     "qa:apollo-saving": "node scripts/qa-apollo-saving.mjs",
-    "qa:apollo-camera": "node scripts/qa-apollo-camera.mjs"
+    "qa:apollo-camera": "node scripts/qa-apollo-camera.mjs",
+    "qa:apollo-movement": "node scripts/qa-apollo-movement.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^7.35.1",

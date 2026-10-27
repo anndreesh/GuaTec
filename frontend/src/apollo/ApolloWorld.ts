@@ -884,7 +884,9 @@ export class ApolloWorld {
       const running = i === 0 && walking && this.keys.has('shift');
       p.walk?.setEffectiveWeight(!airborne && walking && !running ? 1 : 0);
       p.run?.setEffectiveWeight(!airborne && running ? 1 : 0);
-      p.idle?.setEffectiveWeight(!airborne && !walking ? 1 : 0);
+      // This asset has no jump clip. Keep its authored idle pose in the air
+      // instead of giving every action zero weight and exposing the bind pose.
+      p.idle?.setEffectiveWeight((!airborne && !walking) || (airborne && !p.jump) ? 1 : 0);
       if (!p.jump || !airborne) p.jump?.setEffectiveWeight(0);
       if (i === 0 || this.mode === 'crew') p.mixer.update(dt);
     }
