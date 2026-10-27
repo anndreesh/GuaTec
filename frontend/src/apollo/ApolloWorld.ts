@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { loadProp, scatter, type PropOptions } from './ApolloProps';
+import { loadProp, type PropOptions } from './ApolloProps';
 import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
 import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
 import { apolloText } from './ApolloLocale';
@@ -176,23 +176,8 @@ export class ApolloWorld {
       } catch (error) { this.assetErrors.push(`${label}: ${String(error)}`); }
     };
     await Promise.all([
-      load('edificio_colon', '/assets/models/edificio_colon_-_modelo_3d_optimized.glb', { fit: { axis: 'y', size: 46 } }, -125, 205, Math.PI / 2, { x: -125, z: 205, w: 23, d: 15 }),
-      load('icac_headquarters', '/assets/models/edificio_colon_-_modelo_3d_optimized.glb', { fit: { axis: 'y', size: 38 } }, 118, 262, -Math.PI / 2, { x: 118, z: 262, w: 20, d: 14 }),
-      load('mies_van_der_rohe_oficina_bacardi', '/assets/models/mies_van_der_rohe_oficina_bacardi_optimized.glb', { fit: { axis: 'x', size: 30 }, hide: /^Plataforma 00[124]/ }, -122, 345, Math.PI / 2, { x: -122, z: 345, w: 16, d: 11 }),
       load('space_shuttle_nasa', '/assets/models/space_shuttle_nasa_optimized.glb', { fit: { axis: 'z', size: 33 } }, 120, 150, Math.PI / 2, { x: 120, z: 150, w: 17, d: 8 }),
     ]);
-    try {
-      const trees = await loadProp(loader, '/assets/models/arboles_optimized.glb', { fit: { axis: 'y', size: 8 } });
-      this.lateProps.add(scatter(trees, [{ x: -138, z: 178, yaw: 0, scale: 1 }, { x: 138, z: 205, yaw: 0, scale: 1 }, { x: -136, z: 292, yaw: 0, scale: 1 }, { x: 137, z: 372, yaw: 0, scale: 1 }]));
-    } catch (error) { this.assetErrors.push(`arboles_optimized: ${String(error)}`); }
-    try {
-      const statue = await loadProp(loader, '/assets/models/astronaut.glb', { fit: { axis: 'y', size: 2.6 } });
-      statue.group.position.set(24, 1.2, 116); this.lateProps.add(statue.group); this.box(3.4, 1.2, 3.4, this.material('memorial-pedestal', 0xb6b0a0), 24, .6, 116); this.colliders.push({ x: 24, z: 116, w: 2.2, d: 2.2 });
-    } catch (error) { this.assetErrors.push(`astronaut: ${String(error)}`); }
-    try {
-      const consoleModel = await loadProp(loader, '/assets/models/old_nasa_style_computer_console.glb', { fit: { axis: 'y', size: 1.45 } });
-      this.lateProps.add(scatter(consoleModel, [{ x: -35, z: 127, yaw: 0, scale: 1 }, { x: -70, z: 162, yaw: 0, scale: 1 }, { x: -100, z: 217, yaw: 0, scale: 1 }, { x: 70, z: 232, yaw: 0, scale: 1 }]));
-    } catch (error) { this.assetErrors.push(`old_nasa_style_computer_console: ${String(error)}`); }
   }
 
   private material(name: string, color: number, roughness = 0.8, metalness = 0): THREE.MeshStandardMaterial {
