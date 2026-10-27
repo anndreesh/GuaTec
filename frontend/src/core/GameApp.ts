@@ -16,6 +16,19 @@ const MENU_BACKGROUNDS = [
   "/images/tomato-seeds-experiment.avif",
   "/images/sls-rocket-pad.jpeg",
   "/images/shuttle-launch.jpeg",
+  "/images/jeremy-thomas-E0AHdsENmDg-unsplash.jpg",
+  "/images/jorge-gardner-tCtnz_NkYG4-unsplash.jpg",
+  "/images/josh-methven-qz6IXJ7dIDM-unsplash.jpg",
+  "/images/nasa-7Cz6bWjdlDs-unsplash.jpg",
+  "/images/nasa-GkpYlUpUOIY-unsplash.jpg",
+  "/images/nasa-JZz2UYtHo1s-unsplash.jpg",
+  "/images/nasa-Q1p7bh3SHj8-unsplash.jpg",
+  "/images/nasa-dCgbRAQmTQA-unsplash.jpg",
+  "/images/nasa-yZygONrUBe8-unsplash.jpg",
+  "/images/sheeyam-bJgiy4lBFgU-unsplash.jpg",
+  "/images/shot-by-cerqueira-0o_GEzyargo-unsplash.jpg",
+  "/images/spacex--p-KCm6xB9I-unsplash.jpg",
+  "/images/spacex-tKs_2sBoqAg-unsplash.jpg",
 ] as const;
 
 /**
