@@ -121,8 +121,8 @@ body.apollo-active .language-menu{display:none}
 .ap-pause-overlay .ap-pause-icon{width:24px;height:24px;font-size:14px;box-shadow:none}
 .ap-pause-overlay .ap-pause-control strong{font-size:9px;letter-spacing:.02em;line-height:1.15}
 .ap-pause-overlay .ap-pause-map-title{font-size:9px;margin-bottom:7px}
-.ap-pause-overlay .ap-pause-map{height:360px}
+.ap-pause-overlay .ap-pause-map{height:auto;aspect-ratio:1100 / 460;object-fit:contain}
 @keyframes ap-pause-drop{from{opacity:0;transform:translateY(-14px) scaleY(.98);transform-origin:top center}to{opacity:1;transform:translateY(0) scaleY(1)}}
-@media(max-width:760px){.ap-pause-overlay{padding:12px}.ap-pause-overlay .ap-pause-dialog{padding:20px 18px 20px}.ap-pause-overlay .ap-pause-map{height:240px}}
-@media(max-width:520px){.ap-pause-overlay .ap-pause-grid{grid-template-columns:1fr;gap:6px}.ap-pause-overlay .ap-pause-control{height:42px;min-height:42px}.ap-pause-overlay .ap-pause-map{height:220px}}
+@media(max-width:760px){.ap-pause-overlay{padding:12px}.ap-pause-overlay .ap-pause-dialog{padding:20px 18px 20px}.ap-pause-overlay .ap-pause-map{height:auto}}
+@media(max-width:520px){.ap-pause-overlay .ap-pause-grid{grid-template-columns:1fr;gap:6px}.ap-pause-overlay .ap-pause-control{height:42px;min-height:42px}.ap-pause-overlay .ap-pause-map{height:auto}}
 @media(prefers-reduced-motion:reduce){.ap-pause-overlay .ap-pause-dialog{animation:none}}
