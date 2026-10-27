@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {STAND_DESIGNS, standIndicatorPosition, standHasIdentityPost, standUsesPower, type StandModelKind} from './ApolloStandDesigns';
+import {CABLE_CHANNELS,CABLE_TARGET_ORDER} from './ApolloStandRules';
 export type {StandModelKind} from './ApolloStandDesigns';
 
 export type StandMaterialFactory = (name: string, color: number, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial;
@@ -26,7 +27,7 @@ export function standCollisionProxies(kind: StandModelKind, x: number, z: number
 export function createStandAtlas(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1024;
   const c = canvas.getContext('2d')!;
-  const titles = ['GROUND SUPPORT / 1969', 'VOLTAGE / DC', 'SIGNAL / RF', 'CONTINUITY / BUS', 'FLIGHT OPERATIONS', 'CREW / AS-506', 'WEATHER / RANGE', 'RANGE SAFETY', 'OPTICAL SURVEY', 'FIELD RECORD', 'VOICE / UHF', 'TRACKING / 39A', 'LC-39A / KENNEDY', 'FLIGHT PLAN / 16 JUL', 'TOOL CONTROL', 'SERVICE / AUTHORIZED'];
+  const titles = ['GROUND SUPPORT / 1969', 'VOLTAGE / DC', 'SIGNAL / RF', 'CONTINUITY / BUS', 'FLIGHT OPERATIONS', 'CREW / AS-506', 'WEATHER / RANGE', 'RANGE SAFETY', 'OPTICAL SURVEY', 'FIELD RECORD', 'VOICE / UHF', 'TRACKING / 39A', 'LC-39A / KENNEDY', 'FLIGHT PLAN / 16 JUL', 'S-IVB / TELEMETRY', 'PAD / TELEMETRY'];
   for (let index = 0; index < 16; index++) {
     const x = index % 4 * 256, y = Math.floor(index / 4) * 256;
     c.save(); c.translate(x, y);
@@ -44,12 +45,24 @@ export function createStandAtlas(): THREE.CanvasTexture {
       }
       c.strokeStyle = '#af4a34'; c.lineWidth = 4; c.beginPath(); c.moveTo(128, 154); c.lineTo(151, 94); c.stroke();
       c.fillStyle = '#34433b'; c.font = '12px monospace'; c.fillText(index === 6 ? 'RANGE WX' : index === 1 ? '28 V DC' : 'S-BAND', 92, 178);
-    } else if ([2, 3, 7, 10, 11].includes(index)) {
+    } else if (index === 3) {
+      // Isolated label tiles for physical terminals, legible without color cues.
+      CABLE_CHANNELS.forEach((letter,i)=>{
+        c.fillStyle='#e2d9be';c.fillRect(i*64+5,104,54,64);
+        c.fillStyle='#243d3c';c.font='bold 43px monospace';c.textAlign='center';
+        c.fillText(letter,i*64+32,151);
+      });
+    } else if ([2, 7, 10, 11, 14, 15].includes(index)) {
       c.strokeStyle = '#39665b'; c.lineWidth = 1;
       for (let t = 0; t <= 6; t++) { c.beginPath(); c.moveTo(23, 72 + t * 23); c.lineTo(232, 72 + t * 23); c.stroke(); }
       c.strokeStyle = '#9bc7a3'; c.lineWidth = 2; c.beginPath();
-      for (let t = 0; t < 210; t++) { const py = 140 + Math.sin(t * .12) * 25 * Math.sin(t * .025); t ? c.lineTo(23 + t, py) : c.moveTo(23, py); } c.stroke();
-      c.fillStyle = '#b2d2b0'; c.font = '11px monospace'; c.fillText('LINK A     STBY     01', 24, 220);
+      for (let t = 0; t < 210; t++) {
+        const py = index===14 ? 150-Math.exp(-(((t-64)/19)**2))*43+Math.sin(t*.18)*5
+          : index===15 ? 140+(Math.floor(t/30)%2?18:-18)
+          : 140 + Math.sin(t * .12) * 25 * Math.sin(t * .025);
+        t ? c.lineTo(23 + t, py) : c.moveTo(23, py);
+      } c.stroke();
+      c.fillStyle = '#b2d2b0'; c.font = '11px monospace'; c.fillText(index===14?'S-IVB     CH 01':index===15?'PAD       CH 03':'LINK      CH 02', 24, 220);
     } else {
       c.strokeStyle = paper ? '#a49a7b' : '#45635a'; c.lineWidth = 1;
       for (let row = 0; row < 6; row++) {
@@ -91,6 +104,12 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     const geometry = new THREE.PlaneGeometry(w, h), uv = geometry.getAttribute('uv');
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (cell % 4 + .025 + uv.getX(i) * .95) / 4, (3 - Math.floor(cell / 4) + .025 + uv.getY(i) * .95) / 4);
     put(geometry, display, x, y, z, rx, ry);
+  };
+  const terminalLabel=(letter:typeof CABLE_CHANNELS[number],x:number,y:number)=>{
+    const geometry=new THREE.PlaneGeometry(.17,.20),uv=geometry.getAttribute('uv'),column=CABLE_CHANNELS.indexOf(letter);
+    // Cell 3 occupies x=768..1024, y=0..256 in the shared 1024 atlas.
+    for(let i=0;i<uv.count;i++)uv.setXY(i,(768+column*64+4+uv.getX(i)*56)/1024,1-(168-uv.getY(i)*64)/1024);
+    put(geometry,display,x,y,-.46);
   };
   const beveled = (w: number, h: number, depth: number, material: THREE.Material, x: number, y: number, z: number) => {
     const s = new THREE.Shape(), r = .09;
@@ -169,7 +188,7 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     // Three recessed CRT faces, control shelf and a full-height tape/data rack.
     beveled(2.95,.95,.45,paint,0,1.72,-.66);
     for(let i=0;i<3;i++){
-      const x=-.96+i*.96;meter(x,1.84,-.18,2);knob(x-.18,1.39,-.11,.075);knob(x+.15,1.39,-.11,.05);
+      const x=-.96+i*.96;meter(x,1.84,-.18,[14,2,15][i]!);knob(x-.18,1.39,-.11,.075);knob(x+.15,1.39,-.11,.05);
       box(.78,.06,.18,dark,x,2.15,-.13);
     }
     beveled(.73,2.23,.61,dark,2.02,1.31,-.70);
@@ -199,6 +218,7 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     for (let i = 0; i < 4; i++) {
       const x = -1 + i * .64;
       for(const y of[1.62,2.0]){cyl(.095,.08,dark,x,y,-.43,Math.PI/2);cyl(.052,.10,copper,x,y,-.38,Math.PI/2);}
+      terminalLabel(CABLE_CHANNELS[i]!,x,2.20);terminalLabel(CABLE_TARGET_ORDER[i]!,x,1.81);
       tube([[x,2,-.3],[x-.13,1.64,-.1],[x+.16,1.34,.04],[x+.12,1.21,.39]],.022,i%2?dark:red);
       cyl(.035,.15,copper,x+.12,1.21,.39,Math.PI/2);
     }
