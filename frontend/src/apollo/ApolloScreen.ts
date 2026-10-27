@@ -433,11 +433,12 @@ export class ApolloScreen implements Screen {
     box.classList.add('ap-pause-dialog');
     box.append(el('div','ap-pause-status','MISSION CONTROL · APOLLO 11 · KENNEDY SPACE CENTER'),el('p','ap-pause-intro','La misión está detenida. Revisa el estado operativo y retoma el recorrido cuando estés listo.'));
     const grid=el('div','ap-pause-grid');
+    const resume=this.pauseControl('▶','Continuar operaciones',()=>this.closeModal()); resume.classList.add('ap-pause-control--primary');
     const mute=this.pauseControl(this.audio.muted?'🔇':'🔊',this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();this.voice.setVolume(this.audio.muted?0:.82);this.openPause();});
     const restart=this.pauseControl('↻','Reiniciar misión',()=>this.confirmReset());
     const missions=this.pauseControl('⌂','Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());});
     const language=this.pauseControl('文','Idioma',()=>this.togglePauseLanguage(language));
-    grid.append(mute,restart,missions,language); box.append(grid);
+    grid.append(resume,mute,restart,missions,language); box.append(grid);
     const mapCanvas=el('canvas','ap-pause-map'); mapCanvas.width=720; mapCanvas.height=300; this.drawMap(mapCanvas); box.append(el('h2','ap-pause-map-title','Mapa de operaciones'),mapCanvas);
   }
   private pauseControl(icon:string,label:string,callback:()=>void):HTMLElement { const b=this.button('',callback,'ap-pause-control'); b.append(el('span','ap-pause-icon',icon),el('strong','',label)); return b; }
