@@ -4,11 +4,11 @@
   "rewrites": [
     {
       "source": "/api",
-      "destination": "https://gua-tec.vercel.app/api"
+      "destination": "https://gua-tec-n78y.vercel.app/api"
     },
     {
       "source": "/api/:path*",
-      "destination": "https://gua-tec.vercel.app/api/:path*"
+      "destination": "https://gua-tec-n78y.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
