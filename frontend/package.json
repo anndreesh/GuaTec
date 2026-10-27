@@ -15,6 +15,7 @@
     "qa:apollo-story": "node scripts/qa-apollo-story.mjs",
     "qa:apollo-instruments": "node scripts/qa-apollo-instruments.mjs",
     "qa:app-locales": "node scripts/qa-app-locales.mjs",
+    "qa:legal-locales": "node scripts/qa-legal-locales.mjs",
     "qa:apollo-report": "node scripts/qa-apollo-report.mjs"
   },
   "dependencies": {

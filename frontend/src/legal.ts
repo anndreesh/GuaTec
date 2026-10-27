@@ -1,7 +1,7 @@
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./legal.css";
+import {getLanguage,setLanguage,type Language} from "./core/language";
 
-type Language = "es" | "en" | "fr";
 type DocumentId = "privacy" | "terms" | "contact";
 
 interface Section {
@@ -60,7 +60,6 @@ const TEAM_MEMBERS: TeamMember[] = [
   { name: "Luis Enrique Contreras Hernández" },
   { name: "José Carlos Arana Mejía" },
 ];
-const LANGUAGE_KEY = "mm.language";
 const LANGUAGES: Language[] = ["es", "en", "fr"];
 const DOCUMENTS: DocumentId[] = ["privacy", "terms", "contact"];
 
@@ -509,13 +508,9 @@ function isDocument(value: string | null): value is DocumentId {
 
 const params = new URLSearchParams(window.location.search);
 const requestedLanguage = params.get("lang");
-const storedLanguage = localStorage.getItem(LANGUAGE_KEY);
 const requestedDocument = params.get("document");
-let language: Language = isLanguage(requestedLanguage)
-  ? requestedLanguage
-  : isLanguage(storedLanguage)
-    ? storedLanguage
-    : "es";
+if(isLanguage(requestedLanguage))setLanguage(requestedLanguage);
+let language = getLanguage();
 let documentId: DocumentId = isDocument(requestedDocument) ? requestedDocument : "privacy";
 
 const root: HTMLElement = (() => {
@@ -533,7 +528,7 @@ function documentUrl(nextDocument: DocumentId, nextLanguage: Language): string {
 
 function updateUrl(): void {
   window.history.replaceState(null, "", documentUrl(documentId, language));
-  localStorage.setItem(LANGUAGE_KEY, language);
+  setLanguage(language);
   document.documentElement.lang = language;
 }
 
@@ -590,12 +585,14 @@ function render(): void {
       language === option ? "btn-warning" : "btn-outline-light"
     }`;
     button.type = "button";
+    button.dataset.language = option;
     button.textContent = strings.languages[option];
     button.setAttribute("aria-pressed", String(language === option));
     button.addEventListener("click", () => {
       language = option;
       updateUrl();
       render();
+      root.querySelector<HTMLButtonElement>(`[data-language="${option}"]`)?.focus({preventScroll:true});
     });
     languageGroup.append(button);
   });
@@ -727,7 +724,14 @@ window.addEventListener("popstate", () => {
   const nextLanguage = nextParams.get("lang");
   if (isDocument(nextDocument)) documentId = nextDocument;
   if (isLanguage(nextLanguage)) language = nextLanguage;
+  setLanguage(language);
   render();
+});
+
+window.addEventListener("languagechange",()=>{
+  const next=getLanguage();
+  if(next===language)return;
+  language=next;updateUrl();render();
 });
 
 updateUrl();
