@@ -367,7 +367,7 @@ desde archivos locales; no se descargan props al iniciar el juego.
 
 ## Misión 01 actual: Apollo 11
 
-La experiencia actual está en `frontend/src/apollo/` y usa Three.js. Conserva ocho etapas narrativas y siete puestos obligatorios, conectados en seis áreas de trabajo. Las quince operaciones se completan en orden; el guardado mantiene la versión `apollo11-v1`. La implementación de Auburn/Babylon descrita más abajo se conserva como contenido anterior.
+La experiencia actual está en `frontend/src/apollo/` y usa Three.js. Conserva ocho etapas narrativas y siete puestos obligatorios, conectados en seis áreas de trabajo. Las quince operaciones se completan en orden; el guardado mantiene la versión `apollo11-v1`. La implementación de Auburn/Babylon descrita más abajo se conserva como contenido anterior. Modelos, correcciones, mediciones y comandos de verificación: [puestos conectados y continuidad](docs/apollo11-connected-stations.md).
 
 La aceptación completa usa una build local, la API local y una cuenta Invitado nueva:
 
