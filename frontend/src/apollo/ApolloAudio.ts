@@ -4,12 +4,14 @@ export class ApolloAudio {
   private master: GainNode | null = null;
   private ambience: GainNode | null = null;
   private roar: GainNode | null = null;
+  private ui: GainNode | null = null;
   private sources: AudioScheduledSourceNode[] = [];
   muted = false;
   async start() {
     if (this.ctx) { await this.resume(this.ctx); return; }
     const c = this.ctx = new AudioContext();
     this.master = c.createGain(); this.master.gain.value = .38; this.master.connect(c.destination);
+    this.ui = c.createGain(); this.ui.gain.value = .22; this.ui.connect(this.master);
     const buffer = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
     const data = buffer.getChannelData(0); let low = 0;
     for (let i = 0; i < data.length; i++) { low = (low + (Math.random() * 2 - 1) * .02) / 1.02; data[i] = low * 3; }
@@ -51,6 +53,21 @@ export class ApolloAudio {
     gain.gain.exponentialRampToValueAtTime(.0001, c.currentTime + .13);
     tone.connect(gain).connect(this.master); tone.start(); tone.stop(c.currentTime + .14);
   }
+  bonusFeedback(kind: 'success' | 'error') {
+    if (!this.ctx || !this.ui) return;
+    const c = this.ctx;
+    const frequencies = kind === 'success' ? [520, 780] : [170];
+    frequencies.forEach((frequency, index) => {
+      const tone = c.createOscillator(), gain = c.createGain();
+      const start = c.currentTime + index * (kind === 'success' ? .075 : 0);
+      tone.type = kind === 'success' ? 'triangle' : 'sine';
+      tone.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(.0001, start);
+      gain.gain.exponentialRampToValueAtTime(kind === 'success' ? .08 : .05, start + .012);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + (kind === 'success' ? .16 : .2));
+      tone.connect(gain).connect(this.ui!); tone.start(start); tone.stop(start + (kind === 'success' ? .17 : .21));
+    });
+  }
   toggle() { this.muted = !this.muted; if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : .38, this.ctx.currentTime, .08); }
   private async resume(context: AudioContext) {
     try { await context.resume(); }
@@ -65,7 +82,7 @@ export class ApolloAudio {
   }
   dispose() {
     this.sources.forEach(s => { try { s.stop(); } catch {} });this.sources=[];
-    const context=this.ctx;this.ctx=null;
+    const context=this.ctx;this.ctx=null;this.ui=null;
     if(context && context.state!=='closed')void context.close().catch(()=>{});
   }
 }

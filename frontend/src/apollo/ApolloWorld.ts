@@ -6,6 +6,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
 import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
 import { apolloText } from './ApolloLocale';
+import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -76,6 +77,7 @@ export class ApolloWorld {
   private nasaTexture: THREE.Texture | null = null;
   private cloudSprites = new THREE.Group();
   private localizedSigns: { title: string; subtitle: string; planes: THREE.Mesh[]; width: number }[] = [];
+  private bonusAccents: { mesh: THREE.Mesh; phase: number; id: string }[] = [];
 
   constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void }) {
     this.furniture = {
@@ -119,6 +121,7 @@ export class ApolloWorld {
     this.buildSaturn();
     this.buildBuildings();
     this.buildStations();
+    this.buildBonusStations();
     this.buildVehicles();
     this.buildClouds();
     this.buildServiceDetails();
@@ -452,6 +455,33 @@ export class ApolloWorld {
     // Tracking tripod at the spectator area is a distinct authored piece.
     for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
   }
+  private buildBonusStations(): void {
+    const deck = this.material('bonus-deck', 0x384b4a, 0.72, 0.45);
+    const trim = this.material('bonus-trim', 0xa58a53, 0.42, 0.7);
+    const panel = this.material('bonus-panel', 0x1b2b31, 0.44, 0.55);
+    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c];
+    BONUS_CHECKPOINTS.forEach((bonus, index) => {
+      const { x, z } = bonus.target;
+      this.groundPlane(8, 6, x, z, this.material(`bonus-grit-${index}`, 0x8e8772, 0.98), 0.02);
+      this.box(6.8, 0.12, 4.8, deck, x, 0.1, z);
+      this.box(5.6, 0.08, 0.12, trim, x, 1.48, z - 1.75);
+      this.box(5.6, 0.08, 0.12, trim, x, 1.48, z + 1.75);
+      this.box(3.4, 1.2, 0.28, panel, x, 0.72, z - 1.2);
+      this.box(3.1, 0.06, 1.3, trim, x, 1.35, z - 1.2);
+      for (let relay = 0; relay < 4; relay++) {
+        this.box(0.42, 0.34, 0.22, panel, x - 1.25 + relay * 0.84, 1.58, z - 1.2);
+        this.box(0.2, 0.06, 0.05, trim, x - 1.25 + relay * 0.84, 1.78, z - 1.2);
+      }
+      this.box(0.16, 1.7, 0.16, trim, x - 2.7, 0.9, z + 1.2);
+      this.box(0.16, 1.7, 0.16, trim, x + 2.7, 0.9, z + 1.2);
+      this.box(5.4, 0.12, 0.12, trim, x, 1.72, z + 1.2);
+      const accent = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshBasicMaterial({ color: accentColors[index], transparent: true, opacity: 0.82 }));
+      accent.position.set(x, 1.72, z + 1.2);
+      this.scene.add(accent);
+      this.bonusAccents.push({ mesh: accent, phase: index * 1.8, id: bonus.id });
+      this.sign(bonus.title, 'SUBMISIÓN · OPERACIONES APOLLO 11', x + 0.5, 2.5, z - 2.25, 0, 5.5);
+    });
+  }
   private station(x: number, z: number, title: string, subtitle: string, type: StationKind): void {
     const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
     const cream = this.material('station-cream', 0xc6c4ad, 0.8);
@@ -696,6 +726,20 @@ export class ApolloWorld {
     this.targetPoint = position; this.target.visible = !!position && !this.mode;
     if (position) this.target.position.set(position.x, 0, position.z);
   }
+  setBonusStatus(completed: readonly string[]): void {
+    const done = new Set(completed);
+    this.bonusAccents.forEach(({ mesh, id }) => {
+      (mesh.material as THREE.MeshBasicMaterial).color.setHex(done.has(id) ? 0x9bc79f : 0xf0b45e);
+    });
+  }
+  nearbyBonus(): { id: string; title: string; objective: string; distance: number } | null {
+    let nearest: { bonus: ApolloBonusCheckpoint; distance: number } | null = null;
+    for (const bonus of BONUS_CHECKPOINTS) {
+      const distance = Math.hypot(this.player.x - bonus.target.x, this.player.z - bonus.target.z);
+      if (distance <= 11 && (!nearest || distance < nearest.distance)) nearest = { bonus, distance };
+    }
+    return nearest ? { ...nearest.bonus, distance: nearest.distance } : null;
+  }
   setStationStatus(_completed:string[],_active:string):void { /* station furniture is static; minigame state remains in ApolloScreen. */ }
   setInspectionTarget(kind:'rocket'|'tower'|'vab'|null):void { this.inspectionTarget=kind; }
   setZoom(value: boolean): void { this.zoomed = value; }
@@ -750,6 +794,11 @@ export class ApolloWorld {
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
     dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
     this.cloudSprites.position.x += dt * .8;
+    this.bonusAccents.forEach(({ mesh, phase }) => {
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = 0.58 + Math.sin(this.clock * 3 + phase) * 0.24;
+      mesh.scale.setScalar(0.9 + Math.sin(this.clock * 3 + phase) * 0.08);
+    });
     const moving = this.move(dt);
     if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
       this.verticalVelocity = 6.4; this.grounded = false; this.keys.delete(' ');

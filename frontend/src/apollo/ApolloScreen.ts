@@ -3,7 +3,7 @@ import type { GameApp } from '@/core/GameApp';
 import type { MissionSaveState } from '@/types';
 import { progressApi } from '@/api/progressApi';
 import { MISSION_SLUGS } from '@/config/gameConfig';
-import { ApolloState, CHECKPOINTS } from './ApolloState';
+import { ApolloState, BONUS_CHECKPOINTS, CHECKPOINTS } from './ApolloState';
 import { ApolloWorld } from './ApolloWorld';
 import { ApolloAudio } from './ApolloAudio';
 import { ApolloDialogue } from './ApolloDialogue';
@@ -14,6 +14,7 @@ import { ApolloVoice } from './ApolloVoice';
 import { setLanguage } from '@/core/i18n';
 import { mountInstrument, type InstrumentHandle, type InstrumentKind } from './ApolloInstruments';
 import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts } from './ApolloFieldProgress';
+import { mountBonusMission, type BonusMissionHandle } from './ApolloBonusMissions';
 
 const SLUG = MISSION_SLUGS.mission1;
 const el = <K extends keyof HTMLElementTagNameMap>(tag:K, cls='', text='') => {
@@ -80,7 +81,7 @@ export class ApolloScreen implements Screen {
   private prompt!: HTMLButtonElement;
   private map!: HTMLCanvasElement;
   private modal: HTMLElement | null = null;
-  private modalKind: 'welcome'|'pause'|'map'|'end'|'credits'|'sketchfab'|'reset'|'station'|null = null;
+  private modalKind: 'welcome'|'pause'|'map'|'end'|'credits'|'sketchfab'|'reset'|'station'|'bonus'|null = null;
   private movie: 'intro'|'crew'|'launch'|null = null;
   private movieTime=0;
   private movieOverlay: HTMLElement | null=null;
@@ -99,6 +100,7 @@ export class ApolloScreen implements Screen {
   private audio=new ApolloAudio();
   private voice=new ApolloVoice();
   private instrument:InstrumentHandle|null=null;
+  private bonusMission:BonusMissionHandle|null=null;
   private instrumentKey='';
   private fieldDrafts:FieldDrafts={};
   private draftTimer:number|undefined;
@@ -146,7 +148,7 @@ export class ApolloScreen implements Screen {
         const envelope=remote.state as unknown as {apollo11?:unknown;apollo11SavedAt?:number;apollo11Drafts?:unknown};
         const remoteState=envelope.apollo11;
         const cloudTime=envelope.apollo11SavedAt ?? (Date.parse((remote.updatedAt ?? '').replace(/(?<!Z)$/, 'Z')) || 0);
-        const valid=(value:unknown)=>{if(!value || typeof value!=='object')return false;const original=value as ReturnType<ApolloState['toJSON']>,restored=new ApolloState(value).toJSON();return original.version===restored.version && original.checkpoint===restored.checkpoint && original.elapsed===restored.elapsed && original.done===restored.done && ['completed','checks','dialogues'].every(k=>JSON.stringify(original[k as 'checks'])===JSON.stringify(restored[k as 'checks']));};
+        const valid=(value:unknown)=>{if(!value || typeof value!=='object')return false;const original=value as ReturnType<ApolloState['toJSON']>,restored=new ApolloState(value).toJSON();return original.version===restored.version && original.checkpoint===restored.checkpoint && original.elapsed===restored.elapsed && original.done===restored.done && ['completed','checks','dialogues'].every(k=>JSON.stringify(original[k as 'checks'])===JSON.stringify(restored[k as 'checks'])) && JSON.stringify(original.bonusCompleted ?? [])===JSON.stringify(restored.bonusCompleted);};
         const localValid=local && valid(local.state);
         const remoteValid=valid(remoteState);
         const preferLocal=localValid && (!remoteValid || local!.savedAt>cloudTime);
@@ -214,7 +216,7 @@ export class ApolloScreen implements Screen {
     const box=this.openModal('APOLLO 11','El comienzo de una nueva era');
     box.append(el('p','','16 de julio de 1969 · Centro Espacial Kennedy, Florida. Eres un técnico ficticio de apoyo a operaciones terrestres. Observa, documenta y comunica: tu trabajo termina en un punto seguro, antes del despegue de las 9:32 a. m. EDT.'));
     box.append(el('p','ap-note','Recreación educativa. Daniel Carter y los diálogos son ficticios. Las rutas se han acortado; no hay interiores accesibles. Los trajes Mercenary son una adaptación artística, no réplicas del A7L.'));
-    if(this.state.completed.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length} de 8 checkpoints completados.`));
+    if(this.state.completed.length || this.state.bonusCompleted.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length} de 8 checkpoints · ${this.state.bonusCompleted.length} de 3 submisiones.`));
     const start=this.button(this.state.done?'Ver epílogo':this.state.completed.length?'Continuar misión':'Comenzar operaciones',()=>{
       this.started=true; this.closeModal(); void this.audio.start().catch(()=>this.notify('Audio no disponible; los subtítulos permanecen activos.'));
       if(this.state.done) this.showEnd();
@@ -230,8 +232,10 @@ export class ApolloScreen implements Screen {
     this.hud.append(el('small','','MISIÓN 01 — APOLLO 11'),el('span','ap-progress',`${String(this.state.completed.length).padStart(2,'0')} / 08`),el('h2','',cp.title),el('p','',cp.objective));
     const checklist=el('div','ap-checklist');
     for(const action of cp.actions) checklist.append(el('span',this.state.checks.includes(action.id)?'ap-checked':'',`${this.state.checks.includes(action.id)?'✓':'·'} ${action.label}`));
-    this.hud.append(checklist,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
+    const bonusStatus=el('small','ap-bonus-status',`SUBMISIONES OPCIONALES · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADAS`);
+    this.hud.append(checklist,bonusStatus,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
     this.world?.setTarget(this.state.done?null:cp.target);
+    this.world?.setBonusStatus(this.state.bonusCompleted);
     this.world?.setStationStatus(this.state.completed,cp.id);
     const mapButton=this.root.querySelector<HTMLElement>('.ap-minimap');
     mapButton?.setAttribute('aria-label',apolloText('Abrir mapa de Kennedy'));
@@ -259,13 +263,26 @@ export class ApolloScreen implements Screen {
   }
   private distance() { const t=this.state.current.target,p=this.world.player; return Math.hypot(p.x-t.x,p.z-t.z); }
   private interact() {
-    if(!this.started || this.paused || this.modal || this.movie || this.state.done) return;
+    if(!this.started || this.paused || this.modal || this.movie) return;
+    const bonus=this.world.nearbyBonus();
+    if(bonus && !this.state.bonusCompleted.includes(bonus.id)) { this.openBonusMission(bonus.id); return; }
+    if(this.state.done) return;
     if(this.distance()>15) {this.notify('Sigue el marcador hasta la estación autorizada.');return;}
     const index=this.state.checkpoint;
     if(index===4) {this.beginMovie('crew');return;}
     if(index===6) {this.beginMovie('launch');return;}
     if(index===7) {this.showEnd();return;}
     this.showStation();
+  }
+  private openBonusMission(id:string) {
+    const bonus=BONUS_CHECKPOINTS.find(entry=>entry.id===id);
+    if(!bonus || this.state.bonusCompleted.includes(id)) return;
+    this.modalKind='bonus';
+    const box=this.openModal('CHECKPOINT EXTRA · OPERACIÓN DE APOYO',bonus.title);
+    this.bonusMission=mountBonusMission(box,bonus,{onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{
+      this.bonusMission?.dispose(); this.bonusMission=null;
+      if(this.state.completeBonus(id)) { void this.save(); this.closeModal(); this.notify(`SUBMISIÓN COMPLETADA · ${bonus.title}`); }
+    },onCancel:()=>this.closeModal()});
   }
   private showStation() {
     if(this.state.checkpoint===0 && !this.state.checks.includes('arrive')) {
@@ -396,6 +413,7 @@ export class ApolloScreen implements Screen {
   }
   private closeModal() {
     this.disposeInstrument();
+    this.bonusMission?.dispose(); this.bonusMission=null;
     this.modal?.remove();this.modal=null;this.modalKind=null;this.paused=false;this.voice.pause(false);
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
@@ -462,6 +480,7 @@ export class ApolloScreen implements Screen {
     c.font=`${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#afc1c2';c.fillText(apolloText('N ↑'),10,20);c.fillText('39A',rx+10,rz+4);
     c.fillStyle='#a7b9b5';c.fillText(apolloText('↖ VAB · 1 km'),8,Math.max(36,h*.18));
     CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);c.fillStyle=this.state.completed.includes(cp.id)?'#8eba9d':i===this.state.checkpoint?'#f4be67':'#597275';c.beginPath();c.arc(x,z,i===this.state.checkpoint?6:3,0,Math.PI*2);c.fill();if(w>300)c.fillText(`${i+1}. ${apolloText(cp.title)}`,x+10,z+5);});
+    BONUS_CHECKPOINTS.forEach((bonus,index)=>{const [x,z]=p(bonus.target.x,bonus.target.z);c.fillStyle=this.state.bonusCompleted.includes(bonus.id)?'#8eba9d':'#d8a665';c.beginPath();c.rect(x-4,z-4,8,8);c.fill();if(w>300)c.fillText(`S${index+1}`,x+9,z+4);});
     const target=this.state.current.target;
     const remote=this.world.player.z>5000;
     const [tx,tz]=p(target.x,remote?355:target.z),[px,pz]=p(this.world.player.x,remote?355:this.world.player.z);
@@ -507,6 +526,7 @@ export class ApolloScreen implements Screen {
     const kind=this.modalKind;
     if (!kind) return;
     this.captureInstrumentDraft();
+    this.bonusMission?.dispose(); this.bonusMission=null;
     if (this.instrument) { this.disposeInstrument(); this.modal?.remove(); this.modal=null; this.modalKind=null; this.openFieldInstrument(); return; }
     this.modal?.remove(); this.modal=null; this.modalKind=null;
     if (kind==='welcome') this.showWelcome();
@@ -516,6 +536,7 @@ export class ApolloScreen implements Screen {
     else if (kind==='credits') this.openCredits();
     else if (kind==='sketchfab') this.openSketchfab();
     else if (kind==='reset') this.confirmReset();
+    else if (kind==='bonus') this.closeModal();
   }
   private async save() {
     if(this.disposed || !this.started)return;
@@ -563,11 +584,13 @@ export class ApolloScreen implements Screen {
   };
   private updateNavigation() {
     if(!this.prompt)return;
+    const bonus=this.world.nearbyBonus();
+    const bonusNear=!!bonus && !this.state.bonusCompleted.includes(bonus.id);
     const near=this.distance()<=15;
-    this.prompt.hidden=!this.started || this.paused || !!this.movie || this.state.done;
-    this.prompt.textContent=near?'E · '+(this.state.checkpoint===4?'Observar a la tripulación':this.state.checkpoint===6?'Presenciar el lanzamiento':'Examinar estación'):`${Math.round(this.distance())} m · ${this.state.current.title}`;
+    this.prompt.hidden=!this.started || this.paused || !!this.movie || (this.state.done && !bonusNear);
+    this.prompt.textContent=bonusNear?'E · '+bonus!.title:near?'E · '+(this.state.checkpoint===4?'Observar a la tripulación':this.state.checkpoint===6?'Presenciar el lanzamiento':'Examinar estación'):`${Math.round(this.distance())} m · ${this.state.current.title}`;
     this.prompt.textContent=apolloText(this.prompt.textContent);
-    this.prompt.disabled=!near;
+    this.prompt.disabled=!(near || bonusNear);
     if(this.uiTarget) {this.uiTarget.hidden=!!this.movie || this.paused;this.uiTarget.textContent=`◇ ${Math.round(this.distance())} m`;}
   }
   diagnostics() {
@@ -577,7 +600,7 @@ export class ApolloScreen implements Screen {
   unmount() {
     document.body.classList.remove('apollo-active');
     document.body.classList.remove('apollo-cinematic');
-    this.disposeInstrument();this.voice.dispose();clearTimeout(this.draftTimer);
+    this.disposeInstrument();this.bonusMission?.dispose();this.bonusMission=null;this.voice.dispose();clearTimeout(this.draftTimer);
     this.disposed=true;cancelAnimationFrame(this.raf);clearTimeout(this.flashTimer);
     document.removeEventListener('keydown',this.onKey);document.removeEventListener('visibilitychange',this.onVisibility);
     window.removeEventListener('resize',this.onResize);window.removeEventListener('pagehide',this.onPageHide);

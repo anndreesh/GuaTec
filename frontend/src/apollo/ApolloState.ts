@@ -16,6 +16,35 @@ export interface ApolloCheckpoint {
   readonly actions: readonly ApolloAction[];
 }
 
+export type ApolloBonusKind = 'sequence' | 'telemetry' | 'beacons';
+
+export interface ApolloBonusCheckpoint {
+  readonly id: string;
+  readonly title: string;
+  readonly objective: string;
+  readonly target: { readonly x: number; readonly z: number };
+  readonly kind: ApolloBonusKind;
+}
+
+/** Optional field operations: they enrich the mission without gating the historical route. */
+export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
+  {
+    id: 'power-bus', title: 'Banco de alimentación',
+    objective: 'Restablece la secuencia de cuatro relés antes de liberar energía al banco de pruebas.',
+    target: { x: -48, z: 190 }, kind: 'sequence',
+  },
+  {
+    id: 'telemetry-rack', title: 'Rack de telemetría',
+    objective: 'Ajusta tres lecturas analógicas para estabilizar el enlace de datos de la plataforma.',
+    target: { x: 40, z: 290 }, kind: 'telemetry',
+  },
+  {
+    id: 'pad-safety', title: 'Perímetro de seguridad',
+    objective: 'Confirma los tres balizadores del perímetro antes de abrir la ruta de servicio.',
+    target: { x: 44, z: 365 }, kind: 'beacons',
+  },
+];
+
 export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
   {
     id: 'orientation', title: 'Bienvenida y orientación',
@@ -157,6 +186,8 @@ export interface ApolloSave {
   dialogues: string[];
   elapsed: number;
   done: boolean;
+  /** Optional for backward compatibility with saves made before bonus operations existed. */
+  bonusCompleted: string[];
 }
 
 function uniqueStrings(value: unknown): value is string[] {
@@ -170,6 +201,7 @@ export class ApolloState {
   dialogues: string[] = [];
   elapsed = 0;
   done = false;
+  bonusCompleted: string[] = [];
 
   constructor(saved?: unknown) {
     if (!saved || typeof saved !== 'object') return;
@@ -203,6 +235,8 @@ export class ApolloState {
       return !dialogue || dialogue.checkpoint > index
         || (dialogue.checkpoint === index && dialogue.trigger === 'complete' && !candidate.done);
     })) return;
+    const bonusCompleted = candidate.bonusCompleted ?? [];
+    if (!uniqueStrings(bonusCompleted) || bonusCompleted.some(id => !BONUS_CHECKPOINTS.some(bonus => bonus.id === id))) return;
 
     this.checkpoint = index;
     this.completed = [...candidate.completed];
@@ -210,6 +244,7 @@ export class ApolloState {
     this.dialogues = [...candidate.dialogues];
     this.elapsed = candidate.elapsed!;
     this.done = candidate.done;
+    this.bonusCompleted = [...bonusCompleted];
   }
 
   get current(): ApolloCheckpoint { return CHECKPOINTS[this.checkpoint]; }
@@ -230,11 +265,18 @@ export class ApolloState {
     return true;
   }
 
+  completeBonus(id: string): boolean {
+    if (!BONUS_CHECKPOINTS.some(bonus => bonus.id === id) || this.bonusCompleted.includes(id)) return false;
+    this.bonusCompleted.push(id);
+    return true;
+  }
+
   toJSON(): ApolloSave {
     return {
       version: 'apollo11-v1', checkpoint: this.checkpoint,
       completed: [...this.completed], checks: [...this.checks],
       dialogues: [...this.dialogues], elapsed: this.elapsed, done: this.done,
+      bonusCompleted: [...this.bonusCompleted],
     };
   }
 }
