@@ -4,9 +4,11 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
-import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
+import { buildBench, type Kit, type StationKind } from './ApolloFurniture';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
 import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
+import { buildStandModel, createStandAtlas, type StandModelKind } from './ApolloStandModels';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -28,7 +30,7 @@ export class ApolloWorld {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(62, 1, 0.15, 12500);
   readonly renderer: THREE.WebGLRenderer;
-  readonly player = new THREE.Vector3(-35, 0, 130);
+  readonly player = new THREE.Vector3(-35, 0, 136);
   readonly ready: Promise<void>;
   readonly assetErrors: string[] = [];
   yaw = 0;
@@ -63,6 +65,11 @@ export class ApolloWorld {
   private dummy = new THREE.Object3D();
   private cameraGoal = new THREE.Vector3();
   private cameraLook = new THREE.Vector3();
+  private lookGoal = new THREE.Vector3();
+  private navProjection = new THREE.Vector3();
+  private standFocus: { x: number; z: number } | null = null;
+  private lastCameraUpdate = performance.now();
+  private shadowAge = 0;
   private lastPointer: { x: number; y: number } | null = null;
   private loadedModel: Record<string, unknown> = {};
   private staticBuffers: Map<THREE.Material, THREE.BufferGeometry[]> = new Map();
@@ -78,6 +85,8 @@ export class ApolloWorld {
   private cloudSprites = new THREE.Group();
   private localizedSigns: { title: string; subtitle: string; planes: THREE.Mesh[]; width: number }[] = [];
   private bonusAccents: { mesh: THREE.Mesh; phase: number; id: string }[] = [];
+  private standAtlas: THREE.CanvasTexture | null = null;
+  private environmentTarget: THREE.WebGLRenderTarget | null = null;
 
   constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void }) {
     this.furniture = {
@@ -102,10 +111,17 @@ export class ApolloWorld {
     this.renderer.toneMappingExposure = 1.04;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
+    const environment = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.environmentTarget = pmrem.fromScene(environment, .08);
+    this.scene.environment = this.environmentTarget.texture;
+    this.scene.environmentIntensity = .32;
+    environment.dispose(); pmrem.dispose();
     host.append(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x9dcce7);
     this.scene.fog = new THREE.FogExp2(0xb9d4dc, 0.00038);
-    this.scene.add(new THREE.HemisphereLight(0xc7e6ff, 0x66734b, 1.7));
+    this.scene.add(new THREE.HemisphereLight(0xd3e8f2, 0x827860, 1.45));
     this.sun.position.set(220, 260, 120);
     this.sun.castShadow = true;
     this.sun.shadow.camera.left = -180; this.sun.shadow.camera.right = 180;
@@ -232,7 +248,7 @@ export class ApolloWorld {
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     const img = ctx.createImageData(256, 256);
     for (let i = 0; i < img.data.length; i += 4) {
-      const n = (rand() - 0.5) * (type === 'soil' ? 20 : 28);
+      const n = (rand() - 0.5) * (type === 'soil' ? 7 : 24);
       img.data[i] = palette[0] + n; img.data[i + 1] = palette[1] + n; img.data[i + 2] = palette[2] + n; img.data[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
@@ -251,7 +267,7 @@ export class ApolloWorld {
     this.scene.add(plane);
   }
   private buildGround(): void {
-    const soil = new THREE.MeshStandardMaterial({ map: this.texture('soil', 95), roughness: 1 });
+    const soil = new THREE.MeshStandardMaterial({ map: this.texture('soil', 1600), roughness: 1 });
     this.groundPlane(16000, 16000, 0, 0, soil, -0.12);
     this.groundPlane(42, 35, 0, 5600, new THREE.MeshStandardMaterial({ map: this.texture('concrete', 3), roughness: 1 }), 0.04);
     this.sign('OBSERVACIÓN DEL LANZAMIENTO', 'DISTANCIA DE SEGURIDAD · 5,6 KM', -8, 2.2, 5590, 0, 8);
@@ -456,84 +472,25 @@ export class ApolloWorld {
     for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
   }
   private buildBonusStations(): void {
-    const deck = this.material('bonus-deck', 0x384b4a, 0.72, 0.45);
-    const trim = this.material('bonus-trim', 0xa58a53, 0.42, 0.7);
-    const panel = this.material('bonus-panel', 0x1b2b31, 0.44, 0.55);
-    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c, 0xd9a56d, 0x8fc2b2, 0xd2c28a, 0xc59ad9];
+    const atlas = this.standAtlas ??= createStandAtlas();
     BONUS_CHECKPOINTS.forEach((bonus, index) => {
       const { x, z } = bonus.target;
-      this.groundPlane(8, 6, x, z, this.material(`bonus-grit-${index}`, 0x8e8772, 0.98), 0.02);
-      this.box(6.8, 0.12, 4.8, deck, x, 0.1, z);
-      this.box(5.6, 0.08, 0.12, trim, x, 1.48, z - 1.75);
-      this.box(5.6, 0.08, 0.12, trim, x, 1.48, z + 1.75);
-      this.box(3.4, 1.2, 0.28, panel, x, 0.72, z - 1.2);
-      this.box(3.1, 0.06, 1.3, trim, x, 1.35, z - 1.2);
-      for (let relay = 0; relay < 4; relay++) {
-        this.box(0.42, 0.34, 0.22, panel, x - 1.25 + relay * 0.84, 1.58, z - 1.2);
-        this.box(0.2, 0.06, 0.05, trim, x - 1.25 + relay * 0.84, 1.78, z - 1.2);
-      }
-      if (bonus.kind === 'cables') {
-        const nodeMaterial = this.material('bonus-cable-node', 0xd2c69d, 0.45, 0.3);
-        for (let node = 0; node < 4; node++) {
-          this.cylinder(0.18, 0.18, 0.08, nodeMaterial, x - 1.5 + node * 1, 1.52, z + 0.55);
-          this.box(0.62, 0.035, 0.035, trim, x - 1 + node * 1, 1.53, z + 0.55);
-        }
-        const cable = this.material('bonus-cable', 0x9a493c, 0.55, 0.35);
-        for (let node = 0; node < 3; node++) this.beam(new THREE.Vector3(x - 1.5 + node, 1.58, z + 0.55), new THREE.Vector3(x - 0.5 + node, 1.58, z + 0.55), 0.045, cable);
-      } else if (bonus.kind === 'sequence') {
-        const relayGlow = this.material('bonus-relay-glow', 0xd77d47, 0.38, 0.25);
-        for (let relay = 0; relay < 4; relay++) {
-          this.cylinder(0.12, 0.12, 0.18, relayGlow, x - 1.25 + relay * 0.84, 1.98, z - 1.2);
-          this.beam(new THREE.Vector3(x - 1.25 + relay * 0.84, 1.98, z - 1.2), new THREE.Vector3(x - 1.25 + relay * 0.84, 1.98, z - 0.4), 0.035, relayGlow);
-        }
-      } else if (bonus.kind === 'telemetry') {
-        const dial = this.material('bonus-dial', 0xd8d0b6, 0.6, 0.25);
-        const needle = this.material('bonus-needle', 0xb75242, 0.45, 0.35);
-        for (let meter = 0; meter < 3; meter++) {
-          this.cylinder(0.42, 0.42, 0.12, dial, x - 1.15 + meter * 1.15, 1.58, z + 0.65, undefined, 20);
-          this.beam(new THREE.Vector3(x - 1.15 + meter * 1.15, 1.63, z + 0.65), new THREE.Vector3(x - 1.15 + meter * 1.15 + 0.2, 1.86, z + 0.65), 0.045, needle);
-        }
-      } else if (bonus.kind === 'weather') {
-        this.cylinder(0.42, 0.42, 1.25, panel, x - 2.1, 0.72, z + 0.9);
-        this.cylinder(0.31, 0.31, 0.08, trim, x - 2.1, 1.38, z + 0.9);
-        this.cylinder(0.06, 0.06, 2.1, trim, x + 2.1, 1.15, z + 0.9);
-        this.beam(new THREE.Vector3(x + 2.1, 2.18, z + 0.9), new THREE.Vector3(x + 2.9, 2.18, z + 0.9), 0.045, trim);
-      } else if (bonus.kind === 'flight-plan') {
-        for (let card = 0; card < 4; card++) {
-          this.box(0.62, 0.08, 0.9, card % 2 ? trim : panel, x - 1.2 + card * 0.8, 1.42, z + 0.78);
-          this.box(0.42, 0.018, 0.035, trim, x - 1.2 + card * 0.8, 1.48, z + 0.78);
-        }
-      } else if (bonus.kind === 'crew-manifest') {
-        const manifest = this.material('bonus-manifest', 0xd8d0b6, 0.5, 0.3);
-        for (let card = 0; card < 3; card++) {
-          this.box(0.8, 0.06, 0.58, manifest, x - 1.15 + card * 1.15, 1.48, z + 0.72);
-          this.box(0.5, 0.018, 0.035, trim, x - 1.15 + card * 1.15, 1.53, z + 0.72);
-        }
-        this.box(2.9, 0.08, 0.08, trim, x, 1.7, z + 1.15);
-        const badge = this.material('bonus-crew-badge', 0x6f8da0, 0.55, 0.3);
-        for (let astronaut = 0; astronaut < 3; astronaut++) {
-          this.cylinder(0.16, 0.16, 0.55, badge, x - 1.15 + astronaut * 1.15, 1.05, z + 1.3);
-          this.cylinder(0.21, 0.21, 0.06, manifest, x - 1.15 + astronaut * 1.15, 1.38, z + 1.3);
-        }
-      }
-      this.box(0.16, 1.7, 0.16, trim, x - 2.7, 0.9, z + 1.2);
-      this.box(0.16, 1.7, 0.16, trim, x + 2.7, 0.9, z + 1.2);
-      this.box(5.4, 0.12, 0.12, trim, x, 1.72, z + 1.2);
-      const accent = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshBasicMaterial({ color: accentColors[index], transparent: true, opacity: 0.82 }));
-      accent.position.set(x, 1.72, z + 1.2);
-      this.scene.add(accent);
+      const model = buildStandModel(bonus.kind, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, index);
+      model.position.set(x, 0, z); this.scene.add(model);
+      this.colliders.push({ x, z: z - .10, w: 1.85, d: .95 });
+      const accent = new THREE.Mesh(new THREE.SphereGeometry(.10, 10, 6), new THREE.MeshBasicMaterial({ color: 0xc99550 }));
+      accent.position.set(x + 1.82, 2.31, z - 1.10); this.scene.add(accent);
       this.bonusAccents.push({ mesh: accent, phase: index * 1.8, id: bonus.id });
-      this.sign(bonus.title, 'STAND · OPERACIONES APOLLO 11', x + 0.5, 2.5, z - 2.25, 0, 5.5);
     });
   }
   private station(x: number, z: number, title: string, subtitle: string, type: StationKind): void {
-    const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
-    const cream = this.material('station-cream', 0xc6c4ad, 0.8);
-    this.box(7, 0.12, 5, this.material('station-concrete', 0xb7b3a0), x, 0.05, z);
-    const ids:Record<string,StationKind>={'-35,130':'map','-70,165':'camera','-100,220':'desk','70,235':'radio','-24,170':'crew','0,355':'camera'};
-    this.colliders.push(...buildTable(this.furniture, (ids[`${x},${z}`] ?? type) as StationKind, x, z));
-    this.sign(title, subtitle, x + 0.5, 2.5, z - 2, 0, 5.5);
-    this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
+    const atlas = this.standAtlas ??= createStandAtlas();
+    const kinds: Record<string, StandModelKind> = { map: 'orientation', camera: z > 300 ? 'tracking' : 'survey', desk: 'records', radio: 'radio', crew: 'crew' };
+    const model = buildStandModel(kinds[type] ?? 'records', (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, 0);
+    model.position.set(x, 0, z); this.scene.add(model);
+    this.colliders.push({ x, z, w: 1.85, d: .95 });
+    // Keep the existing authored mission names visible above the shared instrument kit.
+    this.sign(title, subtitle, x + .1, 3.22, z - 1.25, 0, 4.5);
   }
   private fence(from: number, to: number, z: number): void {
     const metal = this.material('fence', 0x717b79, 0.8, 0.5);
@@ -610,8 +567,20 @@ export class ApolloWorld {
     const grit=this.material('service-gravel',0x9d967e,.98,0);
     const curb=this.material('curb',0xb9b69d,.92,.08);
     const metal=this.material('utility-pipe',0x6d7d76,.65,.5);
-    for(const [x,z] of [[-35,130],[-70,165],[-100,220],[70,235],[-24,170],[0,355]]) {
+    const stations=[[-35,130],[-70,165],[-100,220],[70,235],[-24,170],[0,355],...BONUS_CHECKPOINTS.map(stand=>[stand.target.x,stand.target.z])];
+    const path = this.material('service-walkway',0xb8b49e,.96);
+    for(const [x,z] of stations) {
       this.groundPlane(10,8,x,z,grit,-.015);
+      // Connect every work area to the nearest authored road instead of stranding
+      // technical benches in the sand. The front of every bench stays open.
+      const cross=[150,235,355].reduce((nearest,candidate)=>Math.abs(z-candidate)<Math.abs(z-nearest)?candidate:nearest,150);
+      if(Math.abs(x)-8<Math.abs(z-cross)-6) {
+        const end=Math.sign(x)*9,span=Math.abs(x-end);
+        if(span>6)this.groundPlane(span,2.1,(x+end)/2,z+2.5,path,.025);
+      }else{
+        const end=cross+Math.sign(z-cross)*7,span=Math.abs(z-end);
+        if(span>4)this.groundPlane(2.1,span,x+3.3,(z+end)/2,path,.025);
+      }
       for(const dx of [-5.1,5.1])this.box(.16,.15,8.3,curb,x+dx,.07,z);
       this.box(10.3,.15,.16,curb,x,.07,z-4.1);
       // Low cable tray and conduit follow the back of the station; approach stays open.
@@ -620,11 +589,22 @@ export class ApolloWorld {
       this.cylinder(.29, .29, .88, metal, x + 4.3, .48, z - 2.6);
     }
     // Low drainage aprons and pipe work give the service buildings a functional edge.
-    for(const [x,z]of[[-125,200],[116,250],[-118,338],[120,130]]) {
+    for(const [x,z,depth]of[[-125,200,21],[116,250,17],[-118,338,19],[120,130,17]]) {
       this.box(25,.12,3,grit,x,.015,z+12);
       for(let i=0;i<4;i++)this.box(.08,.09,2.8,metal,x-11+i*.4,.13,z+12);
       this.box(4,.55,.75,metal,x+8,.3,z-10);
       for(let i=0;i<10;i++)this.box(.12,.6,.8,curb,x+6.1+i*.4,.31,z-10);
+      // Rain hood, recessed entrance and horizontal window mullions establish
+      // the service-building scale without more imported assets.
+      const glass=this.material('service-window-glass',0x344b50,.25,.25);
+      const ivory=this.material('service-building-trim',0xc4c6b4,.7,.12);
+      this.box(3.1,.14,1.8,metal,x,3.02,z+depth/2+.8);
+      for(const dx of[-1.14,1.14])this.box(.12,2.6,.16,ivory,x+dx,1.46,z+depth/2+.18);
+      for(let i=0;i<4;i++) {
+        this.box(2.5,1.2,.06,glass,x-8+i*5,2.93,z+depth/2+.19);
+        this.box(2.6,.065,.075,ivory,x-8+i*5,2.93,z+depth/2+.23);
+        this.box(.065,1.25,.075,ivory,x-8+i*5,2.93,z+depth/2+.23);
+      }
     }
   }
   private buildClouds(): void {
@@ -637,15 +617,15 @@ export class ApolloWorld {
     }));
     let seed = 1847;
     const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 18; i++) {
       const angle = i * 2.399 + random() * 0.28;
       const distance = 1550 + i * 112 + random() * 420;
       const bank = new THREE.Group();
       bank.position.set(Math.sin(angle) * distance, 520 + random() * 210, Math.cos(angle) * distance);
-      bank.rotation.y = angle + Math.PI * 0.5;
+      bank.rotation.y = angle;
       const width = 460 + random() * 260;
       const height = 100 + random() * 55;
-      for (let layer = 0; layer < 3; layer++) {
+      for (let layer = 0; layer < 2; layer++) {
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), materials[(i + layer) % materials.length]);
         mesh.position.set((random() - 0.5) * width * 0.24, (layer - 1) * 18, (layer - 1) * 16);
         mesh.rotation.y = (random() - 0.5) * 0.12;
@@ -770,10 +750,12 @@ export class ApolloWorld {
     this.targetPoint = position; this.target.visible = !!position && !this.mode;
     if (position) this.target.position.set(position.x, 0, position.z);
   }
-  setBonusStatus(completed: readonly string[]): void {
+  setBonusStatus(completed: readonly string[], active?: string): void {
     const done = new Set(completed);
     this.bonusAccents.forEach(({ mesh, id }) => {
-      (mesh.material as THREE.MeshBasicMaterial).color.setHex(done.has(id) ? 0x9bc79f : 0xf0b45e);
+      (mesh.material as THREE.MeshBasicMaterial).color.setHex(done.has(id) ? 0x9bc79f : id === active ? 0xf0b45e : 0x536863);
+      mesh.userData.active = id === active;
+      mesh.userData.completed = done.has(id);
     });
   }
   nearbyBonus(): { id: string; title: string; objective: string; distance: number } | null {
@@ -786,12 +768,18 @@ export class ApolloWorld {
   }
   setStationStatus(_completed:string[],_active:string):void { /* station furniture is static; minigame state remains in ApolloScreen. */ }
   setInspectionTarget(kind:'rocket'|'tower'|'vab'|null):void { this.inspectionTarget=kind; }
+  setStandFocus(target: { x: number; z: number } | null): void { this.standFocus = target; }
+  projectDestination(target: {x:number;z:number}): {x:number;y:number;behind:boolean} {
+    this.navProjection.set(target.x,2.4,target.z).project(this.camera);
+    return {x:this.navProjection.x,y:this.navProjection.y,behind:this.navProjection.z>1};
+  }
   setZoom(value: boolean): void { this.zoomed = value; }
   setSuspended(value: boolean): void { this.suspended = value; if (value) this.keys.clear(); }
   setQuality(value: ApolloQuality): void {
     this.quality = value;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, { low: 1, medium: 1.35, high: 1.75 }[value]));
     this.renderer.shadowMap.enabled = value !== 'low';
+    this.renderer.shadowMap.needsUpdate = true;
     const size = value === 'high' ? 2048 : 1024;
     if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.sun.shadow.mapSize.set(size, size); }
     this.smokeCount = { low: 35, medium: 65, high: 100 }[value];
@@ -835,13 +823,14 @@ export class ApolloWorld {
   }
   update(dt: number): void {
     if (this.disposed) return;
+    const cameraNow = performance.now(), cameraDt = Math.min(.05, Math.max(0, (cameraNow-this.lastCameraUpdate)/1000)); this.lastCameraUpdate=cameraNow;
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
     dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
     this.cloudSprites.position.x += dt * .8;
     this.bonusAccents.forEach(({ mesh, phase }) => {
       const material = mesh.material as THREE.MeshBasicMaterial;
-      material.opacity = 0.58 + Math.sin(this.clock * 3 + phase) * 0.24;
-      mesh.scale.setScalar(0.9 + Math.sin(this.clock * 3 + phase) * 0.08);
+      material.opacity = 1;
+      mesh.scale.setScalar(mesh.userData.active ? 1 + Math.sin(this.clock * 2 + phase) * .08 : 1);
     });
     const moving = this.move(dt);
     if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
@@ -880,13 +869,25 @@ export class ApolloWorld {
       this.camera.position.set(this.player.x,2.15,this.player.z);
       this.inspectionPosition.set(this.inspectionTarget==='vab'?-1000:this.inspectionTarget==='tower'?-17:0,this.inspectionTarget==='vab'?81:65,this.inspectionTarget==='vab'?-100:0);
       this.camera.lookAt(this.inspectionPosition);this.camera.fov=this.inspectionTarget==='vab'?18:35;this.camera.updateProjectionMatrix();
+    } else if (this.standFocus) {
+      const {x,z}=this.standFocus,blend=1-Math.exp(-cameraDt*5);
+      this.cameraGoal.set(x+3.7,3.1,z+5.4); this.lookGoal.set(x,1.4,z-.15);
+      this.camera.position.lerp(this.cameraGoal,blend);this.cameraLook.lerp(this.lookGoal,blend);this.camera.lookAt(this.cameraLook);
+      this.camera.fov=THREE.MathUtils.lerp(this.camera.fov,48,blend);this.camera.updateProjectionMatrix();
     } else {
       const followDistance = 5.8;
       this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * followDistance, this.player.y + 3.35 + this.pitch * 0.9, this.player.z + Math.cos(this.yaw) * followDistance);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 6.3);
-      this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
+      this.lookGoal.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 6.3);
+      this.cameraLook.lerp(this.lookGoal,1-Math.exp(-cameraDt*9));
+      this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-cameraDt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
       this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
+    }
+    // Static support furniture does not need a full shadow pass every frame.
+    // Moving characters, jumps and cinematics keep their shadows live.
+    this.shadowAge += dt;
+    if (moving || !this.grounded || this.mode || this.shadowAge > .16 || !this.sun.shadow.map) {
+      this.renderer.shadowMap.needsUpdate = true; this.shadowAge = 0;
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -990,6 +991,7 @@ export class ApolloWorld {
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown); this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove); this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp); this.renderer.domElement.removeEventListener('pointercancel', this.onPointerUp);
     this.mixers.forEach(m => m.stopAllAction());
     this.disposeObject(this.scene); this.sun.shadow.map?.dispose();
+    this.environmentTarget?.dispose();
     this.renderer.dispose(); this.renderer.domElement.remove();
   }
 }
