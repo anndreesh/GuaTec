@@ -65,6 +65,9 @@ export class MissionSelectScreen implements Screen {
     for (const mission of missions) {
       const locked = mission.status === "locked";
       const card = el("div", { className: `mission-card ${locked ? "mission-card--locked" : ""}` });
+      card.tabIndex = locked ? -1 : 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-disabled", String(locked));
       card.append(
         el("h3", { className: "mission-card-title", text: mission.slug === MISSION_SLUGS.mission1 ? apolloText("Misión 01: Apollo 11") : t(mission.title) }),
         el("p", { className: "mission-card-subtitle", text: mission.slug === MISSION_SLUGS.mission1 ? apolloText("El comienzo de una nueva era · 16 de julio de 1969") : t(mission.subtitle ?? "") }),
@@ -81,7 +84,9 @@ export class MissionSelectScreen implements Screen {
       }
 
       if (!locked && mission.slug === MISSION_SLUGS.mission1) {
-        card.addEventListener("click", () => void this.app.showMission1());
+        const openMission = () => void this.app.showMission1();
+        card.addEventListener("click", openMission);
+        card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openMission(); } });
       } else if (!locked) {
         card.append(el("p", { className: "mission-card-note", text: t("Disponible próximamente en esta demo.") }));
       }

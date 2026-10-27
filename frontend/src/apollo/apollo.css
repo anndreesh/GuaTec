@@ -15,6 +15,34 @@
 
 body.apollo-cinematic .language-menu{visibility:hidden}
 body.apollo-active .language-menu{display:none}
+
+/* Mobile play surface: the active Apollo screen owns these controls. */
+.ap-mobile-controls{display:none}
+.ap-modal,.ap-dialog,.ap-pause-dialog{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.ap-dialog{scrollbar-width:thin;scrollbar-color:#9ca682 #142c32}
+.ap-modal-open .ap-mobile-controls,.ap-in-cinema .ap-mobile-controls{visibility:hidden;pointer-events:none}
+@media(pointer:coarse),(max-width:900px){
+  .ap-mobile-controls{position:absolute;inset:0;z-index:7;display:flex;align-items:flex-end;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));pointer-events:none}
+  .ap-mobile-stick{position:relative;width:clamp(112px,22vw,148px);height:clamp(112px,22vw,148px);border:2px solid #ffffff70;border-radius:50%;background:#05101ca6;box-shadow:inset 0 0 24px #ffffff14,0 8px 28px #0007;touch-action:none;pointer-events:auto}
+  .ap-mobile-stick-hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);color:#ffffffad;font-size:12px;pointer-events:none}
+  .ap-mobile-stick-knob{position:absolute;left:50%;top:50%;width:43%;height:43%;margin:-21.5% 0 0 -21.5%;border:1px solid #ffffff80;border-radius:50%;background:#ddad65d9;box-shadow:0 4px 15px #0008;transform:translate(0,0);pointer-events:none}
+  .ap-mobile-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+  .ap-mobile-action{min-width:74px;min-height:48px;padding:9px 14px;border:1px solid #ffffff66;border-radius:999px;background:#08111fd1;color:#edf2ed;font:inherit;font-size:.78rem;box-shadow:0 6px 18px #0008;touch-action:none;pointer-events:auto}
+  .ap-mobile-action:focus-visible{outline:2px solid #edbe75;outline-offset:3px}
+  .ap-mobile-action.is-active{background:#ddad65;color:#172026}
+  .ap-mobile-action--pause{min-width:48px;padding:8px 12px;font-size:1rem}
+  .ap-mobile-action--interact[hidden]{display:none}
+  .ap-modal{align-items:flex-start;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));overflow-y:auto}
+  .ap-dialog{max-height:calc(100dvh - max(24px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));width:min(680px,100%);padding:clamp(18px,4vw,28px)}
+  .ap-pause-dialog{max-height:calc(100dvh - max(24px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));padding-bottom:max(22px,env(safe-area-inset-bottom))}
+}
+@media(max-width:520px){
+  .ap-mobile-controls{padding-left:10px;padding-right:10px}
+  .ap-mobile-stick{width:112px;height:112px}
+  .ap-mobile-actions{gap:6px}
+  .ap-mobile-action{min-width:68px;min-height:44px;padding:8px 11px;font-size:.7rem}
+  .ap-mobile-action--pause{min-width:44px}
+}
 @media(max-width:520px){.ap-mark{flex:0 0 65px}.ap-mark b{font-size:15px;letter-spacing:.12em}.ap-mark b span{display:block}.ap-controls{margin-right:72px;flex-shrink:0}.ap-controls .ap-button{font-size:9px;padding:7px;min-width:38px}.ap-objective>small:first-child{display:block;font-size:8px}.ap-progress{float:none;display:block;margin-top:5px;font-size:10px}}
 
 .ap-bonus-status{display:block;margin-top:10px;color:#e0b46d;font-size:9px;letter-spacing:.13em}

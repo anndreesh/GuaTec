@@ -35,6 +35,10 @@ export class GameApp {
   private activeView: "splash" | "auth" | "username" | "missions" | "mission1" | "report" = "splash";
   private activeReportSlug: string | null = null;
   private languageMenu: HTMLElement;
+  private uiGamepadIndex: number | null = null;
+  private previousUiGamepadButtons: boolean[] = [];
+  private lastUiDirection: string | null = null;
+  private uiGamepadRaf = 0;
 
   public currentUser: UserDTO | null = null;
 
@@ -46,6 +50,46 @@ export class GameApp {
     document.getElementById("app")?.append(this.languageMenu);
     window.addEventListener("languagechange", () => void this.refreshForLanguage());
     this.chooseMenuBackground();
+    this.uiGamepadRaf = requestAnimationFrame(this.pollUiGamepad);
+  }
+
+  private readonly pollUiGamepad = () => {
+    if (this.activeView === "mission1" || !navigator.getGamepads) {
+      this.previousUiGamepadButtons = [];
+      this.lastUiDirection = null;
+    } else {
+      const pads = navigator.getGamepads();
+      let pad = this.uiGamepadIndex === null ? null : pads[this.uiGamepadIndex];
+      if (!pad?.connected) {
+        pad = Array.from(pads).find(candidate => candidate?.connected) ?? null;
+        this.uiGamepadIndex = pad?.index ?? null;
+        this.previousUiGamepadButtons = [];
+        this.lastUiDirection = null;
+      }
+      if (pad) {
+        const pressed = (index: number) => !!pad!.buttons[index]?.pressed;
+        const justPressed = (index: number) => pressed(index) && !this.previousUiGamepadButtons[index];
+        const axis = (index: number) => { const value = pad!.axes[index] ?? 0; return Math.abs(value) > .55 ? value : 0; };
+        const direction = pressed(12) || axis(1) < 0 ? "up" : pressed(13) || axis(1) > 0 ? "down" : pressed(14) || axis(0) < 0 ? "left" : pressed(15) || axis(0) > 0 ? "right" : null;
+        if (direction && direction !== this.lastUiDirection) this.moveUiFocus(direction);
+        this.lastUiDirection = direction;
+        if (justPressed(0)) (document.activeElement as HTMLElement | null)?.click();
+        this.previousUiGamepadButtons = pad.buttons.map(button => button.pressed);
+      }
+    }
+    this.uiGamepadRaf = requestAnimationFrame(this.pollUiGamepad);
+  };
+
+  private moveUiFocus(direction: "up" | "down" | "left" | "right") {
+    const controls = [...this.uiRoot.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input:not(:disabled),[tabindex="0"]')].filter(node => !!node.getClientRects().length);
+    if (!controls.length) return;
+    const current = document.activeElement as HTMLElement | null;
+    const from = current && controls.includes(current) ? current : controls[0]!;
+    if (current !== from) { from.focus(); return; }
+    const rect = from.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const candidates = controls.filter(node => node !== from).map(node => { const next = node.getBoundingClientRect(); return { node, x: next.left + next.width / 2 - cx, y: next.top + next.height / 2 - cy }; }).filter(candidate => direction === "left" ? candidate.x < 0 : direction === "right" ? candidate.x > 0 : direction === "up" ? candidate.y < 0 : candidate.y > 0);
+    candidates.sort((a, b) => { const primary = direction === "left" || direction === "right" ? "x" : "y"; const secondary = primary === "x" ? "y" : "x"; return Math.abs(a[primary]) + Math.abs(a[secondary]) * .45 - (Math.abs(b[primary]) + Math.abs(b[secondary]) * .45); });
+    candidates[0]?.node.focus();
   }
 
   private createLanguageMenu(): HTMLElement {

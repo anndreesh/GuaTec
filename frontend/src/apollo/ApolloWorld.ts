@@ -40,6 +40,14 @@ export class ApolloWorld {
   private pitch = 0.22;
   private zoomed = false;
   private keys = new Set<string>();
+  private touchMoveX = 0;
+  private touchMoveY = 0;
+  private touchSprint = false;
+  private gamepadMoveX = 0;
+  private gamepadMoveY = 0;
+  private gamepadSprint = false;
+  private activeGamepadIndex: number | null = null;
+  private previousGamepadButtons: boolean[] = [];
   private suspended = false;
   private disposed = false;
   private quality: ApolloQuality = 'medium';
@@ -90,7 +98,7 @@ export class ApolloWorld {
   private standAtlas: THREE.CanvasTexture | null = null;
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
 
-  constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void }) {
+  constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void; onPause?: () => void }) {
     this.furniture = {
       mat: (name, color, roughness, metalness) => this.material(name, color, roughness, metalness),
       box: (w, h, d, material, x, y, z, ry = 0) => { this.box(w, h, d, material, x, y, z, undefined, ry); },
@@ -819,6 +827,21 @@ export class ApolloWorld {
   }
   setZoom(value: boolean): void { this.zoomed = value; }
   setSuspended(value: boolean): void { this.suspended = value; if (value) this.onBlur(); }
+  setTouchMovement(x: number, y: number): void {
+    if (this.suspended || this.mode) return;
+    this.touchMoveX = clamp(x, -1, 1);
+    this.touchMoveY = clamp(y, -1, 1);
+  }
+  setTouchSprint(active: boolean): void { this.touchSprint = !this.suspended && active; }
+  jump(): void {
+    if (!this.suspended && !this.mode && this.grounded) {
+      this.verticalVelocity = 6.4;
+      this.grounded = false;
+    }
+  }
+  interact(): void {
+    if (!this.suspended && !this.mode) this.callbacks.onInteract();
+  }
   setQuality(value: ApolloQuality): void {
     this.quality = value;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, { low: 1, medium: 1.35, high: 1.75 }[value]));
@@ -850,11 +873,11 @@ export class ApolloWorld {
   }
   private move(dt: number): boolean {
     if (this.suspended || this.mode) return false;
-    let forward = Number(this.keys.has('w') || this.keys.has('arrowup')) - Number(this.keys.has('s') || this.keys.has('arrowdown'));
-    let right = Number(this.keys.has('d') || this.keys.has('arrowright')) - Number(this.keys.has('a') || this.keys.has('arrowleft'));
+    let forward = this.gamepadMoveY || this.touchMoveY || (Number(this.keys.has('w') || this.keys.has('arrowup')) - Number(this.keys.has('s') || this.keys.has('arrowdown')));
+    let right = this.gamepadMoveX || this.touchMoveX || (Number(this.keys.has('d') || this.keys.has('arrowright')) - Number(this.keys.has('a') || this.keys.has('arrowleft')));
     if (!forward && !right) return false;
-    const norm = Math.hypot(forward, right); forward /= norm; right /= norm;
-    const speed = this.keys.has('shift') ? 10 : 5.2;
+    const norm = Math.max(1, Math.hypot(forward, right)); forward /= norm; right /= norm;
+    const speed = this.keys.has('shift') || this.touchSprint || this.gamepadSprint ? 10 : 5.2;
     const dx = (-Math.sin(this.yaw) * forward + Math.cos(this.yaw) * right) * speed * dt;
     const dz = (-Math.cos(this.yaw) * forward - Math.sin(this.yaw) * right) * speed * dt;
     // Substeps cap wall crossings even after a slow frame.
@@ -864,6 +887,39 @@ export class ApolloWorld {
     // relative movement and the walk animation always agree visually.
     this.playerRoot.rotation.y = Math.atan2(dx, dz);
     return true;
+  }
+  private applyDeadzone(value: number, deadzone = 0.14): number {
+    const magnitude = Math.abs(value);
+    return magnitude <= deadzone ? 0 : Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
+  }
+  private pollGamepad(dt: number): void {
+    this.gamepadMoveX = 0; this.gamepadMoveY = 0; this.gamepadSprint = false;
+    if (this.suspended || this.mode || !navigator.getGamepads) {
+      this.activeGamepadIndex = null; this.previousGamepadButtons = []; return;
+    }
+    const pads = navigator.getGamepads();
+    let pad = this.activeGamepadIndex === null ? null : pads[this.activeGamepadIndex];
+    if (!pad?.connected) {
+      pad = Array.from(pads).find(candidate => candidate?.connected) ?? null;
+      this.activeGamepadIndex = pad?.index ?? null;
+      this.previousGamepadButtons = [];
+    }
+    if (!pad) return;
+    const axis = (index: number) => this.applyDeadzone(pad!.axes[index] ?? 0);
+    this.gamepadMoveX = axis(0);
+    this.gamepadMoveY = -axis(1);
+    this.gamepadSprint = !!(pad.buttons[4]?.pressed || pad.buttons[5]?.pressed);
+    const lookX = axis(2), lookY = axis(3);
+    if (lookX || lookY) {
+      this.yaw -= lookX * dt * 3.2;
+      this.pitch = clamp(this.pitch + lookY * dt * 2.2, -0.65, 1.8);
+    }
+    const pressed = (index: number) => !!pad!.buttons[index]?.pressed;
+    const justPressed = (index: number) => pressed(index) && !this.previousGamepadButtons[index];
+    if (justPressed(0)) this.jump();
+    if (justPressed(2)) this.interact();
+    if (justPressed(1) || justPressed(9)) this.callbacks.onPause?.();
+    this.previousGamepadButtons = pad.buttons.map(button => button.pressed);
   }
   update(dt: number): void {
     if (this.disposed) return;
@@ -876,9 +932,10 @@ export class ApolloWorld {
       material.opacity = 1;
       mesh.scale.setScalar(mesh.userData.active ? 1 + Math.sin(this.clock * 2 + phase) * .08 : 1);
     });
+    this.pollGamepad(dt);
     const moving = this.move(dt);
     if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
-      this.verticalVelocity = 6.4; this.grounded = false; this.keys.delete(' ');
+      this.jump(); this.keys.delete(' ');
       const jump = this.people[0]?.jump;
       jump?.reset().setEffectiveWeight(1).play();
     }
@@ -1021,7 +1078,9 @@ export class ApolloWorld {
   };
   private onKeyUp = (event: KeyboardEvent): void => { this.keys.delete(event.key.toLowerCase()); };
   private onBlur = (): void => {
-    this.keys.clear();const pointer=this.lastPointer;this.lastPointer=null;
+    this.keys.clear(); this.touchMoveX = 0; this.touchMoveY = 0; this.touchSprint = false;
+    this.gamepadMoveX = 0; this.gamepadMoveY = 0; this.gamepadSprint = false; this.activeGamepadIndex = null; this.previousGamepadButtons = [];
+    const pointer=this.lastPointer;this.lastPointer=null;
     if(pointer&&this.renderer.domElement.hasPointerCapture(pointer.id))this.renderer.domElement.releasePointerCapture(pointer.id);
   };
   private onPointerDown = (event: PointerEvent): void => { if (this.suspended || this.mode || this.lastPointer || event.button!==0 || !event.isPrimary) return; this.lastPointer = { id:event.pointerId,x: event.clientX, y: event.clientY }; this.renderer.domElement.setPointerCapture(event.pointerId); };

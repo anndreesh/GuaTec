@@ -1,0 +1,14 @@
+# Development-only source assets; production loads the optimized models.
+frontend/public/assets/models/mercenary_astronaut.glb
+frontend/public/assets/models/arboles.glb
+frontend/public/assets/models/edificio_colon_-_modelo_3d.glb
+frontend/public/assets/models/mies_van_der_rohe_oficina_bacardi.glb
+frontend/public/assets/models/space_shuttle_nasa.glb
+
+# Local build/test output is never part of the Vercel deployment.
+frontend/node_modules
+frontend/dist
+frontend/artifacts
+backend/.venv
+.venv
+artifacts

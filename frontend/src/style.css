@@ -561,9 +561,35 @@ body {
 .mission-card:hover {
   border-color: var(--accent);
 }
+.mission-card:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 4px;
+  border-color: var(--accent);
+}
 .mission-card--locked {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* Every menu and overlay keeps a real vertical scroll surface on touch devices. */
+#ui-root,
+.screen,
+.mission-select-screen,
+.mission-carousel,
+.nasa-briefing,
+.nasa-carousel-viewport {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.screen,
+.mission-select-screen {
+  min-height: 0;
+}
+@media (pointer: coarse), (max-width: 760px) {
+  #ui-root { touch-action: pan-y; }
+  .mission-select-screen { max-height: none; }
+  .mission-card { min-height: 44px; }
+  .nasa-carousel-viewport { touch-action: pan-y pinch-zoom; }
 }
 .mission-card-title {
   margin: 0 0 4px;

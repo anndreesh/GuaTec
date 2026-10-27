@@ -123,6 +123,12 @@ export class ApolloScreen implements Screen {
   private previousFocus:HTMLElement|null=null;
   private frameTimes:number[]=[];
   private uiTarget:HTMLElement|null=null;
+  private mobileControls:HTMLElement|null=null;
+  private mobileInteract:HTMLButtonElement|null=null;
+  private uiGamepadIndex:number|null=null;
+  private previousUiGamepadButtons:boolean[]=[];
+  private lastUiDirection:string|null=null;
+  private ignoreUiGamepadUntil=0;
   private readonly onKey=(event:KeyboardEvent) => {
     if(event.key==='Escape'&&this.modal?.querySelector('.ap-language-options')){
       event.preventDefault();const host=this.modal.querySelector<HTMLElement>('.ap-language-host');
@@ -181,7 +187,7 @@ export class ApolloScreen implements Screen {
     }
     const sceneLanguage=apolloLanguage();
     try {
-      this.world=new ApolloWorld(this.root,{onInteract:()=>this.interact(),onMap:()=>{}});
+      this.world=new ApolloWorld(this.root,{onInteract:()=>this.interact(),onMap:()=>this.openMap(),onPause:()=>this.openPause()});
       await this.world.ready;
     } catch (error) {
       const failure=sceneStartFailure(error);
@@ -196,7 +202,7 @@ export class ApolloScreen implements Screen {
     this.world.setQuality(this.quality);
     // A resume starts at the last validated checkpoint, never inside a restricted area.
     const destination=this.state.current.target; this.world.player.set(destination.x,0,destination.z+9);
-    this.root.classList.add('ap-ready'); loading.remove(); this.buildHud();
+    this.root.classList.add('ap-ready'); loading.remove(); this.buildHud(); this.buildMobileControls();
     this.dialogue=new ApolloDialogue(this.state,this.subtitle,this.audio,this.voice);
     document.addEventListener('keydown',this.onKey); document.addEventListener('visibilitychange',this.onVisibility);
     window.addEventListener('resize',this.onResize); window.addEventListener('pagehide',this.onPageHide);
@@ -215,6 +221,63 @@ export class ApolloScreen implements Screen {
   }
   private button(text:string, callback:()=>void, cls='ap-button') {
     const b=el('button',cls,text); b.type='button'; b.addEventListener('click',callback); return b;
+  }
+  private buildMobileControls() {
+    const controls=el('div','ap-mobile-controls');
+    const stick=el('div','ap-mobile-stick');
+    const knob=el('span','ap-mobile-stick-knob');
+    stick.append(el('span','ap-mobile-stick-hint','▲'),knob);
+    const actions=el('div','ap-mobile-actions');
+    const pause=this.button('Ⅱ',()=>this.openPause(),'ap-mobile-action ap-mobile-action--pause');
+    pause.setAttribute('aria-label',apolloText('Pausar misión'));
+    const interact=this.button('Examinar',()=>this.interact(),'ap-mobile-action ap-mobile-action--interact');
+    this.mobileInteract=interact; interact.hidden=true;
+    const jump=this.button('Saltar',()=>this.world.jump(),'ap-mobile-action');
+    const sprint=this.button('Correr',()=>undefined,'ap-mobile-action');
+    sprint.setAttribute('aria-pressed','false');
+    const releaseSprint=()=>{this.world.setTouchSprint(false);sprint.classList.remove('is-active');sprint.setAttribute('aria-pressed','false');};
+    sprint.addEventListener('pointerdown',event=>{event.preventDefault();sprint.setPointerCapture(event.pointerId);this.world.setTouchSprint(true);sprint.classList.add('is-active');sprint.setAttribute('aria-pressed','true');});
+    sprint.addEventListener('pointerup',releaseSprint); sprint.addEventListener('pointercancel',releaseSprint); sprint.addEventListener('lostpointercapture',releaseSprint);
+    actions.append(pause,interact,jump,sprint); controls.append(stick,actions); this.root.append(controls); this.mobileControls=controls;
+    const moveStick=(event:PointerEvent)=>{
+      const rect=stick.getBoundingClientRect(),radius=rect.width*.36;
+      const dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),scale=distance>radius?radius/distance:1;
+      const x=dx*scale/radius,y=-dy*scale/radius; knob.style.transform=`translate(${x*radius}px,${-y*radius}px)`; this.world.setTouchMovement(x,y);
+    };
+    const releaseStick=(event:PointerEvent)=>{if(stick.hasPointerCapture(event.pointerId))stick.releasePointerCapture(event.pointerId);knob.style.transform='translate(0,0)';this.world.setTouchMovement(0,0);};
+    stick.addEventListener('pointerdown',event=>{event.preventDefault();stick.setPointerCapture(event.pointerId);moveStick(event);});
+    stick.addEventListener('pointermove',event=>{if(stick.hasPointerCapture(event.pointerId))moveStick(event);});
+    stick.addEventListener('pointerup',releaseStick);stick.addEventListener('pointercancel',releaseStick);stick.addEventListener('lostpointercapture',releaseStick);
+  }
+  private pollUiGamepad(now:number) {
+    if (!navigator.getGamepads || (!this.modal && !this.movie) || now<this.ignoreUiGamepadUntil) return;
+    const pads=navigator.getGamepads(); let pad=this.uiGamepadIndex===null?null:pads[this.uiGamepadIndex];
+    if(!pad?.connected){pad=Array.from(pads).find(candidate=>candidate?.connected)??null;this.uiGamepadIndex=pad?.index??null;this.previousUiGamepadButtons=[];this.lastUiDirection=null;}
+    if(!pad)return;
+    const pressed=(index:number)=>!!pad!.buttons[index]?.pressed;
+    const justPressed=(index:number)=>pressed(index)&&!this.previousUiGamepadButtons[index];
+    const axis=(index:number)=>{const value=pad!.axes[index]??0;return Math.abs(value)>.55?value:0;};
+    const direction=pressed(12)||axis(1)<0?'up':pressed(13)||axis(1)>0?'down':pressed(14)||axis(0)<0?'left':pressed(15)||axis(0)>0?'right':null;
+    if(this.modal && direction&&direction!==this.lastUiDirection)this.moveUiFocus(direction);
+    this.lastUiDirection=direction;
+    if(justPressed(0)) {
+      if(this.movie) this.movieOverlay?.querySelector<HTMLButtonElement>('.ap-skip')?.click();
+      else if(this.modal) (document.activeElement as HTMLElement|null)?.click();
+    }
+    if(justPressed(1)&&this.started&&this.modal&&this.modalKind!=='welcome')this.closeModal();
+    if(justPressed(9)&&this.started){if(this.modalKind==='pause')this.closeModal();else if(!this.modal)this.openPause();}
+    this.previousUiGamepadButtons=pad.buttons.map(button=>button.pressed);
+  }
+  private moveUiFocus(direction:'up'|'down'|'left'|'right') {
+    if(!this.modal)return;
+    const controls=[...this.modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input:not(:disabled),[tabindex="0"]')].filter(node=>!!node.getClientRects().length);
+    if(!controls.length)return;
+    const current=document.activeElement as HTMLElement|null,from=current&&controls.includes(current)?current:controls[0]!;
+    if(current!==from){from.focus();return;}
+    const rect=from.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    const candidates=controls.filter(node=>node!==from).map(node=>{const r=node.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy;return {node,x,y};}).filter(candidate=>direction==='left'?candidate.x<0:direction==='right'?candidate.x>0:direction==='up'?candidate.y<0:candidate.y>0);
+    candidates.sort((a,b)=>{const primary=direction==='left'||direction==='right'?'x':'y';const secondary=primary==='x'?'y':'x';return Math.abs(a[primary])+Math.abs(a[secondary])*.45-(Math.abs(b[primary])+Math.abs(b[secondary])*.45);});
+    candidates[0]?.node.focus();
   }
   private buildHud() {
     const top=el('div','ap-topbar');
@@ -458,13 +521,14 @@ export class ApolloScreen implements Screen {
       if(e.shiftKey && (document.activeElement===first || document.activeElement===box)) {e.preventDefault();last.focus();}
       else if(!e.shiftKey && (document.activeElement===last || document.activeElement===box)) {e.preventDefault();first.focus();}
     });
-    box.focus(); return box;
+    this.root.classList.add('ap-modal-open'); this.ignoreUiGamepadUntil=performance.now()+260;
+    box.focus(); queueMicrotask(()=>{if(this.modal!==overlay)return;const first=box.querySelector<HTMLElement>('button:not(:disabled),a[href],select,input:not(:disabled),[tabindex="0"]');(first??box).focus();}); return box;
   }
   private closeModal() {
     this.disposeInstrument();
     const closingStand=!!this.bonusMission;
     this.bonusMission?.dispose(); this.bonusMission=null;this.bonusKey='';
-    this.modal?.remove();this.modal=null;this.modalKind=null;this.paused=false;this.voice.pause(false);
+    this.modal?.remove();this.modal=null;this.modalKind=null;this.paused=false;this.root.classList.remove('ap-modal-open');this.ignoreUiGamepadUntil=performance.now()+180;this.voice.pause(false);
     this.world?.setStandFocus(null);
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
@@ -634,6 +698,7 @@ export class ApolloScreen implements Screen {
     if(this.disposed)return;
     const raw=Math.max(0,(now-this.lastTime)/1000),dt=Math.min(.1,raw);this.lastTime=now;
     const beforeX=this.world.player.x,beforeZ=this.world.player.z;
+    this.pollUiGamepad(now);
     this.world.update(this.paused ? 0 : dt);
     if(this.started && !this.paused && !this.movie) {
       this.stepDistance+=Math.hypot(this.world.player.x-beforeX,this.world.player.z-beforeZ);
@@ -671,6 +736,7 @@ export class ApolloScreen implements Screen {
     this.prompt.textContent=bonusNear?'E · '+(this.state.canStartBonus(bonus!.id)?bonus!.title:'Stand pendiente de autorización'):near?'E · '+(this.state.checkpoint===4?'Observar a la tripulación':this.state.checkpoint===6?'Presenciar el lanzamiento':'Examinar estación'):`${Math.round(remaining)} m · ${destination.title}`;
     this.prompt.textContent=apolloText(this.prompt.textContent);
     this.prompt.disabled=!(near || bonusNear);
+    if(this.mobileInteract){this.mobileInteract.hidden=!(this.started && !this.paused && !this.movie && (near || bonusNear));this.mobileInteract.textContent=apolloText(bonusNear?'Abrir stand':'Examinar');}
     if(this.uiTarget) {
       this.uiTarget.hidden=!!this.movie || this.paused;
       const projected=this.world.projectDestination(destination.target),width=this.root.clientWidth,height=this.root.clientHeight;
