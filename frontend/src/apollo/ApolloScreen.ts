@@ -232,6 +232,9 @@ export class ApolloScreen implements Screen {
     this.hud.append(el('small','','MISIÓN 01 — APOLLO 11'),el('span','ap-progress',`${String(this.state.completed.length).padStart(2,'0')} / 08`),el('h2','',cp.title),el('p','',cp.objective));
     const checklist=el('div','ap-checklist');
     for(const action of cp.actions) checklist.append(el('span',this.state.checks.includes(action.id)?'ap-checked':'',`${this.state.checks.includes(action.id)?'✓':'·'} ${action.label}`));
+    const blocked=cp.actions.find(action=>!this.state.checks.includes(action.id)&&action.requiresBonus?.some(id=>!this.state.bonusCompleted.includes(id)));
+    const missing=BONUS_CHECKPOINTS.filter(bonus=>blocked?.requiresBonus?.includes(bonus.id)&&!this.state.bonusCompleted.includes(bonus.id));
+    if(missing?.length) this.hud.append(el('small','ap-bonus-gate',`REQUERIDO PARA AVANZAR · ${missing.map(bonus=>bonus.title).join(' · ')}`));
     const bonusStatus=el('small','ap-bonus-status',`SUBMISIONES OPCIONALES · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADAS`);
     this.hud.append(checklist,bonusStatus,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
     this.world?.setTarget(this.state.done?null:cp.target);
@@ -249,7 +252,12 @@ export class ApolloScreen implements Screen {
   }
   private act(id:string) {
     const before=this.state.checkpoint;
-    if(!this.state.act(id)) return false;
+    if(!this.state.act(id)) {
+      const action=this.state.current.actions.find(entry=>entry.id===id);
+      const missing=BONUS_CHECKPOINTS.filter(bonus=>action?.requiresBonus?.includes(bonus.id)&&!this.state.bonusCompleted.includes(bonus.id));
+      if(missing?.length) this.notify(`OPERACIÓN REQUERIDA · ${missing.map(bonus=>bonus.title).join(' · ')}`);
+      return false;
+    }
     void this.save(); this.renderObjective();
     if(before===5 && this.state.checkpoint===6) {
       this.world.player.set(0,0,5600);

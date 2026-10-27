@@ -5,6 +5,8 @@ export interface ApolloAction {
   readonly description: string;
   /** Checks required inside this checkpoint, independent of UI button guards. */
   readonly requires?: readonly string[];
+  /** Optional field operations that must be completed before this action advances the story. */
+  readonly requiresBonus?: readonly string[];
 }
 
 export interface ApolloCheckpoint {
@@ -68,7 +70,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     actions: [
       { id: 'map', label: 'Consultar el mapa', description: 'Pulsa M. La posición, las vías y el objetivo corresponden al terreno de esta recreación.' },
       { id: 'landmark', label: 'Reconocer el Saturn V', description: 'Observa el cohete blanco y negro junto a la torre roja. El Saturn V mide aproximadamente 110,6 metros.' },
-      { id: 'arrive', label: 'Llegar a orientación', description: 'Acércate al punto autorizado y confirma tu llegada. WASD mueve al técnico; Mayús permite caminar más rápido.' },
+      { id: 'arrive', requiresBonus: ['power-bus'], label: 'Llegar a orientación', description: 'Acércate al punto autorizado y confirma tu llegada. WASD mueve al técnico; Mayús permite caminar más rápido.' },
     ],
   },
   {
@@ -89,7 +91,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     actions: [
       { id: 'log', label: 'Revisar el registro', description: 'Registro simulado de apoyo: enlace de voz recibido; observación exterior autorizada; personal fuera del perímetro de lanzamiento.' },
       { id: 'report', requires: ['log'], label: 'Confirmar el informe', description: 'Confirma que el mensaje pertenece al Saturn V AS-506, Apollo 11, plataforma 39A, 16 de julio de 1969.' },
-      { id: 'identify', label: 'Registrar la identificación', description: 'Vincula la observación con la torre umbilical y la plataforma móvil. Esta actividad educativa no opera sistemas reales de lanzamiento.' },
+      { id: 'identify', requiresBonus: ['umbilical-check'], label: 'Registrar la identificación', description: 'Vincula la observación con la torre umbilical y la plataforma móvil. Esta actividad educativa no opera sistemas reales de lanzamiento.' },
     ],
   },
   {
@@ -117,7 +119,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     actions: [
       { id: 'camera', label: 'Preparar la cámara', description: 'Orienta la cámara de seguimiento hacia 39A. Los recorridos y la distancia del área de observación se comprimen por jugabilidad.' },
       { id: 'audio', label: 'Confirmar audio', description: 'Verifica el enlace de radio. El sonido directo de los motores llegará después de la luz debido a la distancia.' },
-      { id: 'authorize', requires: ['camera', 'audio'], label: 'Solicitar autorización', description: 'Confirma que el técnico permanece en el área de observación y autoriza únicamente la reproducción de la secuencia histórica.' },
+      { id: 'authorize', requires: ['camera', 'audio'], requiresBonus: ['weather-window'], label: 'Solicitar autorización', description: 'Confirma que el técnico permanece en el área de observación y autoriza únicamente la reproducción de la secuencia histórica.' },
     ],
   },
   {
@@ -269,6 +271,7 @@ export class ApolloState {
     if (this.done || !definition
       || this.checks.includes(action)
       || definition.requires?.some(id => !this.checks.includes(id))
+      || definition.requiresBonus?.some(id => !this.bonusCompleted.includes(id))
       || !this.current.requirements.every(id => this.completed.includes(id))) return false;
     this.checks.push(action);
     if (this.current.actions.every(entry => this.checks.includes(entry.id))) {
