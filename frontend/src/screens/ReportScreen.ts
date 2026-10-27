@@ -1,6 +1,6 @@
 import { progressApi } from "@/api/progressApi";
 import { samplesApi } from "@/api/samplesApi";
-import { RESOURCE_DEFINITIONS } from "@/config/gameConfig";
+import { RESOURCE_DEFINITIONS,MISSION_SLUGS } from "@/config/gameConfig";
 import { el } from "@/core/dom";
 import type { GameApp } from "@/core/GameApp";
 import type { Screen } from "@/screens/Screen";
@@ -8,6 +8,8 @@ import type { MissionReport, SampleDTO } from "@/types";
 import { t } from "@/core/i18n";
 import { fieldTaskLabel } from "./FieldTaskCopy";
 import { surveyText } from "./FieldSurveyTasks";
+import {readApolloReportState} from '@/apollo/ApolloOperationLog';
+import {renderApolloReport} from '@/apollo/ApolloReport';
 
 const OUTCOME_LABEL: Record<MissionReport["outcome"], string> = {
   success: "Éxito",
@@ -28,15 +30,20 @@ export class ReportScreen implements Screen {
     container.append(panel);
 
     let report: MissionReport | null = null;
+    let apollo:ReturnType<typeof readApolloReportState>=null;
     try {
       const progress = await progressApi.get(this.missionSlug);
       report = progress.report;
+      if(this.missionSlug===MISSION_SLUGS.mission1)apollo=readApolloReportState(progress.state);
     } catch {
       /* ignore, render whatever we can */
     }
 
     if (!report) {
       panel.append(el("p", { text: t("No se encontró un informe para esta misión.") }));
+    } else if(apollo){
+      panel.append(el('div',{className:`outcome-badge outcome-badge--${report.outcome}`,text:t(OUTCOME_LABEL[report.outcome])}));
+      renderApolloReport(panel,apollo);
     } else {
       panel.append(
         el("div", { className: `outcome-badge outcome-badge--${report.outcome}`, text: t(OUTCOME_LABEL[report.outcome]) }),
@@ -98,9 +105,10 @@ export class ReportScreen implements Screen {
     }
 
     let samples: SampleDTO[] = [];
-    try {
+    try {if(!apollo){
       const res = await samplesApi.list();
       samples = res.samples;
+    }
     } catch {
       /* ignore */
     }

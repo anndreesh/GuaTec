@@ -1,0 +1,16 @@
+export const REPORT_TRANSLATIONS:readonly (readonly [string,string,string])[]=[
+  ['Registro de apoyo terrestre','Ground-support log','Registre de soutien au sol'],
+  ['Operaciones registradas: {count} de 15.','Operations recorded: {count} of 15.','Opérations enregistrées : {count} sur 15.'],
+  ['Una jornada de preparación, observación y registro desde el área segura.','A day of preparation, observation and documentation from the safe area.','Une journée de préparation, d’observation et de documentation depuis la zone sûre.'],
+  ['Hitos históricos','Historical milestones','Étapes historiques'],
+  ['Hito histórico','Historical milestone','Étape historique'],
+  ['Stands de apoyo','Support stations','Postes de soutien'],
+  ['Registro total','Total recorded','Total enregistré'],
+  ['Cronología de operaciones','Operations timeline','Chronologie des opérations'],
+  ['Operación de apoyo','Support operation','Opération de soutien'],
+  ['Registro completado','Record complete','Registre complété'],
+  ['Registro pendiente','Record pending','Enregistrement en attente'],
+  ['Referencia histórica · 16 de julio de 1969','Historical reference · July 16, 1969','Référence historique · 16 juillet 1969'],
+  ['Apollo 11 despegó de la plataforma 39A a las 09:32 EDT. Las tareas de apoyo, los registros y Daniel Carter son adaptaciones educativas; el jugador observa el lanzamiento desde un área segura.','Apollo 11 lifted off from pad 39A at 09:32 EDT. The support tasks, logs and Daniel Carter are educational adaptations; the player observes the launch from a safe area.','Apollo 11 a décollé du pas de tir 39A à 09:32 EDT. Les tâches de soutien, les registres et Daniel Carter sont des adaptations pédagogiques ; le joueur observe le lancement depuis une zone sûre.'],
+  ['NASA · Resumen de Apollo 11','NASA · Apollo 11 mission overview','NASA · Présentation de la mission Apollo 11'],
+];

@@ -13,7 +13,8 @@
     "qa:apollo-locales": "node scripts/qa-apollo-locales.mjs",
     "qa:apollo-site": "node scripts/qa-apollo-site.mjs",
     "qa:apollo-instruments": "node scripts/qa-apollo-instruments.mjs",
-    "qa:app-locales": "node scripts/qa-app-locales.mjs"
+    "qa:app-locales": "node scripts/qa-app-locales.mjs",
+    "qa:apollo-report": "node scripts/qa-apollo-report.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^7.35.1",
