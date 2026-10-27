@@ -120,6 +120,10 @@ export class ApolloScreen implements Screen {
   private frameTimes:number[]=[];
   private uiTarget:HTMLElement|null=null;
   private readonly onKey=(event:KeyboardEvent) => {
+    if(event.key==='Escape'&&this.modal?.querySelector('.ap-language-options')){
+      event.preventDefault();const host=this.modal.querySelector<HTMLElement>('.ap-language-host');
+      if(host){this.togglePauseLanguage(host);host.querySelector('button')?.focus();}return;
+    }
     if(event.key==='Escape') {event.preventDefault();if(this.modal && this.started)this.closeModal();else if(this.started && !this.movie)this.openPause();return;}
     if(this.modal)return;
     if(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.repeat)return;
@@ -480,7 +484,7 @@ export class ApolloScreen implements Screen {
     const missions=this.pauseControl('⌂','Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());});
     const languageHost=el('div','ap-language-host');
     const language=this.pauseControl('文','Idioma',()=>this.togglePauseLanguage(languageHost));
-    language.setAttribute('aria-expanded','false');languageHost.append(language);
+    language.setAttribute('aria-expanded','false');language.setAttribute('aria-controls','ap-pause-language-options');languageHost.append(language);
     grid.append(resume,mute,restart,missions,languageHost); box.append(grid);
     const mapCanvas=el('canvas','ap-pause-map'); mapCanvas.width=1100; mapCanvas.height=460; this.drawMap(mapCanvas); box.append(el('h2','ap-pause-map-title','Mapa de operaciones'),mapCanvas);
   }
@@ -490,8 +494,10 @@ export class ApolloScreen implements Screen {
     if(existing){existing.remove();trigger?.setAttribute('aria-expanded','false');return;}
     trigger?.setAttribute('aria-expanded','true');
     const options=el('div','ap-language-options');
+    options.id='ap-pause-language-options';options.setAttribute('role','group');options.setAttribute('aria-label',apolloText('Idioma'));
     (['es','en','fr'] as const).forEach(language=>{const button=this.button(language.toUpperCase(),()=>setLanguage(language),'ap-language-option');button.setAttribute('aria-pressed',String(apolloLanguage()===language));options.append(button);});
     host.append(options);
+    options.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
   }
   private confirmReset() {
     this.modalKind='reset';
