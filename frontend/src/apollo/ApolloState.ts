@@ -28,44 +28,46 @@ export interface ApolloBonusCheckpoint {
   readonly kind: ApolloBonusKind;
   /** Earlier stands that must be complete before this one can be registered. */
   readonly requires?: readonly string[];
+  /** Historical checkpoint that must already be earned before visiting the stand. */
+  readonly afterCheckpoint?: string;
 }
 
 /** Mandatory field stands: they extend the historical route with hands-on operations. */
 export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
   {
     id: 'power-bus', title: 'Banco de alimentación',
-    objective: 'Restablece la secuencia de cuatro relés antes de liberar energía al banco de pruebas.',
+    objective: 'Coloca los fusibles correctos y acciona la palanca del banco eléctrico de apoyo.',
     target: { x: -48, z: 190 }, kind: 'sequence',
   },
   {
     id: 'flight-record', title: 'Plan de vuelo',
     objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
-    target: { x: 42, z: 180 }, kind: 'flight-plan', requires: ['power-bus'],
+    target: { x: 42, z: 180 }, kind: 'flight-plan', requires: ['power-bus'], afterCheckpoint: 'orientation',
   },
   {
     id: 'telemetry-rack', title: 'Rack de telemetría',
     objective: 'Ajusta tres lecturas analógicas para estabilizar el enlace de datos de la plataforma.',
-    target: { x: 40, z: 290 }, kind: 'telemetry', requires: ['flight-record'],
+    target: { x: 40, z: 290 }, kind: 'telemetry', requires: ['flight-record'], afterCheckpoint: 'complex',
   },
   {
     id: 'umbilical-check', title: 'Conexiones umbilicales',
-    objective: 'Une los cuatro nodos de servicio en el orden correcto para confirmar la continuidad del conjunto.',
-    target: { x: -45, z: 285 }, kind: 'cables', requires: ['telemetry-rack'],
+    objective: 'Conecta cada canal con el borne de su letra y comprueba la continuidad del panel de práctica.',
+    target: { x: -45, z: 285 }, kind: 'cables', requires: ['telemetry-rack'], afterCheckpoint: 'complex',
   },
   {
     id: 'crew-manifest', title: 'Manifiesto de tripulación',
-    objective: 'Verifica que cada astronauta esté asociado con su asiento y distintivo antes del traslado a la plataforma.',
-    target: { x: 18, z: 170 }, kind: 'crew-manifest', requires: ['umbilical-check'],
+    objective: 'Asocia las credenciales de Armstrong, Collins y Aldrin con sus funciones en el Apollo 11.',
+    target: { x: 18, z: 170 }, kind: 'crew-manifest', requires: ['umbilical-check'], afterCheckpoint: 'communications',
   },
   {
     id: 'weather-window', title: 'Ventana meteorológica',
-    objective: 'Ajusta viento, humedad y nubosidad para emitir el parte de condiciones de lanzamiento.',
-    target: { x: 95, z: 315 }, kind: 'weather', requires: ['crew-manifest'],
+    objective: 'Coteja la veleta y la placa de nubosidad con las referencias del ejercicio meteorológico.',
+    target: { x: 95, z: 315 }, kind: 'weather', requires: ['crew-manifest'], afterCheckpoint: 'crew',
   },
   {
     id: 'pad-safety', title: 'Perímetro de seguridad',
-    objective: 'Confirma los tres balizadores del perímetro antes de abrir la ruta de servicio.',
-    target: { x: 44, z: 365 }, kind: 'beacons', requires: ['weather-window'],
+    objective: 'Mantén el visor sobre cada baliza para confirmar el perímetro de observación.',
+    target: { x: 44, z: 365 }, kind: 'beacons', requires: ['weather-window'], afterCheckpoint: 'crew',
   },
 ];
 
@@ -273,6 +275,25 @@ export class ApolloState {
 
   get current(): ApolloCheckpoint { return CHECKPOINTS[this.checkpoint]; }
 
+  /** Select the first outstanding dependency, including chained stand prerequisites.
+   * Earned legacy actions remain earned; future tasks still obey their own guards. */
+  get requiredStand(): ApolloBonusCheckpoint | undefined {
+    const needed = new Set<string>();
+    const visit = (id: string) => {
+      if (this.bonusCompleted.includes(id) || needed.has(id)) return;
+      needed.add(id); BONUS_CHECKPOINTS.find(stand => stand.id === id)?.requires?.forEach(visit);
+    };
+    if (!this.done) this.current.actions.filter(action => !this.checks.includes(action.id)).forEach(action => action.requiresBonus?.forEach(visit));
+    return BONUS_CHECKPOINTS.find(stand => needed.has(stand.id));
+  }
+
+  canStartBonus(id: string): boolean {
+    const stand = BONUS_CHECKPOINTS.find(entry => entry.id === id);
+    return !!stand && !this.done && !this.bonusCompleted.includes(id)
+      && (!stand.afterCheckpoint || this.completed.includes(stand.afterCheckpoint))
+      && !stand.requires?.some(required => !this.bonusCompleted.includes(required));
+  }
+
   act(action: string): boolean {
     const definition = this.current.actions.find(entry => entry.id === action);
     if (this.done || !definition
@@ -291,8 +312,7 @@ export class ApolloState {
   }
 
   completeBonus(id: string): boolean {
-    const bonus = BONUS_CHECKPOINTS.find(entry => entry.id === id);
-    if (!bonus || this.bonusCompleted.includes(id) || bonus.requires?.some(required => !this.bonusCompleted.includes(required))) return false;
+    if (!this.canStartBonus(id)) return false;
     this.bonusCompleted.push(id);
     return true;
   }

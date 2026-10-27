@@ -8,6 +8,7 @@ import { ApolloWorld } from './ApolloWorld';
 import { ApolloAudio } from './ApolloAudio';
 import { ApolloDialogue } from './ApolloDialogue';
 import './apollo.css';
+import './ApolloPause.css';
 import './apollo-start-error.css';
 import { apolloText, apolloLanguage } from './ApolloLocale';
 import { ApolloVoice } from './ApolloVoice';
@@ -15,6 +16,7 @@ import { setLanguage } from '@/core/i18n';
 import { mountInstrument, type InstrumentHandle, type InstrumentKind } from './ApolloInstruments';
 import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts } from './ApolloFieldProgress';
 import { mountBonusMission, type BonusMissionHandle } from './ApolloBonusMissions';
+import { restoreStandDraft, type StandDraft } from './ApolloStandRules';
 
 const SLUG = MISSION_SLUGS.mission1;
 const el = <K extends keyof HTMLElementTagNameMap>(tag:K, cls='', text='') => {
@@ -26,8 +28,8 @@ const INTRO = [
   'Neil Armstrong, Buzz Aldrin y Michael Collins están a punto de comenzar un viaje que cambiará nuestra historia.',
 ];
 type Quality = 'low'|'medium'|'high';
-type Saved = { state:ReturnType<ApolloState['toJSON']>; savedAt:number; drafts?:FieldDrafts };
-type Resume = ReturnType<ApolloState['toJSON']> & {fieldDrafts?:unknown;resumeInstrument?:boolean};
+type Saved = { state:ReturnType<ApolloState['toJSON']>; savedAt:number; drafts?:FieldDrafts; standDrafts?:Record<string,StandDraft> };
+type Resume = ReturnType<ApolloState['toJSON']> & {fieldDrafts?:unknown;standDrafts?:unknown;resumeInstrument?:boolean};
 
 type SceneStartFailure = {
   kind: 'webgl' | 'scene';
@@ -93,6 +95,7 @@ export class ApolloScreen implements Screen {
   private mapTime=0;
   private syncTime=0;
   private hudTime=0;
+  private objectivesExpanded=window.innerWidth>640;
   private activeIndex=-1;
   private quality:Quality='high';
   private zoom=false;
@@ -101,6 +104,8 @@ export class ApolloScreen implements Screen {
   private voice=new ApolloVoice();
   private instrument:InstrumentHandle|null=null;
   private bonusMission:BonusMissionHandle|null=null;
+  private bonusKey='';
+  private standDrafts:Record<string,StandDraft>={};
   private instrumentKey='';
   private fieldDrafts:FieldDrafts={};
   private draftTimer:number|undefined;
@@ -116,6 +121,7 @@ export class ApolloScreen implements Screen {
   private uiTarget:HTMLElement|null=null;
   private readonly onKey=(event:KeyboardEvent) => {
     if(event.key==='Escape') {event.preventDefault();if(this.modal && this.started)this.closeModal();else if(this.started && !this.movie)this.openPause();return;}
+    if(this.modal)return;
     if(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.repeat)return;
     const key=event.key.toLowerCase();
     if(this.instrument)return;
@@ -131,7 +137,7 @@ export class ApolloScreen implements Screen {
   }
   languageRefreshState() {
     this.captureInstrumentDraft();
-    return {...this.state.toJSON(),fieldDrafts:this.fieldDrafts,resumeInstrument:!!this.instrument};
+    return {...this.state.toJSON(),fieldDrafts:this.fieldDrafts,standDrafts:this.standDrafts,resumeInstrument:!!this.instrument};
   }
   async mount(container:HTMLElement) {
     document.body.classList.add('apollo-active');
@@ -139,13 +145,14 @@ export class ApolloScreen implements Screen {
     const loading=el('div','ap-loading','PREPARANDO OPERACIONES · APOLLO 11'); this.root.append(loading); container.append(this.root);
     let saved:unknown=this.initialState;
     let drafts:unknown=(this.initialState as Resume|undefined)?.fieldDrafts;
+    let standDrafts:unknown=(this.initialState as Resume|undefined)?.standDrafts;
     this.resumeInstrument=!!(this.initialState as Resume|undefined)?.resumeInstrument;
     let local:Saved|undefined;
     try { local=JSON.parse(localStorage.getItem(this.localKey) ?? 'null') ?? undefined; } catch {}
     if (!saved) {
       try {
         const remote=await progressApi.get(SLUG);
-        const envelope=remote.state as unknown as {apollo11?:unknown;apollo11SavedAt?:number;apollo11Drafts?:unknown};
+        const envelope=remote.state as unknown as {apollo11?:unknown;apollo11SavedAt?:number;apollo11Drafts?:unknown;apollo11StandDrafts?:unknown};
         const remoteState=envelope.apollo11;
         const cloudTime=envelope.apollo11SavedAt ?? (Date.parse((remote.updatedAt ?? '').replace(/(?<!Z)$/, 'Z')) || 0);
         const valid=(value:unknown)=>{if(!value || typeof value!=='object')return false;const original=value as ReturnType<ApolloState['toJSON']>,restored=new ApolloState(value).toJSON();return original.version===restored.version && original.checkpoint===restored.checkpoint && original.elapsed===restored.elapsed && original.done===restored.done && ['completed','checks','dialogues'].every(k=>JSON.stringify(original[k as 'checks'])===JSON.stringify(restored[k as 'checks'])) && JSON.stringify(original.bonusCompleted ?? [])===JSON.stringify(restored.bonusCompleted);};
@@ -154,11 +161,16 @@ export class ApolloScreen implements Screen {
         const preferLocal=localValid && (!remoteValid || local!.savedAt>cloudTime);
         saved=preferLocal ? local!.state : remoteValid?remoteState:undefined;
         drafts=preferLocal?local?.drafts:envelope.apollo11Drafts;
-      } catch { saved=local?.state; drafts=local?.drafts; this.saveStatus='Sin conexión · guardado en este dispositivo'; }
+        standDrafts=preferLocal?local?.standDrafts:envelope.apollo11StandDrafts;
+      } catch { saved=local?.state; drafts=local?.drafts;standDrafts=local?.standDrafts; this.saveStatus='Sin conexión · guardado en este dispositivo'; }
     }
     if(this.disposed) return;
     this.state=new ApolloState(saved);
     this.fieldDrafts=restoreFieldDrafts(drafts,this.state.checkpoint);
+    if(standDrafts&&typeof standDrafts==='object'&&!Array.isArray(standDrafts))for(const bonus of BONUS_CHECKPOINTS){
+      const savedDraft=(standDrafts as Record<string,unknown>)[bonus.id];
+      if(savedDraft&&!this.state.bonusCompleted.includes(bonus.id))this.standDrafts[bonus.id]=restoreStandDraft(bonus.kind,savedDraft);
+    }
     try {
       this.world=new ApolloWorld(this.root,{onInteract:()=>this.interact(),onMap:()=>{}});
       await this.world.ready;
@@ -217,10 +229,10 @@ export class ApolloScreen implements Screen {
     box.append(el('p','','16 de julio de 1969 · Centro Espacial Kennedy, Florida. Eres un técnico ficticio de apoyo a operaciones terrestres. Observa, documenta y comunica: tu trabajo termina en un punto seguro, antes del despegue de las 9:32 a. m. EDT.'));
     box.append(el('p','ap-note','Recreación educativa. Daniel Carter y los diálogos son ficticios. Las rutas se han acortado; no hay interiores accesibles. Los trajes Mercenary son una adaptación artística, no réplicas del A7L.'));
     if(this.state.completed.length || this.state.bonusCompleted.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length + this.state.bonusCompleted.length} de 15 operaciones de historia.`));
-    const start=this.button(this.state.done?'Ver epílogo':this.state.completed.length?'Continuar misión':'Comenzar operaciones',()=>{
+    const start=this.button(this.state.done?'Ver epílogo':this.state.completed.length||this.state.bonusCompleted.length||this.state.checks.length?'Continuar misión':'Comenzar operaciones',()=>{
       this.started=true; this.closeModal(); void this.audio.start().catch(()=>this.notify('Audio no disponible; los subtítulos permanecen activos.'));
       if(this.state.done) this.showEnd();
-      else if(this.state.completed.length || this.state.checks.length) {this.enterCheckpoint();if(this.resumeInstrument){this.resumeInstrument=false;this.openFieldInstrument();}}
+      else if(this.state.completed.length || this.state.checks.length || this.state.bonusCompleted.length) {this.enterCheckpoint();if(this.resumeInstrument){this.resumeInstrument=false;this.openFieldInstrument();}}
       else this.beginMovie('intro');
     },'ap-button ap-primary'); box.append(start);
     box.append(this.button('Inspeccionar Saturn V · Sketchfab',()=>this.openSketchfab()));
@@ -229,18 +241,22 @@ export class ApolloScreen implements Screen {
   private renderObjective() {
     if(!this.hud) return;
     const cp=this.state.current; this.hud.replaceChildren();
-    this.hud.append(el('small','','MISIÓN 01 — APOLLO 11 · 15 OPERACIONES'),el('span','ap-progress',`${String(this.state.completed.length + this.state.bonusCompleted.length).padStart(2,'0')} / 15`),el('h2','',cp.title),el('p','',cp.objective));
+    this.hud.append(el('small','','MISIÓN 01 — APOLLO 11'),el('span','ap-progress',`${String(this.state.completed.length + this.state.bonusCompleted.length).padStart(2,'0')} / 15`));
+    const details=el('details','ap-objective-details');details.open=this.objectivesExpanded;
+    const summary=el('summary');summary.append(el('h2','',cp.title));details.append(summary,el('p','',cp.objective));
+    details.addEventListener('toggle',()=>{this.objectivesExpanded=details.open;});
     const checklist=el('div','ap-checklist');
     for(const action of cp.actions) checklist.append(el('span',this.state.checks.includes(action.id)?'ap-checked':'',`${this.state.checks.includes(action.id)?'✓':'·'} ${action.label}`));
     const blocked=cp.actions.find(action=>!this.state.checks.includes(action.id)&&action.requiresBonus?.some(id=>!this.state.bonusCompleted.includes(id)));
     const missing=BONUS_CHECKPOINTS.filter(bonus=>blocked?.requiresBonus?.includes(bonus.id)&&!this.state.bonusCompleted.includes(bonus.id));
-    if(missing?.length) this.hud.append(el('small','ap-bonus-gate',`REQUERIDO PARA AVANZAR · ${missing.map(bonus=>bonus.title).join(' · ')}`));
+    if(missing?.length) details.append(el('small','ap-bonus-gate',`REQUERIDO PARA AVANZAR · ${(this.state.requiredStand ?? missing[0]).title}`));
     const bonusStatus=el('small','ap-bonus-status',`STANDS OBLIGATORIOS · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADOS`);
-    const nextBonus=BONUS_CHECKPOINTS.find(bonus=>!this.state.bonusCompleted.includes(bonus.id));
+    const nextBonus=this.state.requiredStand;
     const nextStand=nextBonus ? el('small','ap-bonus-next',`SIGUIENTE STAND · ${nextBonus.title}`) : null;
-    this.hud.append(checklist,bonusStatus,...(nextStand?[nextStand]:[]),el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
-    this.world?.setTarget(this.state.done?null:cp.target);
-    this.world?.setBonusStatus(this.state.bonusCompleted);
+    details.append(checklist,bonusStatus,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
+    this.hud.append(details,...(nextStand?[nextStand]:[]));
+    this.world?.setTarget(this.state.done?null:(this.state.requiredStand?.target ?? cp.target));
+    this.world?.setBonusStatus(this.state.bonusCompleted, this.state.requiredStand?.id);
     this.world?.setStationStatus(this.state.completed,cp.id);
     const mapButton=this.root.querySelector<HTMLElement>('.ap-minimap');
     mapButton?.setAttribute('aria-label',apolloText('Abrir mapa de Kennedy'));
@@ -279,21 +295,31 @@ export class ApolloScreen implements Screen {
     if(this.state.done) return;
     if(this.distance()>15) {this.notify('Sigue el marcador hasta la estación autorizada.');return;}
     const index=this.state.checkpoint;
-    if(index===4) {this.beginMovie('crew');return;}
+    if(index===4) {
+      if(this.state.requiredStand) { this.notify(`OPERACIÓN REQUERIDA · ${this.state.requiredStand.title}`); return; }
+      this.beginMovie('crew');return;
+    }
     if(index===6) {this.beginMovie('launch');return;}
     if(index===7) {this.showEnd();return;}
     this.showStation();
   }
   private openBonusMission(id:string) {
     const bonus=BONUS_CHECKPOINTS.find(entry=>entry.id===id);
-    if(!bonus || this.state.bonusCompleted.includes(id)) return;
+    if(!bonus || this.state.bonusCompleted.includes(id) || Math.hypot(this.world.player.x-bonus.target.x,this.world.player.z-bonus.target.z)>11) return;
     const missing=BONUS_CHECKPOINTS.filter(entry=>bonus.requires?.includes(entry.id)&&!this.state.bonusCompleted.includes(entry.id));
     if(missing?.length) { this.notify(`STAND BLOQUEADO · COMPLETA ${missing[0]!.title}`); return; }
+    if(!this.state.canStartBonus(id)) { this.notify('Continúa el recorrido histórico antes de abrir este stand.'); return; }
     this.modalKind='bonus';
     const box=this.openModal('STAND OBLIGATORIO · OPERACIÓN DE APOYO',bonus.title);
-    this.bonusMission=mountBonusMission(box,bonus,{onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{
+    this.audio.pause(true,true);
+    this.world.setStandFocus(bonus.target);
+    this.bonusKey=id;
+    this.bonusMission=mountBonusMission(box,bonus,{draft:this.standDrafts[id],onDraft:draft=>{
+      this.standDrafts[id]=draft;clearTimeout(this.draftTimer);this.draftTimer=window.setTimeout(()=>void this.save(),450);
+    },onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{
       this.bonusMission?.dispose(); this.bonusMission=null;
-      if(this.state.completeBonus(id)) { void this.save(); this.closeModal(); this.notify(`SUBMISIÓN COMPLETADA · ${bonus.title}`); }
+      this.bonusKey='';delete this.standDrafts[id];
+      if(this.state.completeBonus(id)) { void this.save(); this.renderObjective(); this.closeModal(); this.notify(`STAND COMPLETADO · ${bonus.title}`); }
     },onCancel:()=>this.closeModal()});
   }
   private showStation() {
@@ -308,6 +334,7 @@ export class ApolloScreen implements Screen {
     box.append(el('p','',cp.objective),this.button('Consultar el mapa',()=>this.openMap(),'ap-button ap-primary'),this.button('Regresar al recorrido',()=>this.closeModal()));
   }
   private captureInstrumentDraft() {
+    if(this.bonusMission&&this.bonusKey)this.standDrafts[this.bonusKey]=this.bonusMission.snapshot();
     if(this.instrument && this.instrumentKey)this.fieldDrafts[this.instrumentKey]=this.instrument.snapshot();
   }
   private disposeInstrument() {
@@ -318,6 +345,7 @@ export class ApolloScreen implements Screen {
   private openFieldInstrument() {
     const checkpoint=this.state.checkpoint,kind=FIELD_INSTRUMENTS[checkpoint];
     if(!kind || this.distance()>15 || this.state.done)return;
+    if(checkpoint!==0 && this.state.requiredStand) {this.notify(`OPERACIÓN REQUERIDA · ${this.state.requiredStand.title}`);return;}
     const key=fieldDraftKey(checkpoint,kind);
     const box=this.openModal('Instrumentos de campo',this.state.current.title);
     box.classList.add('ap-instrument-dialog');this.modal?.classList.add('ap-instrument-overlay');
@@ -425,10 +453,13 @@ export class ApolloScreen implements Screen {
   }
   private closeModal() {
     this.disposeInstrument();
-    this.bonusMission?.dispose(); this.bonusMission=null;
+    const closingStand=!!this.bonusMission;
+    this.bonusMission?.dispose(); this.bonusMission=null;this.bonusKey='';
     this.modal?.remove();this.modal=null;this.modalKind=null;this.paused=false;this.voice.pause(false);
+    this.world?.setStandFocus(null);
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
+    if(closingStand&&this.started)void this.save();
   }
   private openPause() {
     if(!this.world || !this.started || this.modal)return;
@@ -439,18 +470,25 @@ export class ApolloScreen implements Screen {
     box.append(el('div','ap-pause-status','MISSION CONTROL · APOLLO 11 · KENNEDY SPACE CENTER'),el('p','ap-pause-intro','La misión está detenida. Revisa el estado operativo y retoma el recorrido cuando estés listo.'));
     const grid=el('div','ap-pause-grid');
     const resume=this.pauseControl('▶','Continuar operaciones',()=>this.closeModal()); resume.classList.add('ap-pause-control--primary');
-    const mute=this.pauseControl(this.audio.muted?'🔇':'🔊',this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();this.voice.setVolume(this.audio.muted?0:.82);this.openPause();});
+    const mute=this.pauseControl(this.audio.muted?'◌':'♪',this.audio.muted?'Activar audio':'Silenciar audio',()=>{
+      this.audio.toggle();this.voice.setVolume(this.audio.muted?0:.82);
+      mute.replaceChildren(el('span','ap-pause-icon',this.audio.muted?'◌':'♪'),el('strong','',this.audio.muted?'Activar audio':'Silenciar audio'));
+      mute.setAttribute('aria-pressed',String(this.audio.muted));
+    });
+    mute.setAttribute('aria-pressed',String(this.audio.muted));
     const restart=this.pauseControl('↻','Reiniciar misión',()=>this.confirmReset());
     const missions=this.pauseControl('⌂','Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());});
-    const language=this.pauseControl('文','Idioma',()=>this.togglePauseLanguage(language));
-    grid.append(resume,mute,restart,missions,language); box.append(grid);
+    const languageHost=el('div','ap-language-host');
+    const language=this.pauseControl('文','Idioma',()=>this.togglePauseLanguage(languageHost));
+    language.setAttribute('aria-expanded','false');languageHost.append(language);
+    grid.append(resume,mute,restart,missions,languageHost); box.append(grid);
     const mapCanvas=el('canvas','ap-pause-map'); mapCanvas.width=1100; mapCanvas.height=460; this.drawMap(mapCanvas); box.append(el('h2','ap-pause-map-title','Mapa de operaciones'),mapCanvas);
   }
   private pauseControl(icon:string,label:string,callback:()=>void):HTMLElement { const b=this.button('',callback,'ap-pause-control'); b.append(el('span','ap-pause-icon',icon),el('strong','',label)); return b; }
   private togglePauseLanguage(host:HTMLElement) {
-    const existing=this.modal?.querySelector('.ap-language-options');
-    if(existing){existing.remove();return;}
-    host.classList.add('ap-language-host');
+    const trigger=host.querySelector('button'),existing=host.querySelector('.ap-language-options');
+    if(existing){existing.remove();trigger?.setAttribute('aria-expanded','false');return;}
+    trigger?.setAttribute('aria-expanded','true');
     const options=el('div','ap-language-options');
     (['es','en','fr'] as const).forEach(language=>{const button=this.button(language.toUpperCase(),()=>setLanguage(language),'ap-language-option');button.setAttribute('aria-pressed',String(apolloLanguage()===language));options.append(button);});
     host.append(options);
@@ -495,9 +533,9 @@ export class ApolloScreen implements Screen {
     c.font=`600 ${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#f0e7c9';c.fillText(apolloText('N ↑'),12,24);c.fillText('39A · RESTRINGIDO',rx+12,rz+5);
     c.fillStyle='#b8d1c6';c.fillText(apolloText('↖ VAB · 1 km'),12,Math.max(42,h*.18));
     c.font=`600 ${Math.max(10,w/52)}px sans-serif`;
-    CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);const completed=this.state.completed.includes(cp.id),active=i===this.state.checkpoint;c.fillStyle=completed?'#76d49b':active?'#ffd166':'#86a8ae';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.arc(x,z,active?8:5,0,Math.PI*2);c.fill();c.stroke();if(active){c.strokeStyle='#ffd166';c.lineWidth=2;c.beginPath();c.arc(x,z,13,0,Math.PI*2);c.stroke();}if(w>300){c.fillStyle=completed?'#a9e7be':active?'#ffe29a':'#d5e4df';c.fillText(`C${i+1}`,x+13,z+5);}});
-    BONUS_CHECKPOINTS.forEach((bonus,index)=>{const [x,z]=p(bonus.target.x,bonus.target.z);const completed=this.state.bonusCompleted.includes(bonus.id);c.fillStyle=completed?'#76d49b':'#e99a61';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.rect(x-6,z-6,12,12);c.fill();c.stroke();if(w>300){c.fillStyle=completed?'#a9e7be':'#ffc09a';c.fillText(`S${index+1}`,x+11,z+4);}});
-    const target=this.state.current.target;
+    CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);const completed=this.state.completed.includes(cp.id),active=!this.state.requiredStand && i===this.state.checkpoint;c.fillStyle=completed?'#76d49b':active?'#ffd166':'#86a8ae';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.arc(x,z,active?8:5,0,Math.PI*2);c.fill();c.stroke();if(active){c.strokeStyle='#ffd166';c.lineWidth=2;c.beginPath();c.arc(x,z,13,0,Math.PI*2);c.stroke();}if(w>300){c.fillStyle=completed?'#a9e7be':active?'#ffe29a':'#d5e4df';c.fillText(`C${i+1}`,x+13,z+5);}});
+    BONUS_CHECKPOINTS.forEach((bonus,index)=>{const [x,z]=p(bonus.target.x,bonus.target.z);const completed=this.state.bonusCompleted.includes(bonus.id),active=this.state.requiredStand?.id===bonus.id;c.fillStyle=completed?'#76d49b':'#e99a61';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.rect(x-6,z-6,12,12);c.fill();c.stroke();if(active){c.strokeStyle='#ffd166';c.lineWidth=2;c.strokeRect(x-10,z-10,20,20);}if(w>300){c.fillStyle=completed?'#a9e7be':'#ffc09a';c.fillText(`S${index+1}`,x+11,z+4);}});
+    const target=this.state.requiredStand?.target ?? this.state.current.target;
     const remote=this.world.player.z>5000;
     const [tx,tz]=p(target.x,remote?355:target.z),[px,pz]=p(this.world.player.x,remote?355:this.world.player.z);
     c.strokeStyle='#ffd166';c.lineWidth=3;c.setLineDash([8,6]);c.beginPath();c.moveTo(px,pz);c.lineTo(tx,tz);c.stroke();c.setLineDash([]);
@@ -559,10 +597,11 @@ export class ApolloScreen implements Screen {
     this.captureInstrumentDraft();
     const snapshot=this.state.toJSON(),savedAt=Date.now();
     const drafts=JSON.parse(JSON.stringify(this.fieldDrafts)) as FieldDrafts;
-    try {localStorage.setItem(this.localKey,JSON.stringify({state:snapshot,savedAt,drafts}));this.saveStatus='Guardado local · sincronizando…';} catch {this.saveStatus='Almacenamiento local no disponible · sincronizando…';}
-    const wire={tick:Math.floor(this.state.elapsed),resources:{fuel:100,pressure:100,stability:100,telemetry:100},resolvedDecisionIds:[],log:[],apollo11:snapshot,apollo11SavedAt:savedAt,apollo11Drafts:drafts} as unknown as MissionSaveState;
+    const standDrafts=JSON.parse(JSON.stringify(this.standDrafts)) as Record<string,StandDraft>;
+    try {localStorage.setItem(this.localKey,JSON.stringify({state:snapshot,savedAt,drafts,standDrafts}));this.saveStatus='Guardado local · sincronizando…';} catch {this.saveStatus='Almacenamiento local no disponible · sincronizando…';}
+    const wire={tick:Math.floor(this.state.elapsed),resources:{fuel:100,pressure:100,stability:100,telemetry:100},resolvedDecisionIds:[],log:[],apollo11:snapshot,apollo11SavedAt:savedAt,apollo11Drafts:drafts,apollo11StandDrafts:standDrafts} as unknown as MissionSaveState;
     this.saveQueue=this.saveQueue.catch(()=>{}).then(async()=>{
-      try {await progressApi.autosave(SLUG,wire,snapshot.completed.length/8*100);this.saveStatus='Registro guardado y sincronizado';}
+      try {await progressApi.autosave(SLUG,wire,snapshot.done?100:(snapshot.completed.length+snapshot.bonusCompleted.length)/15*100);this.saveStatus='Registro guardado y sincronizado';}
       catch {this.saveStatus='Guardado local · sin conexión al servidor';}
       if(!this.disposed)this.renderObjective();
     });
@@ -603,11 +642,20 @@ export class ApolloScreen implements Screen {
     const bonus=this.world.nearbyBonus();
     const bonusNear=!!bonus && !this.state.bonusCompleted.includes(bonus.id);
     const near=this.distance()<=15;
+    const destination=this.state.requiredStand ?? this.state.current;
+    const remaining=Math.hypot(this.world.player.x-destination.target.x,this.world.player.z-destination.target.z);
     this.prompt.hidden=!this.started || this.paused || !!this.movie || (this.state.done && !bonusNear);
-    this.prompt.textContent=bonusNear?'E · '+bonus!.title:near?'E · '+(this.state.checkpoint===4?'Observar a la tripulación':this.state.checkpoint===6?'Presenciar el lanzamiento':'Examinar estación'):`${Math.round(this.distance())} m · ${this.state.current.title}`;
+    this.prompt.textContent=bonusNear?'E · '+(this.state.canStartBonus(bonus!.id)?bonus!.title:'Stand pendiente de autorización'):near?'E · '+(this.state.checkpoint===4?'Observar a la tripulación':this.state.checkpoint===6?'Presenciar el lanzamiento':'Examinar estación'):`${Math.round(remaining)} m · ${destination.title}`;
     this.prompt.textContent=apolloText(this.prompt.textContent);
     this.prompt.disabled=!(near || bonusNear);
-    if(this.uiTarget) {this.uiTarget.hidden=!!this.movie || this.paused;this.uiTarget.textContent=`◇ ${Math.round(this.distance())} m`;}
+    if(this.uiTarget) {
+      this.uiTarget.hidden=!!this.movie || this.paused;
+      const projected=this.world.projectDestination(destination.target),width=this.root.clientWidth,height=this.root.clientHeight;
+      const x=projected.behind?width*.5:Math.max(55,Math.min(width-55,(projected.x*.5+.5)*width));
+      const y=projected.behind?height-245:Math.max(72,Math.min(height-245,(-projected.y*.5+.5)*height));
+      this.uiTarget.style.left=`${x}px`;this.uiTarget.style.top=`${y}px`;
+      this.uiTarget.textContent=`${projected.behind?'↶':'◇'} ${Math.round(remaining)} m`;
+    }
   }
   diagnostics() {
     const times=this.frameTimes,average=times.reduce((a,b)=>a+b,0)/Math.max(1,times.length);

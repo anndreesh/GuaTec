@@ -1,4 +1,5 @@
 import type { Language } from '@/core/i18n';
+import { STAND_TRANSLATIONS } from './ApolloStandLocale';
 
 /** Spanish is the authored source. Exact source strings keep content and persistent IDs
  * independent; translated dynamic fragments are composed rather than sent to a service. */
@@ -260,7 +261,7 @@ const rows: readonly (readonly [string, string, string])[] = [
   ['Iniciar lanzamiento sin comprobaciones','Start launch without checks','Lancer sans vérifications'],
 ];
 
-export const APOLLO_TRANSLATIONS = new Map(rows.map(([source,en,fr]) => [source, { en, fr }]));
+export const APOLLO_TRANSLATIONS = new Map([...rows,...STAND_TRANSLATIONS].map(([source,en,fr]) => [source, { en, fr }]));
 export function apolloLanguage(): Language {
   try { const value=localStorage.getItem('mm.language'); return value==='en'||value==='fr' ? value : 'es'; } catch { return 'es'; }
 }
@@ -274,6 +275,21 @@ export function apolloText(source: string, language: Language = apolloLanguage()
   if(trimmed!==source && APOLLO_TRANSLATIONS.has(trimmed))return source.replace(trimmed,APOLLO_TRANSLATIONS.get(trimmed)![language]);
   if(source.startsWith('✓ ') || source.startsWith('· '))return source.slice(0,2)+apolloText(source.slice(2),language);
   if(source.startsWith('E · '))return 'E · '+apolloText(source.slice(4),language);
+  const prefixes:Record<string,[string,string]>={
+    'REQUERIDO PARA AVANZAR · ':['REQUIRED TO PROCEED · ','REQUIS POUR AVANCER · '],
+    'SIGUIENTE STAND · ':['NEXT STATION · ','POSTE SUIVANT · '],
+    'OPERACIÓN REQUERIDA · ':['REQUIRED OPERATION · ','OPÉRATION REQUISE · '],
+    'STAND COMPLETADO · ':['STATION COMPLETE · ','POSTE TERMINÉ · '],
+    'STAND BLOQUEADO · COMPLETA ':['STATION LOCKED · COMPLETE ','POSTE VERROUILLÉ · TERMINEZ '],
+  };
+  for(const [prefix,translated]of Object.entries(prefixes))if(source.startsWith(prefix))return translated[language==='en'?0:1]+apolloText(source.slice(prefix.length),language);
+  const progress=source.match(/^(\d+) \/ (\d+) (FUSIBLES|DOCUMENTOS|CONECTORES|BALIZAS REGISTRADAS)$/);
+  if(progress){const units:Record<string,[string,string]>={FUSIBLES:['FUSES','FUSIBLES'],DOCUMENTOS:['DOCUMENTS','DOCUMENTS'],CONECTORES:['CONNECTORS','CONNECTEURS'],'BALIZAS REGISTRADAS':['BEACONS RECORDED','BALISES ENREGISTRÉES']};return `${progress[1]} / ${progress[2]} ${units[progress[3]!]![language==='en'?0:1]}`;}
+  const port=source.match(/^(\d+ A) \/ PORTAFUSIBLE$/);if(port)return `${port[1]} / ${language==='en'?'FUSE SOCKET':'PORTE-FUSIBLE'}`;
+  const cable=source.match(/^([A-D]) \/ CANAL (\d+)$/);if(cable)return `${cable[1]} / ${language==='en'?'CHANNEL':'CANAL'} ${cable[2]}`;
+  const terminal=source.match(/^BORNE ([A-D])$/);if(terminal)return `${language==='en'?'TERMINAL':'BORNE'} ${terminal[1]}`;
+  const stands=source.match(/^STANDS OBLIGATORIOS · (\d+) \/ (\d+) COMPLETADOS$/);if(stands)return language==='en'?`REQUIRED STATIONS · ${stands[1]} / ${stands[2]} COMPLETE`:`POSTES OBLIGATOIRES · ${stands[1]} / ${stands[2]} TERMINÉS`;
+  const restored=source.match(/^Registro recuperado · (\d+) de 15 operaciones de historia\.$/);if(restored)return language==='en'?`Log restored · ${restored[1]} of 15 story operations.`:`Registre récupéré · ${restored[1]} opérations historiques sur 15.`;
   let match=source.match(/^CHECKPOINT (\d+) COMPLETADO$/);
   if(match)return language==='en'?`CHECKPOINT ${match[1]} COMPLETE`:`POINT DE CONTRÔLE ${match[1]} TERMINÉ`;
   match=source.match(/^CHECKPOINT (\d+) \/ 8$/);

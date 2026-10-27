@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const directory = await mkdtemp(join(tmpdir(), 'guatec-tests-'));
-const tests = ['mission01-engineering', 'mission01-tasks', 'mission01-progression', 'mission01-field', 'apollo-state', 'apollo-audio', 'apollo-instruments', 'apollo-locale', 'apollo-bonus'];
+const tests = ['mission01-engineering', 'mission01-tasks', 'mission01-progression', 'mission01-field', 'apollo-state', 'apollo-audio', 'apollo-instruments', 'apollo-locale', 'apollo-bonus', 'apollo-stands'];
 try {
   await build({ entryPoints: tests.map(name => `tests/${name}.test.ts`), outdir: directory,
     bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' },

@@ -1,223 +1,229 @@
 import type { ApolloBonusCheckpoint } from './ApolloState';
 import { apolloText } from './ApolloLocale';
+import { FUSE_RATINGS, FUSE_SOCKETS, TELEMETRY_REFERENCE, CABLE_CHANNELS, CABLE_TARGET_ORDER, FLIGHT_CARDS, CREW_CARDS, slotsCorrect, moveIntoSlot, readingsAligned, weatherAligned, advanceScan, restoreStandDraft, type StandDraft } from './ApolloStandRules';
+import './ApolloStands.css';
 
-export interface BonusMissionHandle {
-  dispose(): void;
-}
-
-interface BonusMissionOptions {
-  onComplete: () => void;
-  onCancel: () => void;
-  onFeedback?: (kind: 'success' | 'error') => void;
-}
-
-const node = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] => {
-  const element = document.createElement(tag);
-  element.className = className;
-  if (text) element.textContent = apolloText(text);
-  return element;
+export interface BonusMissionHandle { dispose(): void; snapshot(): StandDraft }
+interface BonusMissionOptions { onComplete(): void; onCancel(): void; onFeedback?: (kind: 'success' | 'error') => void; draft?: unknown; onDraft?: (draft:StandDraft)=>void }
+const node = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => {
+  const element = document.createElement(tag); element.className = cls; element.textContent = apolloText(text); return element;
+};
+const descriptions: Record<ApolloBonusCheckpoint['kind'], { code: string; title: string; verb: string; note: string }> = {
+  sequence: { code: 'PWR / 01', title: 'Distribución eléctrica', verb: 'Encaja cada fusible y eleva la palanca para energizar el banco.', note: 'El amperaje del fusible debe coincidir con la placa del alojamiento.' },
+  'flight-plan': { code: 'OPS / 02', title: 'Mesa de secuencias', verb: 'Ordena los documentos en la línea de tiempo.', note: 'Preparación → tripulación a bordo → encendido → despegue.' },
+  telemetry: { code: 'DATA / 03', title: 'Consola de telemetría', verb: 'Ajusta los tres sintonizadores hasta superponer las señales.', note: 'La traza punteada es la referencia; la traza continua es tu lectura.' },
+  cables: { code: 'LINK / 04', title: 'Panel de conexiones', verb: 'Lleva cada cable al terminal con la misma letra.', note: 'Las letras identifican los canales además del color.' },
+  'crew-manifest': { code: 'CREW / 05', title: 'Registro de tripulación', verb: 'Asocia cada credencial con su función en la misión.', note: 'Armstrong: comandante. Collins: módulo de mando. Aldrin: módulo lunar.' },
+  weather: { code: 'WX / 06', title: 'Parte de observación', verb: 'Alinea la veleta y ajusta la placa de nubosidad.', note: 'Referencia del ejercicio: rumbo 225° y placa al 35 %. No son mediciones históricas.' },
+  beacons: { code: 'SAFE / 07', title: 'Barrido del perímetro', verb: 'Mueve el visor sobre cada baliza y mantén el encuadre.', note: 'Inspecciona B1, B2 y B3. También puedes mover el visor con las flechas.' },
 };
 
 export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoint, options: BonusMissionOptions): BonusMissionHandle {
-  let disposed = false;
-  const listeners: Array<() => void> = [];
-  const listen = (target: EventTarget, type: string, callback: EventListener) => {
-    target.addEventListener(type, callback);
-    listeners.push(() => target.removeEventListener(type, callback));
+  const abort = new AbortController(), timers = new Set<number>(), frames = new Set<number>();
+  let disposed = false, complete = false;
+  const draft=restoreStandDraft(bonus.kind,options.draft);
+  let snapshot:()=>StandDraft=()=>({version:1,kind:bonus.kind});
+  const draftChanged=()=>{if(!complete&&!disposed)options.onDraft?.(snapshot());};
+  const listen = <E extends Event>(target: EventTarget, event: string, callback: (event: E) => void) => target.addEventListener(event, callback as EventListener, { signal: abort.signal });
+  const later = (callback: () => void, ms: number) => { const id = window.setTimeout(() => { timers.delete(id); if (!disposed) callback(); }, ms); timers.add(id); };
+  const animate = (callback: (dt: number, time: number) => void) => {
+    let previous = performance.now();
+    const frame = (now: number) => { if (disposed) return; frames.clear(); callback(Math.min(.05, Math.max(0, (now - previous) / 1000)), now / 1000); previous = now; frames.add(requestAnimationFrame(frame)); };
+    frames.add(requestAnimationFrame(frame));
   };
-  const stage = node('div', `ap-bonus-stage ap-bonus-${bonus.kind}`);
-  const header = node('div', 'ap-bonus-header');
-  header.append(node('span', 'ap-bonus-kicker', 'STAND OBLIGATORIO · OPERACIONES APOLLO 11'), node('h2', '', bonus.title));
-  stage.append(header, node('p', 'ap-bonus-objective', bonus.objective));
-  const feedback = node('p', 'ap-bonus-feedback', 'Sistema en espera · completa la verificación para registrar el checkpoint.');
-  stage.append(feedback);
-
-  const finish = (message: string) => {
-    if (disposed) return;
-    feedback.textContent = apolloText(message);
-    options.onFeedback?.('success');
-    feedback.classList.add('ap-bonus-feedback--success');
-    stage.classList.add('ap-bonus-stage--complete');
-    window.setTimeout(() => { if (!disposed) options.onComplete(); }, 360);
-  };
+  const spec = descriptions[bonus.kind], stage = node('section', 'ap-stand ap-stand--' + bonus.kind), rail = node('aside', 'ap-stand-brief');
+  host.classList.add('ap-stand-dialog'); host.parentElement?.classList.add('ap-stand-overlay');
+  rail.append(node('span', 'ap-stand-code', spec.code), node('h2', '', spec.title), node('p', '', spec.verb), node('small', 'ap-stand-note', spec.note));
+  const progress = node('div', 'ap-stand-progress'); progress.setAttribute('role', 'progressbar'); progress.setAttribute('aria-label', apolloText('Verificación del stand')); progress.setAttribute('aria-valuemin', '0'); progress.setAttribute('aria-valuemax', '100');
+  const progressBar = node('span'); progress.append(progressBar);
+  const counter = node('output', 'ap-stand-counter', 'EN ESPERA');
+  rail.append(progress, counter, node('small', 'ap-stand-footnote', 'OPERACIONES DE APOYO · RECREACIÓN EDUCATIVA'));
+  const workspace = node('div', 'ap-stand-workspace'), plate = node('header', 'ap-stand-plate');
+  plate.append(node('span', '', 'APOLLO 11'), node('span', '', 'AS-506 / LC-39A'), node('span', 'ap-stand-led', '● EN SERVICIO')); workspace.append(plate);
+  const feedback = node('p', 'ap-stand-feedback', 'Manipula las piezas para comenzar.'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
+  const footer = node('footer', 'ap-stand-footer'), back = node('button', 'ap-button', 'Volver al recorrido'); back.type = 'button'; listen(back, 'click', options.onCancel);
+  footer.append(back, feedback); stage.append(rail, workspace, footer); host.append(stage);
+  const update = (value: number, text: string) => { progressBar.style.width = Math.round(value * 100) + '%'; progress.setAttribute('aria-valuenow', String(Math.round(value * 100))); counter.textContent = apolloText(text); };
   const fail = (message: string) => {
-    feedback.textContent = apolloText(message);
-    options.onFeedback?.('error');
-    feedback.classList.remove('ap-bonus-feedback--success');
-    stage.classList.add('ap-bonus-stage--error');
-    window.setTimeout(() => stage.classList.remove('ap-bonus-stage--error'), 230);
+    if (complete || disposed) return;
+    feedback.textContent = apolloText(message); stage.dataset.feedback = 'error'; options.onFeedback?.('error'); later(() => { if (!complete) delete stage.dataset.feedback; }, 450);
+  };
+  const finish = (message: string) => {
+    if (complete || disposed) return;
+    complete = true; stage.dataset.feedback = 'complete'; update(1, '✓ REGISTRO VALIDADO'); feedback.textContent = apolloText(message); options.onFeedback?.('success');
+    workspace.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach(control => control.disabled = true);
+    later(options.onComplete, 900);
+  };
+  const action = (label: string, callback: () => void) => { const b = node('button', 'ap-stand-action', label); b.type = 'button'; listen(b, 'click', callback); workspace.append(b); return b; };
+
+  // Stable DOM and delegated listeners support pointer capture, touch and keyboard.
+  const placement = (items: readonly string[], labels: readonly string[], cls: string, onChange: (slots: (number | null)[]) => void) => {
+    const board = node('div', 'ap-placement ' + cls), tray = node('div', 'ap-placement-tray'), sockets = node('div', 'ap-placement-slots');
+    const hint = node('small', 'ap-stand-input-hint', 'Arrastra una pieza o selecciónala y pulsa su destino. Tab y Enter también funcionan.');
+    let slots: (number | null)[] = draft.slots ? [...draft.slots] : labels.map(() => null), selected: number | null = null;
+    snapshot=()=>({version:1,kind:bonus.kind,slots:[...slots]});
+    let drag: { item: number; id: number; x: number; y: number; moved: boolean } | null = null, ghost: HTMLElement | null = null, suppressClick = false;
+    const chips = items.map((label, index) => {
+      const chip = node('button', 'ap-placement-piece'); chip.type = 'button'; chip.dataset.item = String(index);
+      chip.append(node('span', 'ap-piece-index', String(index + 1).padStart(2, '0')), node('strong', '', label)); chip.setAttribute('aria-label', apolloText(label));
+      chip.style.setProperty('--channel-color', ['#d07d56', '#77a7b8', '#d4b65b', '#9c9ac3'][index % 4]!); tray.append(chip); return chip;
+    });
+    const destinations = labels.map((label, index) => {
+      const slot = node('button', 'ap-placement-slot'); slot.type = 'button'; slot.dataset.slot = String(index); slot.setAttribute('aria-label', apolloText(label));
+      slot.append(node('small', '', label), node('strong', '', '—')); sockets.append(slot); return slot;
+    });
+    const render = () => {
+      chips.forEach((chip, i) => { chip.dataset.placed = String(slots.includes(i)); chip.setAttribute('aria-pressed', String(selected === i)); });
+      destinations.forEach((slot, i) => { const value = slots[i]; slot.dataset.filled = String(value !== null); slot.querySelector('strong')!.textContent = value === null ? '—' : apolloText(items[value!]!); });
+      onChange([...slots]); board.dispatchEvent(new Event('placementchange'));draftChanged();
+    };
+    const place = (item: number, slot: number) => { if (complete) return; slots = moveIntoSlot(slots, item, slot); selected = null; render(); feedback.textContent = apolloText('Pieza colocada · puedes cambiarla antes de verificar.'); };
+    listen<MouseEvent>(board, 'click', event => {
+      if (suppressClick) { suppressClick = false; return; }
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-item], [data-slot]'); if (!target || complete) return;
+      if (target.dataset.item !== undefined) { selected = Number(target.dataset.item); render(); destinations[0]?.focus({ preventScroll: true }); }
+      else if (selected !== null) place(selected, Number(target.dataset.slot));
+      else { selected = slots[Number(target.dataset.slot)] ?? null; render(); }
+    });
+    listen<KeyboardEvent>(board, 'keydown', event => {
+      const target = (event.target as HTMLElement).closest<HTMLElement>('[data-slot]'); if (!target) return;
+      const i = Number(target.dataset.slot);
+      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) { event.preventDefault(); destinations[(i + (['ArrowLeft', 'ArrowUp'].includes(event.key) ? labels.length - 1 : 1)) % labels.length]?.focus(); }
+      if (['Delete', 'Backspace'].includes(event.key) && !complete) { event.preventDefault(); slots[i] = null; render(); }
+    });
+    const cleanupDrag = () => { ghost?.remove(); ghost = null; chips.forEach(chip => chip.classList.remove('ap-piece-dragging')); destinations.forEach(slot => slot.classList.remove('ap-slot-over')); drag = null; };
+    listen<PointerEvent>(board, 'pointerdown', event => {
+      const chip = (event.target as HTMLElement).closest<HTMLElement>('[data-item]'); if (!chip || complete || event.button !== 0) return;
+      drag = { item: Number(chip.dataset.item), id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }; chip.setPointerCapture(event.pointerId);
+    });
+    listen<PointerEvent>(board, 'pointermove', event => {
+      if (!drag || drag.id !== event.pointerId) return;
+      if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 6) return;
+      drag.moved = true;
+      if (!ghost) { ghost = chips[drag.item]!.cloneNode(true) as HTMLElement; ghost.className = 'ap-placement-ghost'; ghost.setAttribute('aria-hidden', 'true'); ghost.removeAttribute('data-item'); stage.append(ghost); chips[drag.item]!.classList.add('ap-piece-dragging'); }
+      ghost.style.left = event.clientX + 'px'; ghost.style.top = event.clientY + 'px';
+      const drop = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-slot]');
+      destinations.forEach(slot => slot.classList.toggle('ap-slot-over', slot === drop));
+    });
+    listen<PointerEvent>(board, 'pointerup', event => {
+      if (!drag || drag.id !== event.pointerId) return;
+      if (drag.moved) { suppressClick = true; later(() => { suppressClick = false; }, 80); const drop = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-slot]'); if (drop && board.contains(drop)) place(drag.item, Number(drop.dataset.slot)); }
+      cleanupDrag();
+    });
+    listen(board, 'pointercancel', cleanupDrag); listen(board, 'lostpointercapture', cleanupDrag);
+    board.append(tray, sockets); workspace.append(board, hint); render();
+    return { board, get: () => [...slots] };
   };
 
   if (bonus.kind === 'sequence') {
-    const target = [1, 3, 0, 2];
-    let progress = 0;
-    const readout = node('div', 'ap-bonus-readout', 'RELAY PATH · — — — —');
-    const bank = node('div', 'ap-bonus-relay-bank');
-    const render = () => { readout.textContent = `RELAY PATH · ${target.map((_, i) => i < progress ? '●' : '—').join(' ')}`; };
-    target.forEach((_, index) => {
-      const button = node('button', 'ap-bonus-relay', `${index + 1}`);
-      button.type = 'button';
-      button.setAttribute('aria-label', `Relé ${index + 1}`);
-      listen(button, 'click', () => {
-        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
-        const expected = target[progress];
-        if (index !== expected) { progress = 0; render(); fail('Secuencia rechazada · el banco volvió a modo seguro.'); return; }
-        progress += 1; button.classList.add('ap-bonus-relay--active'); render();
-        if (progress === target.length) finish('Banco estabilizado · checkpoint registrado.');
-      });
-      bank.append(button);
+    let fitted = false;
+    placement(FUSE_RATINGS.map(rating => rating + ' A'), FUSE_SOCKETS.map(rating => rating + ' A / PORTAFUSIBLE'), 'ap-fuse-board', slots => {
+      fitted = slotsCorrect(slots.map(i => i === null ? null : FUSE_RATINGS[i]!), FUSE_SOCKETS); update(slots.filter(i => i !== null).length / 5, slots.filter(i => i !== null).length + ' / 4 FUSIBLES');
     });
-    render();
-    stage.append(readout, bank, node('small', 'ap-bonus-hint', 'Activa los relés en el orden indicado por el pulso luminoso: 2 · 4 · 1 · 3.'));
+    const leverBox = node('label', 'ap-breaker'), lever = node('input'); lever.type = 'range'; lever.min = '0'; lever.max = '100'; lever.value = '0'; lever.setAttribute('aria-label', apolloText('Palanca de alimentación'));
+    listen(lever, 'input', () => { if (Number(lever.value) < 95) return; if (!fitted) { lever.value = '0'; fail('Circuito abierto · revisa el amperaje de cada fusible.'); } else finish('Alimentación estable · banco de apoyo energizado.'); });
+    leverBox.append(node('span', '', 'INTERRUPTOR GENERAL / 0 → 1'), lever, node('span', 'ap-breaker-state', 'OFF / ON')); workspace.append(leverBox);
   }
 
-  if (bonus.kind === 'telemetry') {
-    const targets = [62, 74, 58];
-    const labels = ['S-IVB', 'Enlace', 'Plataforma'];
-    const rack = node('div', 'ap-bonus-telemetry-rack');
-    const inputs: HTMLInputElement[] = [];
-    targets.forEach((target, index) => {
-      const row = node('label', 'ap-bonus-slider');
-      const title = node('span', '', `${labels[index]} · objetivo ${target}`);
-      const input = node('input'); input.type = 'range'; input.min = '0'; input.max = '100'; input.value = '50'; input.step = '1'; input.setAttribute('aria-label', labels[index]!);
-      const output = node('output', '', '50');
-      listen(input, 'input', () => { output.textContent = input.value; });
-      row.append(title, input, output); rack.append(row); inputs.push(input);
-    });
-    const confirm = node('button', 'ap-bonus-action', 'Bloquear lecturas'); confirm.type = 'button';
-    listen(confirm, 'click', () => {
-      if (disposed) return;
-      const aligned = inputs.every((input, index) => Math.abs(Number(input.value) - targets[index]!) <= 3);
-      if (aligned) finish('Telemetría estable · enlace de datos confirmado.');
-      else fail('Lectura fuera de tolerancia · ajusta los tres canales.');
-    });
-    stage.append(rack, confirm, node('small', 'ap-bonus-hint', 'Los tres canales deben quedar dentro de ±3 unidades.'));
-  }
-
-  if (bonus.kind === 'weather') {
-    const targets = [38, 62, 26];
-    const labels = ['Viento', 'Humedad', 'Nubosidad'];
-    const rack = node('div', 'ap-bonus-telemetry-rack');
-    const inputs: HTMLInputElement[] = [];
-    targets.forEach((target, index) => {
-      const row = node('label', 'ap-bonus-slider');
-      const title = node('span', '', `${labels[index]} · objetivo ${target}`);
-      const input = node('input'); input.type = 'range'; input.min = '0'; input.max = '100'; input.value = '50'; input.step = '1'; input.setAttribute('aria-label', labels[index]!);
-      const output = node('output', '', '50');
-      listen(input, 'input', () => { output.textContent = input.value; });
-      row.append(title, input, output); rack.append(row); inputs.push(input);
-    });
-    const confirm = node('button', 'ap-bonus-action', 'Emitir parte meteorológico'); confirm.type = 'button';
-    listen(confirm, 'click', () => {
-      if (disposed) return;
-      const aligned = inputs.every((input, index) => Math.abs(Number(input.value) - targets[index]!) <= 4);
-      if (aligned) finish('Ventana confirmada · parte meteorológico enviado.');
-      else fail('Condiciones inestables · revisa los tres instrumentos.');
-    });
-    stage.append(rack, confirm, node('small', 'ap-bonus-hint', 'Ajusta los tres indicadores dentro de ±4 unidades.'));
-  }
-
-  if (bonus.kind === 'beacons') {
-    const target = [1, 2, 0];
-    let progress = 0;
-    const beaconRow = node('div', 'ap-bonus-beacon-row');
-    const readout = node('div', 'ap-bonus-readout', 'PERÍMETRO · 0 / 3 BALIZADORES');
-    target.forEach((_, index) => {
-      const beacon = node('button', 'ap-bonus-beacon', `B-${index + 1}`); beacon.type = 'button';
-      beacon.setAttribute('aria-label', `Balizador ${index + 1}`);
-      listen(beacon, 'click', () => {
-        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
-        if (index !== target[progress]) { progress = 0; beaconRow.querySelectorAll('.ap-bonus-beacon--active').forEach(item => item.classList.remove('ap-bonus-beacon--active')); readout.textContent = 'PERÍMETRO · SECUENCIA REINICIADA'; fail('Balizador incorrecto · vuelve a recorrer el perímetro.'); return; }
-        progress += 1; beacon.classList.add('ap-bonus-beacon--active'); readout.textContent = `PERÍMETRO · ${progress} / 3 BALIZADORES`;
-        if (progress === target.length) finish('Perímetro confirmado · ruta de servicio segura.');
-      });
-      beaconRow.append(beacon);
-    });
-    stage.append(readout, beaconRow, node('small', 'ap-bonus-hint', 'Confirma los balizadores en el orden que marca el barrido: B-2 · B-3 · B-1.'));
+  if (bonus.kind === 'flight-plan' || bonus.kind === 'crew-manifest') {
+    const flight = bonus.kind === 'flight-plan';
+    const items = flight ? [FLIGHT_CARDS[2].title, FLIGHT_CARDS[0].title, FLIGHT_CARDS[3].title, FLIGHT_CARDS[1].title] : [CREW_CARDS[2].name, CREW_CARDS[0].name, CREW_CARDS[1].name];
+    const labels = flight ? ['01 / PREPARACIÓN', '02 / EMBARQUE', '03 / MOTORES', '04 / SALIDA'] : CREW_CARDS.map(card => card.role);
+    const reference = flight ? [1, 3, 0, 2] : [1, 2, 0];
+    const deck = placement(items, labels, flight ? 'ap-timeline-board' : 'ap-manifest-board', slots => update(slots.filter(v => v !== null).length / labels.length * .85, slots.filter(v => v !== null).length + ' / ' + labels.length + ' DOCUMENTOS'));
+    action(flight ? 'Sellar plan de vuelo' : 'Cotejar manifiesto', () => slotsCorrect(deck.get(), reference) ? finish(flight ? 'Cronología validada · registro archivado.' : 'Tripulación identificada · manifiesto cotejado.') : fail('Hay documentos pendientes o fuera de lugar. Revisa las placas de destino.'));
   }
 
   if (bonus.kind === 'cables') {
-    const target = [0, 2, 1, 3];
-    const nodes = node('div', 'ap-bonus-cable-nodes');
-    const readout = node('div', 'ap-bonus-readout', 'CONTINUIDAD · ARRASTRA LOS NODOS A LA RUTA');
-    const order = [0, 1, 2, 3];
-    let dragged = -1;
-    const render = () => {
-      nodes.replaceChildren();
-      order.forEach((value, slot) => {
-        const terminal = node('button', 'ap-bonus-cable-node', `N-${value + 1}`); terminal.type = 'button'; terminal.draggable = true;
-        terminal.setAttribute('aria-label', `Nodo de servicio ${value + 1}, posición ${slot + 1}`);
-        listen(terminal, 'dragstart', () => { dragged = slot; terminal.classList.add('ap-bonus-dragging'); });
-        listen(terminal, 'dragend', () => terminal.classList.remove('ap-bonus-dragging'));
-        listen(terminal, 'dragover', event => event.preventDefault());
-        listen(terminal, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `CONTINUIDAD · ${order.map(value => `N-${value + 1}`).join(' · ')}`; });
-        nodes.append(terminal);
-      });
+    const deck = placement(CABLE_CHANNELS.map((channel, i) => channel + ' / CANAL ' + (i + 1)), CABLE_TARGET_ORDER.map(channel => 'BORNE ' + channel), 'ap-patch-board', slots => update(slots.filter(v => v !== null).length / 4 * .85, slots.filter(v => v !== null).length + ' / 4 CONECTORES'));
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.classList.add('ap-patch-wires'); svg.setAttribute('viewBox', '0 0 1000 400'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true'); deck.board.prepend(svg);
+    const draw = () => {
+      svg.replaceChildren();
+      deck.get().forEach((source, slot) => { if (source === null) return; const y1 = 50 + source * 100, y2 = 50 + slot * 100; const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M 240 ' + y1 + ' C 480 ' + y1 + ',520 ' + y2 + ',760 ' + y2); path.setAttribute('stroke', ['#df8f60', '#85bed0', '#e2c375', '#aaa7dc'][source]!); svg.append(path); });
     };
-    const confirm = node('button', 'ap-bonus-action', 'Verificar conexiones'); confirm.type = 'button';
-    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Continuidad confirmada · umbilical listo.') : fail('Ruta incorrecta · reordena los nodos hasta cerrar el circuito.'));
-    render(); stage.append(readout, nodes, confirm, node('small', 'ap-bonus-hint', 'Arrastra los nodos para formar la ruta: N-1 · N-3 · N-2 · N-4.'));
+    listen(deck.board, 'placementchange', draw);draw();
+    action('Probar continuidad', () => slotsCorrect(deck.get().map(i => i === null ? null : CABLE_CHANNELS[i]!), CABLE_TARGET_ORDER) ? finish('Cuatro circuitos cerrados · continuidad confirmada.') : fail('Continuidad interrumpida · conecta cada letra con su borne.'));
   }
 
-  if (bonus.kind === 'flight-plan') {
-    const target = [2, 0, 3, 1];
-    const cards = node('div', 'ap-bonus-flight-cards');
-    const readout = node('div', 'ap-bonus-readout', 'SECUENCIA DE SALIDA · ARRASTRA LAS TARJETAS');
-    const labels = ['T−10 · autorización', 'T−05 · brazos', 'T−00 · ignición', 'T+01 · ascenso'];
-    const order = [0, 1, 2, 3];
-    let dragged = -1;
-    const render = () => {
-      cards.replaceChildren();
-      order.forEach((value, slot) => {
-        const card = node('button', 'ap-bonus-flight-card', labels[value]!); card.type = 'button'; card.draggable = true;
-        card.setAttribute('aria-label', `${labels[value]}, posición ${slot + 1}`);
-        listen(card, 'dragstart', () => { dragged = slot; card.classList.add('ap-bonus-dragging'); });
-        listen(card, 'dragend', () => card.classList.remove('ap-bonus-dragging'));
-        listen(card, 'dragover', event => event.preventDefault());
-        listen(card, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `SECUENCIA · ${order.map(value => labels[value]!.split(' · ')[0]).join(' → ')}`; });
-        cards.append(card);
-      });
-    };
-    const confirm = node('button', 'ap-bonus-action', 'Verificar secuencia'); confirm.type = 'button';
-    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Plan verificado · secuencia de salida archivada.') : fail('Orden incorrecto · reordena las tarjetas antes de confirmar.'));
-    render(); stage.append(readout, cards, confirm, node('small', 'ap-bonus-hint', 'Arrastra para reconstruir: T−00 · T−10 · T+01 · T−05.'));
+  if (bonus.kind === 'telemetry') {
+    const panel = node('div', 'ap-signal-panel'), canvas = node('canvas', 'ap-signal-scope'); canvas.width = 800; canvas.height = 240;
+    canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', apolloText('Comparación de señal recibida y señal de referencia'));
+    const controls = node('div', 'ap-dial-bank'), values = draft.controls ? [...draft.controls] : [24, 42, 82];
+    snapshot=()=>({version:1,kind:bonus.kind,controls:[...values]});
+    TELEMETRY_REFERENCE.forEach((reference, index) => {
+      const dial = node('label', 'ap-tuner'), face = node('div', 'ap-tuner-face'), needle = node('span'), input = node('input'), out = node('output');
+      face.append(needle); input.type = 'range'; input.min = '0'; input.max = '100'; input.value = String(values[index]); input.setAttribute('aria-label', ['S-IVB', 'Enlace', 'Plataforma'][index]!);
+      const render = () => { values[index] = Number(input.value); face.style.setProperty('--dial-angle', (-130 + values[index]! * 2.6) + 'deg'); out.textContent = input.value + ' / REF ' + reference; dial.dataset.aligned = String(Math.abs(values[index]! - reference) <= 3); update(values.filter((v, i) => Math.abs(v - TELEMETRY_REFERENCE[i]!) <= 3).length / 3 * .9, 'AJUSTE DE SEÑAL');draftChanged(); };
+      listen(input, 'input', render); dial.append(node('strong', '', ['S-IVB', 'Enlace', 'Plataforma'][index]), face, out, input); controls.append(dial); render();
+      let turn: { pointer: number; y: number; value: number } | null = null;
+      listen<PointerEvent>(face,'pointerdown',event=>{if(complete||event.button!==0)return;turn={pointer:event.pointerId,y:event.clientY,value:Number(input.value)};face.setPointerCapture(event.pointerId);input.focus({preventScroll:true});});
+      listen<PointerEvent>(face,'pointermove',event=>{if(!turn||turn.pointer!==event.pointerId)return;input.value=String(Math.round(Math.max(0,Math.min(100,turn.value+(turn.y-event.clientY)*.65))));render();});
+      listen(face,'pointerup',()=>{turn=null;});listen(face,'pointercancel',()=>{turn=null;});listen(face,'lostpointercapture',()=>{turn=null;});
+    });
+    panel.append(canvas, controls); workspace.append(panel);
+    animate((_dt, time) => {
+      const c = canvas.getContext('2d')!; c.fillStyle = '#0c201d'; c.fillRect(0, 0, 800, 240); c.strokeStyle = '#28463b'; c.lineWidth = 1;
+      for (let x = 0; x < 800; x += 40) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 240); c.stroke(); }
+      for (let y = 0; y < 240; y += 40) { c.beginPath(); c.moveTo(0, y); c.lineTo(800, y); c.stroke(); }
+      for (let channel = 0; channel < 3; channel++) for (const reference of [true, false]) {
+        c.strokeStyle = reference ? '#b5c5a0' : ['#efbd6a', '#8bc7bb', '#b8a7dd'][channel]!; c.setLineDash(reference ? [3, 6] : []); c.lineWidth = reference ? 1 : 2; c.beginPath();
+        for (let x = 0; x < 800; x += 3) { const offset = reference ? 0 : (values[channel]! - TELEMETRY_REFERENCE[channel]!) * .45; const y = 42 + channel * 78 + Math.sin(x * .032 + time * 1.3) * 14 + offset; x ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+      } c.setLineDash([]);
+    });
+    action('Fijar enlace', () => readingsAligned(values) ? finish('Las tres trazas coinciden · telemetría registrada.') : fail('Una traza sigue desplazada. Ajusta los tres sintonizadores.'));
   }
 
-  if (bonus.kind === 'crew-manifest') {
-    const target = [2, 0, 1];
-    const readout = node('div', 'ap-bonus-readout', 'MANIFIESTO · 0 / 3 ASIGNACIONES');
-    const cards = node('div', 'ap-bonus-crew-cards');
-    const labels = ['ARMSTRONG · COMANDANTE', 'COLLINS · PILOTO CM', 'ALDRIN · PILOTO LM'];
-    const seats = ['ASIENTO A', 'ASIENTO B', 'ASIENTO C'];
-    const order = [0, 1, 2];
-    let dragged = -1;
-    const render = () => {
-      cards.replaceChildren();
-      order.forEach((value, slot) => {
-        const card = node('button', 'ap-bonus-crew-card', `${labels[value]}\n${seats[slot]}`); card.type = 'button'; card.draggable = true;
-        card.setAttribute('aria-label', `${labels[value]}, ${seats[slot]}`);
-        listen(card, 'dragstart', () => { dragged = slot; card.classList.add('ap-bonus-dragging'); });
-        listen(card, 'dragend', () => card.classList.remove('ap-bonus-dragging'));
-        listen(card, 'dragover', event => event.preventDefault());
-        listen(card, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `MANIFIESTO · ${order.map(value => labels[value]!.split(' · ')[0]).join(' → ')}`; });
-        cards.append(card);
-      });
+  if (bonus.kind === 'weather') {
+    const panel = node('div', 'ap-weather-panel'), compass = node('div', 'ap-wind-rose'), needle = node('span', 'ap-wind-needle');
+    compass.setAttribute('aria-hidden', 'true'); compass.append(node('span', 'ap-wind-north', 'N'), node('span', 'ap-wind-reference', '225° / SO'), needle);
+    const controls = node('div', 'ap-weather-controls'); let heading = draft.controls?.[0] ?? 65, cloud = draft.controls?.[1] ?? 75;
+    snapshot=()=>({version:1,kind:bonus.kind,controls:[heading,cloud]});
+    const addControl = (label: string, max: number, initial: number, callback: (v: number) => void) => {
+      const row = node('label', 'ap-weather-control'), input = node('input'), output = node('output'); input.type = 'range'; input.min = '0'; input.max = String(max); input.value = String(initial); input.setAttribute('aria-label', apolloText(label));
+      const render = () => { output.textContent = input.value + (max === 359 ? '°' : ' %'); callback(Number(input.value)); update(weatherAligned(heading, cloud) ? .9 : .25, weatherAligned(heading, cloud) ? 'PARTE PREPARADO' : 'COMPARANDO REFERENCIA');draftChanged(); };
+      listen(input, 'input', render); row.append(node('span', '', label), input, output); controls.append(row); render();return input;
     };
-    const confirm = node('button', 'ap-bonus-action', 'Verificar manifiesto'); confirm.type = 'button';
-    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Manifiesto verificado · traslado autorizado.') : fail('Asignación incorrecta · reordena las tarjetas antes de confirmar.'));
-    render(); stage.append(readout, cards, confirm, node('small', 'ap-bonus-hint', 'Arrastra los distintivos para sentar a la tripulación: Aldrin · Armstrong · Collins.'));
+    const headingControl=addControl('Rumbo de veleta', 359, heading, v => { heading = v; needle.style.transform = 'rotate(' + v + 'deg)'; });
+    let steering: number | null = null;
+    const steer=(event:PointerEvent)=>{const r=compass.getBoundingClientRect();headingControl.value=String(Math.round((Math.atan2(event.clientX-r.left-r.width/2,-(event.clientY-r.top-r.height/2))*180/Math.PI+360)%360));headingControl.dispatchEvent(new Event('input'));};
+    listen<PointerEvent>(compass,'pointerdown',event=>{if(complete||event.button!==0)return;steering=event.pointerId;compass.setPointerCapture(event.pointerId);headingControl.focus({preventScroll:true});steer(event);});
+    listen<PointerEvent>(compass,'pointermove',event=>{if(event.pointerId===steering)steer(event);});
+    listen(compass,'pointerup',()=>{steering=null;});listen(compass,'pointercancel',()=>{steering=null;});listen(compass,'lostpointercapture',()=>{steering=null;});
+    const shutter = node('div', 'ap-cloud-plate'); shutter.append(node('span', '', 'PLACA DE NUBOSIDAD / REF 35 %')); controls.append(shutter);
+    addControl('Obturador de nubosidad', 100, cloud, v => { cloud = v; shutter.style.setProperty('--cloud-cover', v + '%'); });
+    panel.append(compass, controls); workspace.append(panel);
+    action('Sellar parte de observación', () => weatherAligned(heading, cloud) ? finish('Referencias cotejadas · parte meteorológico archivado.') : fail('La veleta o la placa no coincide con la referencia del ejercicio.'));
   }
 
-  const cancel = node('button', 'ap-button ap-bonus-cancel', 'Volver a operaciones'); cancel.type = 'button';
-  listen(cancel, 'click', () => options.onCancel()); stage.append(cancel); host.append(stage);
-  stage.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true });
+  if (bonus.kind === 'beacons') {
+    const view = node('div', 'ap-perimeter'), canvas = node('canvas'); canvas.width = 800; canvas.height = 400; canvas.tabIndex = 0;
+    canvas.setAttribute('role', 'application'); canvas.setAttribute('aria-label', apolloText('Visor de perímetro. Mueve con el puntero o las flechas. Mantén el visor en cada baliza.'));
+    const points = [{ x: .22, y: .3 }, { x: .73, y: .65 }, { x: .48, y: .24 }], recorded = draft.scanned ? [...draft.scanned] : [false, false, false], lock = [0, 0, 0], keys = new Set<string>();
+    snapshot=()=>({version:1,kind:bonus.kind,scanned:[...recorded]});
+    update(recorded.filter(Boolean).length/3,recorded.filter(Boolean).length+' / 3 BALIZAS REGISTRADAS');
+    let aim = { x: .5, y: .7 };
+    const pointer = (event: PointerEvent) => { const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return; aim = { x: Math.max(0, Math.min(1, (event.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (event.clientY - r.top) / r.height)) }; };
+    listen<PointerEvent>(canvas, 'pointerdown', e => { canvas.focus(); canvas.setPointerCapture(e.pointerId); pointer(e); }); listen<PointerEvent>(canvas, 'pointermove', pointer);
+    listen<KeyboardEvent>(canvas, 'keydown', e => { if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); } }); listen<KeyboardEvent>(canvas, 'keyup', e => keys.delete(e.key)); listen(canvas, 'blur', () => keys.clear());
+    view.append(canvas); workspace.append(view);
+    animate((dt, time) => {
+      if (complete) return;
+      aim.x = Math.max(0, Math.min(1, aim.x + (Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'))) * dt * .35)); aim.y = Math.max(0, Math.min(1, aim.y + (Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'))) * dt * .6));
+      const c = canvas.getContext('2d')!; c.fillStyle = '#122a28'; c.fillRect(0, 0, 800, 400); c.strokeStyle = '#2c4940'; c.lineWidth = 1;
+      for (let x = 0; x < 800; x += 50) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 400); c.stroke(); } for (let y = 0; y < 400; y += 50) { c.beginPath(); c.moveTo(0, y); c.lineTo(800, y); c.stroke(); }
+      c.strokeStyle = '#8d815b'; c.setLineDash([8, 7]); c.strokeRect(85, 48, 620, 295); c.setLineDash([]);
+      points.forEach((point, i) => {
+        const aligned = Math.hypot((aim.x - point.x) * 2, aim.y - point.y) < .09;
+        lock[i] = recorded[i] ? 1 : advanceScan(lock[i]!, dt, aligned);
+        if (!recorded[i] && lock[i]! >= 1) { recorded[i] = true; options.onFeedback?.('success'); update(recorded.filter(Boolean).length / 3, recorded.filter(Boolean).length + ' / 3 BALIZAS REGISTRADAS');draftChanged(); }
+        const x = point.x * 800, y = point.y * 400; c.fillStyle = recorded[i] ? '#9bd4a8' : '#e4b76c'; c.beginPath(); c.arc(x, y, 7 + Math.sin(time * 2) * 1, 0, Math.PI * 2); c.fill();
+        c.lineWidth = 3; c.strokeStyle = recorded[i] ? '#9bd4a8' : '#e4b76c'; c.beginPath(); c.arc(x, y, 20, -Math.PI / 2, -Math.PI / 2 + lock[i]! * Math.PI * 2); c.stroke(); c.font = 'bold 15px monospace'; c.fillText((recorded[i] ? '✓ ' : '') + 'B' + (i + 1), x + 26, y + 5);
+      });
+      const x = aim.x * 800, y = aim.y * 400; c.strokeStyle = '#e1dfbf'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 35, 0, Math.PI * 2); c.moveTo(x - 48, y); c.lineTo(x + 48, y); c.moveTo(x, y - 48); c.lineTo(x, y + 48); c.stroke();
+      if (recorded.every(Boolean)) finish('Perímetro inspeccionado · traslado a observación autorizado.');
+    });
+  }
 
-  return {
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      listeners.forEach(remove => remove());
-      stage.remove();
-    },
-  };
+  workspace.querySelector<HTMLElement>('button, input, canvas[tabindex]')?.focus({ preventScroll: true });
+  return { snapshot, dispose() { if (disposed) return; disposed = true; abort.abort(); timers.forEach(clearTimeout); frames.forEach(cancelAnimationFrame); stage.remove(); host.classList.remove('ap-stand-dialog'); } };
 }
