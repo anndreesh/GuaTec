@@ -46,6 +46,11 @@ try{
      }
      if(kind==='tracking'){for(const[i,v]of[61,57,79].entries())await range(i,v);await page.locator('.ap-inst-action').click();}
      await finish();checks.push(language+' / '+kind+' completes through real controls.');
+     if(kind==='records'){
+       await open('records',language);
+       for(const[i,id]of['AS-506','LC-39A','09:32 EDT'].entries()){await page.locator('[data-card="'+id+'"]').click();await page.locator('.ap-inst-record-slot').nth(i).click();}
+       await page.locator('.ap-inst-stamp').click();await finish();checks.push(language+' / records also accepts native pointer clicks after focus.');
+     }
    }
  }
  await page.setViewportSize({width:390,height:844});

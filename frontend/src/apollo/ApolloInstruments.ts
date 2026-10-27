@@ -241,7 +241,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     });
     for (let i = 0; i < 3; i++) {
       const b = node('button', 'ap-inst-record-slot'); b.type = 'button'; b.dataset.slot = String(i); slots.push(b); slotTray.append(b);
-      listen(b,'focus',()=>{selectedSlot=i;renderSlots();});
+      listen(b,'focus',()=>{selectedSlot=i;slots.forEach((slot,index)=>slot.classList.toggle('ap-inst-slot-active',index===i));});
       listen(b, 'click', () => { selectedSlot = i; if (selectedCard) assign(i, selectedCard); else { renderSlots(); b.focus(); } });
       listen(b, 'dragover', (e: Event) => { e.preventDefault(); b.classList.add('ap-inst-drop'); });
       listen(b, 'dragleave', () => b.classList.remove('ap-inst-drop'));
