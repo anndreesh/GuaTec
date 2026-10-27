@@ -459,7 +459,7 @@ export class ApolloWorld {
     const deck = this.material('bonus-deck', 0x384b4a, 0.72, 0.45);
     const trim = this.material('bonus-trim', 0xa58a53, 0.42, 0.7);
     const panel = this.material('bonus-panel', 0x1b2b31, 0.44, 0.55);
-    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c, 0xd9a56d, 0x8fc2b2, 0xd2c28a];
+    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c, 0xd9a56d, 0x8fc2b2, 0xd2c28a, 0xc59ad9];
     BONUS_CHECKPOINTS.forEach((bonus, index) => {
       const { x, z } = bonus.target;
       this.groundPlane(8, 6, x, z, this.material(`bonus-grit-${index}`, 0x8e8772, 0.98), 0.02);
@@ -488,6 +488,13 @@ export class ApolloWorld {
           this.box(0.62, 0.08, 0.9, card % 2 ? trim : panel, x - 1.2 + card * 0.8, 1.42, z + 0.78);
           this.box(0.42, 0.018, 0.035, trim, x - 1.2 + card * 0.8, 1.48, z + 0.78);
         }
+      } else if (bonus.kind === 'crew-manifest') {
+        const manifest = this.material('bonus-manifest', 0xd8d0b6, 0.5, 0.3);
+        for (let card = 0; card < 3; card++) {
+          this.box(0.8, 0.06, 0.58, manifest, x - 1.15 + card * 1.15, 1.48, z + 0.72);
+          this.box(0.5, 0.018, 0.035, trim, x - 1.15 + card * 1.15, 1.53, z + 0.72);
+        }
+        this.box(2.9, 0.08, 0.08, trim, x, 1.7, z + 1.15);
       }
       this.box(0.16, 1.7, 0.16, trim, x - 2.7, 0.9, z + 1.2);
       this.box(0.16, 1.7, 0.16, trim, x + 2.7, 0.9, z + 1.2);

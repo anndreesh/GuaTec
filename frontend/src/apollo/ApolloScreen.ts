@@ -216,7 +216,7 @@ export class ApolloScreen implements Screen {
     const box=this.openModal('APOLLO 11','El comienzo de una nueva era');
     box.append(el('p','','16 de julio de 1969 · Centro Espacial Kennedy, Florida. Eres un técnico ficticio de apoyo a operaciones terrestres. Observa, documenta y comunica: tu trabajo termina en un punto seguro, antes del despegue de las 9:32 a. m. EDT.'));
     box.append(el('p','ap-note','Recreación educativa. Daniel Carter y los diálogos son ficticios. Las rutas se han acortado; no hay interiores accesibles. Los trajes Mercenary son una adaptación artística, no réplicas del A7L.'));
-    if(this.state.completed.length || this.state.bonusCompleted.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length} de 8 checkpoints · ${this.state.bonusCompleted.length} de ${BONUS_CHECKPOINTS.length} submisiones.`));
+    if(this.state.completed.length || this.state.bonusCompleted.length) box.append(el('p','ap-resume',`Registro recuperado · ${this.state.completed.length + this.state.bonusCompleted.length} de 15 operaciones de historia.`));
     const start=this.button(this.state.done?'Ver epílogo':this.state.completed.length?'Continuar misión':'Comenzar operaciones',()=>{
       this.started=true; this.closeModal(); void this.audio.start().catch(()=>this.notify('Audio no disponible; los subtítulos permanecen activos.'));
       if(this.state.done) this.showEnd();
@@ -229,13 +229,13 @@ export class ApolloScreen implements Screen {
   private renderObjective() {
     if(!this.hud) return;
     const cp=this.state.current; this.hud.replaceChildren();
-    this.hud.append(el('small','','MISIÓN 01 — APOLLO 11'),el('span','ap-progress',`${String(this.state.completed.length).padStart(2,'0')} / 08`),el('h2','',cp.title),el('p','',cp.objective));
+    this.hud.append(el('small','','MISIÓN 01 — APOLLO 11 · 15 OPERACIONES'),el('span','ap-progress',`${String(this.state.completed.length + this.state.bonusCompleted.length).padStart(2,'0')} / 15`),el('h2','',cp.title),el('p','',cp.objective));
     const checklist=el('div','ap-checklist');
     for(const action of cp.actions) checklist.append(el('span',this.state.checks.includes(action.id)?'ap-checked':'',`${this.state.checks.includes(action.id)?'✓':'·'} ${action.label}`));
     const blocked=cp.actions.find(action=>!this.state.checks.includes(action.id)&&action.requiresBonus?.some(id=>!this.state.bonusCompleted.includes(id)));
     const missing=BONUS_CHECKPOINTS.filter(bonus=>blocked?.requiresBonus?.includes(bonus.id)&&!this.state.bonusCompleted.includes(bonus.id));
     if(missing?.length) this.hud.append(el('small','ap-bonus-gate',`REQUERIDO PARA AVANZAR · ${missing.map(bonus=>bonus.title).join(' · ')}`));
-    const bonusStatus=el('small','ap-bonus-status',`SUBMISIONES OPCIONALES · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADAS`);
+    const bonusStatus=el('small','ap-bonus-status',`STANDS OBLIGATORIOS · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADOS`);
     this.hud.append(checklist,bonusStatus,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
     this.world?.setTarget(this.state.done?null:cp.target);
     this.world?.setBonusStatus(this.state.bonusCompleted);
@@ -286,7 +286,7 @@ export class ApolloScreen implements Screen {
     const bonus=BONUS_CHECKPOINTS.find(entry=>entry.id===id);
     if(!bonus || this.state.bonusCompleted.includes(id)) return;
     this.modalKind='bonus';
-    const box=this.openModal('CHECKPOINT EXTRA · OPERACIÓN DE APOYO',bonus.title);
+    const box=this.openModal('STAND OBLIGATORIO · OPERACIÓN DE APOYO',bonus.title);
     this.bonusMission=mountBonusMission(box,bonus,{onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{
       this.bonusMission?.dispose(); this.bonusMission=null;
       if(this.state.completeBonus(id)) { void this.save(); this.closeModal(); this.notify(`SUBMISIÓN COMPLETADA · ${bonus.title}`); }
@@ -397,7 +397,7 @@ export class ApolloScreen implements Screen {
       box.querySelectorAll('button').forEach(b=>b.disabled=true);
       if(!this.state.done)this.act('finish');
       void this.save().then(async()=>{
-        try { await progressApi.complete(SLUG,{ticksSurvived:Math.floor(this.state.elapsed),decisionsMade:19,samplesCollected:0,finalResources:{fuel:100,pressure:100,stability:100,telemetry:100},outcome:'success',summary:'Apollo 11: ocho checkpoints de apoyo terrestre completados; traslado y lanzamiento observados desde el área segura.'}); } catch { this.notify('Misión guardada localmente; la sincronización del informe queda pendiente.'); }
+        try { await progressApi.complete(SLUG,{ticksSurvived:Math.floor(this.state.elapsed),decisionsMade:26,samplesCollected:0,finalResources:{fuel:100,pressure:100,stability:100,telemetry:100},outcome:'success',summary:'Apollo 11: quince operaciones de apoyo terrestre completadas; traslado y lanzamiento observados desde el área segura.'}); } catch { this.notify('Misión guardada localmente; la sincronización del informe queda pendiente.'); }
         return this.app.showMissionSelect();
       });
     },'ap-button ap-primary'));

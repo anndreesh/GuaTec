@@ -18,7 +18,7 @@ export interface ApolloCheckpoint {
   readonly actions: readonly ApolloAction[];
 }
 
-export type ApolloBonusKind = 'sequence' | 'telemetry' | 'beacons' | 'cables' | 'weather' | 'flight-plan';
+export type ApolloBonusKind = 'sequence' | 'telemetry' | 'beacons' | 'cables' | 'weather' | 'flight-plan' | 'crew-manifest';
 
 export interface ApolloBonusCheckpoint {
   readonly id: string;
@@ -28,7 +28,7 @@ export interface ApolloBonusCheckpoint {
   readonly kind: ApolloBonusKind;
 }
 
-/** Optional field operations: they enrich the mission without gating the historical route. */
+/** Mandatory field stands: they extend the historical route with hands-on operations. */
 export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
   {
     id: 'power-bus', title: 'Banco de alimentación',
@@ -60,6 +60,11 @@ export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
     objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
     target: { x: 42, z: 180 }, kind: 'flight-plan',
   },
+  {
+    id: 'crew-manifest', title: 'Manifiesto de tripulación',
+    objective: 'Verifica que cada astronauta esté asociado con su asiento y distintivo antes del traslado a la plataforma.',
+    target: { x: 18, z: 170 }, kind: 'crew-manifest',
+  },
 ];
 
 export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
@@ -81,7 +86,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
       { id: 'tower', label: 'Examinar la torre umbilical', description: 'La torre conecta servicios del equipo terrestre y la pasarela de acceso con el vehículo. Su estructura permanece en tierra al despegar.' },
       { id: 'pad', label: 'Identificar la plataforma 39A', description: 'Apollo 11 partió del Launch Complex 39A sobre una plataforma móvil de lanzamiento. No cruces el perímetro restringido.' },
       { id: 'vab', label: 'Localizar el VAB', description: 'El Vehicle Assembly Building sirvió para ensamblar el Saturn V. El crawler-transporter llevó el conjunto hacia la plataforma por el crawlerway.' },
-      { id: 'technician', label: 'Hablar con el técnico', description: 'La mayor parte del trabajo ya está hecha. Hoy observamos el resultado de años de ingeniería; no modificamos el cohete.' },
+      { id: 'technician', requiresBonus: ['flight-record'], label: 'Hablar con el técnico', description: 'La mayor parte del trabajo ya está hecha. Hoy observamos el resultado de años de ingeniería; no modificamos el cohete.' },
     ],
   },
   {
@@ -101,7 +106,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     actions: [
       { id: 'antenna', label: 'Reconocer las antenas', description: 'Las comunicaciones terrestres enlazan estaciones especializadas. Este terminal exterior es una adaptación educativa de consulta.' },
       { id: 'signal', label: 'Identificar la señal', description: 'Escucha y reconoce el patrón de identificación del enlace local antes de comunicar su estado.' },
-      { id: 'ready', requires: ['antenna', 'signal'], label: 'Comunicar estación lista', description: 'Envía la confirmación simulada a Daniel Carter. La tripulación y el equipo histórico mantienen todas las responsabilidades reales de vuelo.' },
+      { id: 'ready', requires: ['antenna', 'signal'], requiresBonus: ['telemetry-rack'], label: 'Comunicar estación lista', description: 'Envía la confirmación simulada a Daniel Carter. La tripulación y el equipo histórico mantienen todas las responsabilidades reales de vuelo.' },
     ],
   },
   {
@@ -109,7 +114,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     objective: 'Observa la recreación retrospectiva del traslado de Armstrong, Collins y Aldrin.',
     target: { x: -24, z: 170 }, requirements: ['communications'],
     actions: [
-      { id: 'crew-film', label: 'Observar el traslado', description: 'Recreación retrospectiva de la mañana del 16 de julio: tres representaciones estilizadas se dirigen hacia el vehículo de traslado y la plataforma. La elipsis a negro representa su embarque.' },
+      { id: 'crew-film', requiresBonus: ['crew-manifest'], label: 'Observar el traslado', description: 'Recreación retrospectiva de la mañana del 16 de julio: tres representaciones estilizadas se dirigen hacia el vehículo de traslado y la plataforma. La elipsis a negro representa su embarque.' },
     ],
   },
   {
@@ -119,7 +124,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
     actions: [
       { id: 'camera', label: 'Preparar la cámara', description: 'Orienta la cámara de seguimiento hacia 39A. Los recorridos y la distancia del área de observación se comprimen por jugabilidad.' },
       { id: 'audio', label: 'Confirmar audio', description: 'Verifica el enlace de radio. El sonido directo de los motores llegará después de la luz debido a la distancia.' },
-      { id: 'authorize', requires: ['camera', 'audio'], requiresBonus: ['weather-window'], label: 'Solicitar autorización', description: 'Confirma que el técnico permanece en el área de observación y autoriza únicamente la reproducción de la secuencia histórica.' },
+      { id: 'authorize', requires: ['camera', 'audio'], requiresBonus: ['weather-window', 'pad-safety'], label: 'Solicitar autorización', description: 'Confirma que el técnico permanece en el área de observación y autoriza únicamente la reproducción de la secuencia histórica.' },
     ],
   },
   {

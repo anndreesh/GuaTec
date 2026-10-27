@@ -82,8 +82,12 @@ body.apollo-active .language-menu{display:none}
 .ap-bonus-flight-card{padding:10px;font-size:10px;line-height:1.4;text-align:left}
 .ap-bonus-cable-node:hover,.ap-bonus-cable-node:focus-visible,.ap-bonus-flight-card:hover,.ap-bonus-flight-card:focus-visible{transform:translateY(-2px);border-color:#e8c579;outline:2px solid #e8c57955;outline-offset:2px}
 .ap-bonus-cable-node--active,.ap-bonus-flight-card--active{background:#91c49d;color:#11231f;border-color:#c6e4ae;box-shadow:0 0 20px #9bd6a544}
+.ap-bonus-crew-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ap-bonus-crew-card{min-height:72px;padding:10px;border:1px solid #b69a5b66;background:linear-gradient(#234448,#0c242b);color:#d7e2cf;white-space:pre-line;text-align:left;font-size:10px;line-height:1.45;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.ap-bonus-crew-card:hover,.ap-bonus-crew-card:focus-visible{transform:translateY(-2px);border-color:#e8c579;outline:2px solid #e8c57955;outline-offset:2px}
+.ap-bonus-crew-card--active{background:#91c49d;color:#11231f;border-color:#c6e4ae;box-shadow:0 0 20px #9bd6a544}
 .ap-bonus-cancel{justify-self:start;margin-top:4px}
-@media(max-width:520px){.ap-bonus-stage{padding:12px;gap:11px}.ap-bonus-header{display:block}.ap-bonus-kicker{display:block;margin-bottom:8px}.ap-bonus-slider{grid-template-columns:88px 1fr 28px;font-size:10px}.ap-bonus-relay,.ap-bonus-beacon{min-height:54px}.ap-bonus-hint{font-size:9px}}
+@media(max-width:520px){.ap-bonus-stage{padding:12px;gap:11px}.ap-bonus-header{display:block}.ap-bonus-kicker{display:block;margin-bottom:8px}.ap-bonus-slider{grid-template-columns:88px 1fr 28px;font-size:10px}.ap-bonus-relay,.ap-bonus-beacon{min-height:54px}.ap-bonus-crew-cards{grid-template-columns:1fr}.ap-bonus-crew-card{min-height:54px}.ap-bonus-hint{font-size:9px}}
 
 /* Lift the checkpoint panel while preserving its existing dimensions. */
 .ap-objective{top:4px}

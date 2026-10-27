@@ -27,7 +27,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   };
   const stage = node('div', `ap-bonus-stage ap-bonus-${bonus.kind}`);
   const header = node('div', 'ap-bonus-header');
-  header.append(node('span', 'ap-bonus-kicker', 'SUBMISIÓN OPCIONAL · OPERACIONES APOLLO 11'), node('h2', '', bonus.title));
+  header.append(node('span', 'ap-bonus-kicker', 'STAND OBLIGATORIO · OPERACIONES APOLLO 11'), node('h2', '', bonus.title));
   stage.append(header, node('p', 'ap-bonus-objective', bonus.objective));
   const feedback = node('p', 'ap-bonus-feedback', 'Sistema en espera · completa la verificación para registrar el checkpoint.');
   stage.append(feedback);
@@ -173,6 +173,33 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
       cards.append(card);
     });
     stage.append(readout, cards, node('small', 'ap-bonus-hint', 'Reconstruye la secuencia: T−00 · T−10 · T+01 · T−05.'));
+  }
+
+  if (bonus.kind === 'crew-manifest') {
+    const target = [2, 0, 1];
+    let progress = 0;
+    const readout = node('div', 'ap-bonus-readout', 'MANIFIESTO · 0 / 3 ASIGNACIONES');
+    const cards = node('div', 'ap-bonus-crew-cards');
+    const labels = ['ARMSTRONG · COMANDANTE', 'COLLINS · PILOTO CM', 'ALDRIN · PILOTO LM'];
+    const seats = ['ASIENTO A', 'ASIENTO B', 'ASIENTO C'];
+    target.forEach((_expected, index) => {
+      const card = node('button', 'ap-bonus-crew-card', `${labels[index]}\n${seats[index]}`); card.type = 'button';
+      card.setAttribute('aria-label', `${labels[index]}, ${seats[index]}`);
+      listen(card, 'click', () => {
+        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
+        if (index !== target[progress]) {
+          progress = 0;
+          cards.querySelectorAll('.ap-bonus-crew-card--active').forEach(item => item.classList.remove('ap-bonus-crew-card--active'));
+          readout.textContent = 'MANIFIESTO · REVISAR ASIGNACIONES';
+          fail('Asignación incorrecta · el manifiesto volvió a la bandeja.');
+          return;
+        }
+        progress += 1; card.classList.add('ap-bonus-crew-card--active'); readout.textContent = `MANIFIESTO · ${progress} / 3 ASIGNACIONES`;
+        if (progress === target.length) finish('Manifiesto verificado · traslado autorizado.');
+      });
+      cards.append(card);
+    });
+    stage.append(readout, cards, node('small', 'ap-bonus-hint', 'Asocia cada distintivo con su asiento en el orden del manifiesto: Aldrin · Armstrong · Collins.'));
   }
 
   const cancel = node('button', 'ap-button ap-bonus-cancel', 'Volver a operaciones'); cancel.type = 'button';
