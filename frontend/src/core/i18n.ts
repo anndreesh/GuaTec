@@ -1487,23 +1487,24 @@ Object.assign(spanishFromEnglish, {
   "The data technician is preparing the outdoor recorders.": "La técnica de datos prepara los registradores exteriores.",
 });
 
+export const UI_TRANSLATIONS:Readonly<Record<Language,Readonly<Record<string,string>>>>=Object.freeze({
+  es:Object.freeze({...spanishExtra,...spanishFromEnglish}),
+  en:Object.freeze({...englishExtra,...translations}),
+  fr:Object.freeze({...frenchRemaining,...frenchExtra,...frenchTranslations}),
+});
+// Preserve the authored fallback precedence, but build and sort these immutable
+// fragments once. Rebuilding ~700 entries for every unknown NASA title or label
+// used to allocate and sort dictionaries on each render of a menu.
+const fragmentSources={es:{...spanishFromEnglish,...spanishExtra},en:{...translations,...englishExtra},fr:{...translations,...englishExtra,...frenchTranslations,...frenchExtra,...frenchRemaining}};
+const fragmentsByLanguage=Object.fromEntries(Object.entries(fragmentSources).map(([language,copy])=>[language,Object.entries(copy).filter(([source])=>source.length>5).sort((a,b)=>b[0].length-a[0].length)])) as Record<Language,[string,string][]>;
+
 export function t(text: string): string {
-  const currentLanguage = getLanguage();
-  const exact = currentLanguage === "en"
-    ? translations[text] ?? englishExtra[text]
-    : currentLanguage === "fr"
-      ? frenchTranslations[text] ?? frenchExtra[text] ?? frenchRemaining[text]
-      : spanishFromEnglish[text] ?? spanishExtra[text];
+  const currentLanguage=getLanguage(),exact=UI_TRANSLATIONS[currentLanguage][text];
   if (exact !== undefined) return exact;
 
   let result = text;
-  const fragments = currentLanguage === "es"
-    ? { ...spanishFromEnglish, ...spanishExtra }
-    : currentLanguage === "fr"
-      ? { ...translations, ...englishExtra, ...frenchTranslations, ...frenchExtra, ...frenchRemaining }
-      : { ...translations, ...englishExtra };
-  for (const [source, translated] of Object.entries(fragments).sort((a, b) => b[0].length - a[0].length)) {
-    if (source.length > 5 && result.includes(source)) result = result.split(source).join(translated);
+  for (const [source, translated] of fragmentsByLanguage[currentLanguage]) {
+    if (result.includes(source)) result = result.split(source).join(translated);
   }
   return result;
 }
