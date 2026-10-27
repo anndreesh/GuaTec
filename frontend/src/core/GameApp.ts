@@ -136,10 +136,11 @@ export class GameApp {
   }
 
   private chooseMenuBackground(): string {
-    const previous = sessionStorage.getItem("mm.menuBackground");
+    let previous:string|null=null;
+    try{previous=sessionStorage.getItem("mm.menuBackground");}catch{/* Background rotation is optional. */}
     const available = MENU_BACKGROUNDS.filter((path) => path !== previous);
     const selected = available[Math.floor(Math.random() * available.length)] ?? MENU_BACKGROUNDS[0];
-    sessionStorage.setItem("mm.menuBackground", selected);
+    try{sessionStorage.setItem("mm.menuBackground", selected);}catch{/* Use this background for the current page. */}
     if (this.menuBackdrop) {
       this.menuBackdrop.style.backgroundImage = `url("${selected}")`;
     }
