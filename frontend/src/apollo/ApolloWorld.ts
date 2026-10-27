@@ -11,6 +11,7 @@ import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
 import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind, type StandMovingPart } from './ApolloStandModels';
 import {SITE_BUILDINGS,SITE_PLOTS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
 import {standIndicatorPosition,standUsesPower} from './ApolloStandDesigns';
+import {batchCharacterMeshes} from './ApolloCharacterBatches';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -754,6 +755,7 @@ export class ApolloWorld {
       const activeBounds = bounds;
       const height = activeBounds.getSize(new THREE.Vector3()).y;
       const scale = 1.85 / Math.max(height, 0.01);
+      this.loadedModel.batching = batchCharacterMeshes(gltf.scene);
       for (let i = 0; i < 4; i++) {
         const model = clone(gltf.scene);
         const holder = i === 0 ? this.playerRoot : new THREE.Group();
@@ -1189,7 +1191,9 @@ export class ApolloWorld {
   private onPointerUp = (event:PointerEvent): void => { if(this.lastPointer?.id===event.pointerId)this.lastPointer = null; };
   private disposeObject(root: THREE.Object3D): void {
     const geoms = new Set<THREE.BufferGeometry>(), mats = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
-    root.traverse(node => { if (node instanceof THREE.Mesh) { geoms.add(node.geometry); for (const mat of Array.isArray(node.material) ? node.material : [node.material]) { mats.add(mat); for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value); } } });
+    const skeletons = new Set<THREE.Skeleton>();
+    root.traverse(node => { if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton); if (node instanceof THREE.Mesh) { geoms.add(node.geometry); for (const mat of Array.isArray(node.material) ? node.material : [node.material]) { mats.add(mat); for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value); } } });
+    skeletons.forEach(skeleton=>skeleton.dispose());
     geoms.forEach(g => g.dispose()); mats.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
   }
   dispose(): void {
@@ -1198,7 +1202,7 @@ export class ApolloWorld {
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp); window.removeEventListener('blur', this.onBlur);
     this.onBlur();
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown); this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove); this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp); this.renderer.domElement.removeEventListener('pointercancel', this.onPointerUp); this.renderer.domElement.removeEventListener('lostpointercapture', this.onPointerUp);
-    this.mixers.forEach(m => m.stopAllAction());
+    this.mixers.forEach(m => { m.stopAllAction(); m.uncacheRoot(m.getRoot()); });
     this.disposeObject(this.scene); this.geometries.clear(); this.sun.shadow.map?.dispose();
     this.environmentTarget?.dispose();
     this.renderer.dispose(); this.renderer.domElement.remove();
