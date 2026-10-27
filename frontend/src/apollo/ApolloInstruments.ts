@@ -14,6 +14,7 @@ export interface InstrumentHandle { dispose: () => void; snapshot: () => Instrum
 type Copy = typeof COPY.es;
 const COPY = {
   es: {
+    protocol: 'Protocolo', adjustPhase: 'Ajustar', stabilizePhase: 'Estabilizar', capturePhase: 'Capturar', selectPhase: 'Elegir ficha', placePhase: 'Colocar', stampPhase: 'Sellar', tunePhase: 'Sintonizar', transmitPhase: 'Transmitir', ackPhase: 'Acuse', listening: 'ESCUCHANDO',
     station: 'OPERACIONES DE APOYO · 1969', simulation: 'Instrumento educativo simulado · no opera sistemas de lanzamiento',
     survey: 'Reconocimiento óptico', records: 'Mesa de documentación', signal: 'Enlace de radio terrestre', tracking: 'Cámara de seguimiento',
     surveyHelp: 'Localiza cada estructura. Ajusta rumbo, aumento y enfoque hasta obtener una imagen estable; después acciona el obturador.',
@@ -36,6 +37,7 @@ const COPY = {
     expose: 'Exponer placa', trackingReady: 'Seguimiento preparado · placa expuesta', interrupted: 'Ajuste interrumpido', quality: 'Calidad de señal', finish: 'REGISTRO VALIDADO',
   },
   en: {
+    protocol: 'Protocol', adjustPhase: 'Adjust', stabilizePhase: 'Steady', capturePhase: 'Capture', selectPhase: 'Choose card', placePhase: 'Place', stampPhase: 'Stamp', tunePhase: 'Tune', transmitPhase: 'Transmit', ackPhase: 'Acknowledge', listening: 'LISTENING',
     station: 'GROUND SUPPORT · 1969', simulation: 'Simulated educational instrument · does not operate launch systems',
     survey: 'Optical survey', records: 'Documentation desk', signal: 'Ground radio link', tracking: 'Tracking camera',
     surveyHelp: 'Locate each structure. Adjust bearing, magnification and focus until the image is steady, then release the shutter.',
@@ -58,6 +60,7 @@ const COPY = {
     expose: 'Expose plate', trackingReady: 'Tracking ready · plate exposed', interrupted: 'Setting interrupted', quality: 'Signal quality', finish: 'RECORD VALIDATED',
   },
   fr: {
+    protocol: 'Protocole', adjustPhase: 'Régler', stabilizePhase: 'Stabiliser', capturePhase: 'Capturer', selectPhase: 'Choisir', placePhase: 'Placer', stampPhase: 'Tamponner', tunePhase: 'Accorder', transmitPhase: 'Transmettre', ackPhase: 'Accusé', listening: 'ÉCOUTE',
     station: 'SOUTIEN AU SOL · 1969', simulation: 'Instrument pédagogique simulé · ne commande aucun système de lancement',
     survey: 'Reconnaissance optique', records: 'Table de documentation', signal: 'Liaison radio terrestre', tracking: 'Caméra de poursuite',
     surveyHelp: 'Repérez chaque structure. Réglez le cap, le grossissement et la mise au point jusqu’à stabiliser l’image, puis déclenchez.',
@@ -98,11 +101,32 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
   const cleanups: Array<() => void> = [];
   const sliders: HTMLInputElement[] = [], outputs: HTMLOutputElement[] = [];
   const root = node('section', `ap-instrument ap-instrument-${kind}`); root.tabIndex = 0;
-  root.setAttribute('aria-label', copy[kind]);
+  root.setAttribute('aria-label', copy[kind]); root.lang = options.language;
   const top = node('header', 'ap-inst-header');
   top.append(node('span', 'ap-inst-serial', copy.station), node('span', 'ap-inst-badge', `AP11 / ${kind === 'survey' ? 'OPT-01' : kind === 'records' ? 'DOC-02' : kind === 'signal' ? 'RF-03' : 'CAM-04'}`));
   const protocol = node('div', 'ap-inst-protocol');
-  protocol.append(node('span', 'ap-inst-protocol-code', `PROTOCOLO / ${kind.toUpperCase()}`), node('span', 'ap-inst-protocol-steps', 'OBSERVAR  ·  AJUSTAR  ·  REGISTRAR'));
+  const phases = kind === 'records' ? [copy.selectPhase, copy.placePhase, copy.stampPhase]
+    : kind === 'signal' ? [copy.tunePhase, copy.transmitPhase, copy.ackPhase]
+    : [copy.adjustPhase, copy.stabilizePhase, copy.capturePhase];
+  const phaseList = node('ol', 'ap-inst-protocol-steps'); phaseList.setAttribute('aria-label', copy.protocol);
+  const phaseNodes = phases.map(label => { const item = node('li', 'ap-inst-phase'); item.append(node('i'), node('span', '', label)); item.firstElementChild!.setAttribute('aria-hidden', 'true'); phaseList.append(item); return item; });
+  const tally = node('span', 'ap-inst-tally');
+  protocol.append(node('span', 'ap-inst-protocol-code', copy.protocol), phaseList, tally);
+  let shownPhase = -1, shownComplete = false;
+  function showPhase(index: number) {
+    if (index === shownPhase && completed === shownComplete) return;
+    shownPhase = index; shownComplete = completed;
+    root.dataset.phase = String(index);
+    phaseNodes.forEach((item, i) => {
+      item.dataset.state = completed || i < index ? 'done' : i === index ? 'active' : 'pending';
+      if (!completed && i === index) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
+    });
+  }
+  function showTally(count: number, total: number, label: string) {
+    const value = `${count} / ${total}`;
+    if (tally.textContent !== value) { tally.textContent = value; tally.setAttribute('aria-label', `${label}: ${value}`); }
+  }
+  showPhase(0);
   root.append(top, protocol, node('h2', 'ap-inst-title', copy[kind]), node('p', 'ap-inst-instructions', copy[`${kind}Help`]));
   const stage = node('div', 'ap-inst-stage'); root.append(stage);
   const feedback = node('p', 'ap-inst-feedback'); feedback.setAttribute('aria-live', 'polite'); root.append(feedback);
@@ -119,7 +143,14 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     if (audio && audio.state !== 'closed') void audio.close().catch(() => {}); audio = null; root.remove();
   }
   function finish(message: string) {
-    if (disposed || completed) return; completed = true; root.classList.add('ap-inst-complete'); say(message); persist();
+    if (disposed || completed) return; completed = true; root.classList.add('ap-inst-complete'); showPhase(2);
+    if (kind === 'survey') showTally(draft.captures.length, surveyTargets.length, copy.progress);
+    else if (kind === 'signal') showTally(draft.pulses.length, PULSE_PATTERN.length, copy.pattern);
+    if (status) { status.textContent = copy.finish; status.classList.add('ap-inst-status-locked'); }
+    if (action) action.disabled = true;
+    stage.querySelectorAll('.ap-inst-pulse-active, .ap-inst-pulse-demo, .ap-inst-pulse-next').forEach(pulse => pulse.classList.remove('ap-inst-pulse-active', 'ap-inst-pulse-demo', 'ap-inst-pulse-next'));
+    stage.querySelectorAll('.ap-inst-radio-actions button').forEach(button => { button.setAttribute('aria-pressed', 'false'); (button as HTMLButtonElement).disabled = true; });
+    say(message); persist();
     options.onComplete();
   }
   listen(back, 'click', () => { if (disposed || completed) return; persist(); dispose(); options.onCancel(); });
@@ -152,7 +183,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     const corners = node('div', 'ap-inst-glass'); viewport.append(corners);
     status = node('span', 'ap-inst-status', copy.aligning); viewport.append(status);
     targetText = node('span', 'ap-inst-target'); viewport.append(targetText);
-    const gauge = node('div', 'ap-inst-lock'); meter = node('i'); gauge.append(meter); viewport.append(gauge); stage.append(viewport);
+    const gauge = node('div', 'ap-inst-lock'); meter = node('i'); gauge.append(meter); gauge.setAttribute('role', 'progressbar'); gauge.setAttribute('aria-label', copy.hold); gauge.setAttribute('aria-valuemin', '0'); gauge.setAttribute('aria-valuemax', '100'); gauge.setAttribute('aria-valuenow', '0'); viewport.append(gauge); stage.append(viewport);
     const panel = node('div', 'ap-inst-panel');
     if (kind === 'survey') panel.append(slider(copy.azimuth, 0), slider(copy.zoom, 1), slider(copy.focus, 2));
     if (kind === 'tracking') panel.append(slider(copy.pan, 0), slider(copy.tilt, 1), slider(copy.focus, 2));
@@ -183,11 +214,11 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     } else {
       referenceLabel.textContent = copy.tune; referenceValues.textContent = `${copy.frequency} 67 · ${copy.gain} 73`;
       const pulseRow = node('div', 'ap-inst-pulses');
-      PULSE_PATTERN.forEach((_, index) => pulseRow.append(node('span', 'ap-inst-pulse', index === 1 ? '━' : '●')));
+      PULSE_PATTERN.forEach((_, index) => { const pulse = node('span', 'ap-inst-pulse', index === 1 ? '━' : '●'); pulse.setAttribute('aria-label', `${index + 1}: ${index === 1 ? copy.long : copy.short}`); pulseRow.append(pulse); });
       stage.append(node('strong', 'ap-inst-pattern-title', copy.pattern), pulseRow, node('p', 'ap-inst-pulse-help', copy.pulseHelp));
       const row = node('div', 'ap-inst-radio-actions'), replay = node('button', 'ap-inst-replay', copy.replay), key = node('button', 'ap-inst-telegraph', copy.key);
       replay.type = key.type = 'button'; row.append(replay, key); stage.append(row);
-      listen(replay, 'click', () => { if(pulseStarted!==null)return; pulseDemo = 0; ensureTone(true); });
+      listen(replay, 'click', () => { if(pulseStarted!==null || completed)return; pulseDemo = 0; ensureTone(true); });
       const beginPulse = () => {
         if (disposed || completed || pulseStarted !== null) return;
         if (!locked || !signalAligned(draft.values)) { say(copy.pulseLost, true); return; }
@@ -222,10 +253,13 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     const desk = node('div', 'ap-inst-desk'), cardTray = node('div', 'ap-inst-card-tray'), slotTray = node('div', 'ap-inst-slot-tray');
     cardTray.append(node('h3', '', copy.cards)); slotTray.append(node('h3', '', copy.slots)); desk.append(cardTray, slotTray); stage.append(desk);
     const cards: HTMLButtonElement[] = [], slots: HTMLButtonElement[] = [];
-    const select = (id: string) => { selectedCard = id; cards.forEach(b => { b.classList.toggle('ap-inst-card-selected', b.dataset.card === id); b.setAttribute('aria-pressed', String(b.dataset.card === id)); }); say(`${copy.selected}: ${id}`); };
+    const select = (id: string) => { selectedCard = id; cards.forEach(b => { b.classList.toggle('ap-inst-card-selected', b.dataset.card === id); b.setAttribute('aria-pressed', String(b.dataset.card === id)); }); say(`${copy.selected}: ${id}`); renderSlots(); };
     function renderSlots() {
       slots.forEach((b, i) => { const name = [copy.vehicle, copy.platform, copy.time][i]; b.replaceChildren(node('small', '', name), node('strong', '', draft.slots[i] ?? copy.empty)); b.classList.toggle('ap-inst-slot-filled', !!draft.slots[i]); b.classList.toggle('ap-inst-slot-active', i === selectedSlot); b.setAttribute('aria-label', `${name}: ${draft.slots[i] ?? copy.empty}`); });
       cards.forEach(b => b.classList.toggle('ap-inst-card-used', draft.slots.includes(b.dataset.card!)));
+      const count = draft.slots.filter(Boolean).length;
+      showTally(count, RECORDS.length, copy.slots); showPhase(count === RECORDS.length ? 2 : count || selectedCard ? 1 : 0);
+      root.classList.remove('ap-inst-mismatch');
     }
     function assign(index: number, id: string) {
       if (disposed || completed || !(RECORDS as readonly string[]).includes(id)) return;
@@ -319,12 +353,25 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     if (kind !== 'records') {
       const aligned = kind === 'survey' ? surveyAligned(draft.values, surveyIndex()) : kind === 'tracking' ? trackingAligned(draft.values) : signalAligned(draft.values);
       const previousLock = locked; lock = advanceInstrumentLock(lock, aligned, dt, requiredLock); locked = lock >= requiredLock;
-      if (meter) meter.style.transform = `scaleX(${lock / requiredLock})`;
-      status!.textContent = locked ? kind === 'signal' ? copy.locked : copy.stable : `${copy.aligning} · ${Math.round(lock / requiredLock * 100)}%`;
+      if (meter) {
+        meter.style.transform = `scaleX(${lock / requiredLock})`;
+        const percent = String(Math.round(lock / requiredLock * 100));
+        if (meter.parentElement!.getAttribute('aria-valuenow') !== percent) meter.parentElement!.setAttribute('aria-valuenow', percent);
+      }
+      showPhase(kind === 'signal' ? locked ? 1 : 0 : locked ? 2 : lock > 0 ? 1 : 0);
+      if (kind === 'survey') showTally(draft.captures.length, surveyTargets.length, copy.progress);
+      if (kind === 'signal') showTally(draft.pulses.length, PULSE_PATTERN.length, copy.pattern);
+      status!.textContent = pulseDemo >= 0 ? copy.listening : pulseStarted !== null ? copy.transmitting : locked ? kind === 'signal' ? copy.locked : copy.stable : `${copy.aligning} · ${Math.round(lock / requiredLock * 100)}%`;
       status!.classList.toggle('ap-inst-status-locked', locked);
       targetText!.textContent = kind === 'survey' ? `${copy.target} · ${copy[surveyTargets[Math.min(draft.captures.length, surveyTargets.length-1)].id]}` : kind === 'tracking' ? 'SATURN V · LC-39A' : copy.tune;
       if (action) action.disabled = !locked;
+      let demoIndex = -1;
       if (kind === 'signal') {
+        const key = stage.querySelector<HTMLButtonElement>('.ap-inst-telegraph')!;
+        key.setAttribute('aria-disabled', String(!locked));
+        key.setAttribute('aria-pressed', String(pulseStarted !== null));
+        const replay = stage.querySelector<HTMLButtonElement>('.ap-inst-replay')!;
+        replay.setAttribute('aria-pressed', String(pulseDemo >= 0));
         if (locked && !previousLock) say(copy.readyPulse);
         if (!aligned && draft.pulses.length) { draft.pulses = []; persist(); [...stage.querySelectorAll('.ap-inst-pulse')].forEach(n => n.classList.remove('ap-inst-pulse-done')); }
         if (pulseStarted !== null) {
@@ -332,15 +379,27 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
         }
         if (pulseDemo >= 0) {
           pulseDemo += dt; const t = pulseDemo;
-          const demoOn = t < .28 || (t > .58 && t < 1.4) || (t > 1.7 && t < 1.98);
-          ensureTone(demoOn); if (t > 2.1) { pulseDemo = -1; stopTone(); }
+          demoIndex = t < .28 ? 0 : t > .58 && t < 1.4 ? 1 : t > 1.7 && t < 1.98 ? 2 : -1;
+          ensureTone(demoIndex >= 0); if (t > 2.1) { pulseDemo = -1; stopTone(); }
         }
+      }
+      if (kind === 'signal') {
+        stage.querySelectorAll<HTMLElement>('.ap-inst-pulse').forEach((pulse, i) => {
+          const active = pulseStarted !== null && i === draft.pulses.length;
+          pulse.classList.toggle('ap-inst-pulse-active', active);
+          pulse.classList.toggle('ap-inst-pulse-next', locked && i === draft.pulses.length);
+          pulse.classList.toggle('ap-inst-pulse-demo', i === demoIndex);
+          pulse.classList.toggle('ap-inst-pulse-done', i < draft.pulses.length);
+          pulse.style.setProperty('--pulse-fill', active ? `${Math.min(100, (now - pulseStarted!) / (PULSE_PATTERN[i] * 1000) * 100)}%` : '0%');
+        });
       }
       if (context && canvas) { if (kind === 'signal') drawSignal(context, canvas.width, canvas.height); else drawOptics(context, canvas.width, canvas.height); }
     }
     raf = requestAnimationFrame(frame);
   }
   listen(document, 'visibilitychange', () => { lastFrame = performance.now(); if (document.hidden) { stopTone(); pulseStarted = null; pulseDemo=-1; stage.querySelector('.ap-inst-telegraph')?.classList.remove('ap-inst-key-down'); } });
+  if (kind === 'survey') showTally(draft.captures.length, surveyTargets.length, copy.progress);
+  if (kind === 'signal') showTally(draft.pulses.length, PULSE_PATTERN.length, copy.pattern);
   persist(); raf = requestAnimationFrame(frame);
   return { dispose, snapshot };
 }

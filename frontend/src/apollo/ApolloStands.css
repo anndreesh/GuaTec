@@ -82,3 +82,32 @@
 @media(max-width:850px){.ap-stand{grid-template-columns:190px minmax(0,1fr)}.ap-stand-brief{padding:20px 16px}.ap-stand-brief h2{font-size:23px}.ap-stand-workspace{padding:16px;gap:15px}.ap-placement-tray,.ap-placement-slots{gap:7px}.ap-placement-piece,.ap-placement-slot{padding:10px 7px}.ap-placement-piece strong,.ap-placement-slot strong{font-size:11px}.ap-weather-panel{grid-template-columns:1fr}.ap-wind-rose{margin:auto}}
 @media(max-width:640px){.ap-dialog.ap-stand-dialog{padding:14px;max-height:calc(100dvh - 24px)}.ap-stand{grid-template-columns:1fr}.ap-stand-brief{padding:16px;gap:8px;border-right:0;border-bottom:1px solid #7e977066}.ap-stand-brief h2{font-size:22px;margin:0}.ap-stand-code{padding:3px 7px;font-size:10px}.ap-dialog .ap-stand-brief p{font-size:13px}.ap-stand-footnote{display:none}.ap-stand-progress{margin-top:4px}.ap-stand-note{font-size:11px}.ap-stand-workspace{padding:14px 10px}.ap-stand-plate{font-size:8px}.ap-stand-plate>span:nth-child(2){display:none}.ap-placement-tray,.ap-placement-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.ap-placement-piece,.ap-placement-slot{min-height:76px}.ap-manifest-board :is(.ap-placement-tray,.ap-placement-slots){grid-template-columns:1fr}.ap-manifest-board .ap-placement-piece{min-height:55px;flex-direction:row;align-items:center;border-top-width:3px}.ap-manifest-board .ap-piece-index{font-size:18px}.ap-manifest-board .ap-placement-slot{min-height:60px}.ap-breaker{grid-template-columns:1fr;gap:10px}.ap-breaker-state{display:none}.ap-stand-footer{flex-direction:column-reverse;align-items:stretch;gap:10px;padding:14px}.ap-stand-footer .ap-button{text-align:center}.ap-dial-bank{gap:6px}.ap-tuner{font-size:9px;padding:9px 5px;gap:7px}.ap-tuner-face{width:54px;height:54px;border-width:5px}.ap-tuner-face span{height:18px}.ap-patch-board{min-height:300px;gap:28%}.ap-patch-board .ap-placement-piece strong{font-size:9px}.ap-patch-board .ap-placement-slot small{font-size:9px}.ap-patch-board .ap-placement-slot strong{font-size:8px}.ap-patch-board .ap-placement-piece,.ap-patch-board .ap-placement-slot{min-height:54px;padding:5px}.ap-stand-action{width:100%;font-size:12px}.ap-stand-input-hint{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.ap-stand *{transition:none!important}.ap-placement-ghost{transform:translate(-50%,-50%)}}
+
+/* Phase lamps share the bench's engraved plates; no independent game state. */
+.ap-stand-phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0 0 14px;border-bottom:1px solid #626e5966}
+.ap-stand-phase{display:flex;align-items:center;gap:8px;min-width:0;font:500 13px/1.4 Inter,system-ui,sans-serif;color:#4b5d50;overflow-wrap:anywhere}
+.ap-stand-phase i{display:grid;place-items:center;flex:0 0 16px;height:16px;border:1px solid #637362;border-radius:50%;font-style:normal;font-size:11px}
+.ap-stand-phase[data-state=active]{color:#243f32;font-weight:750}
+.ap-stand-phase[data-state=active] i{border:4px solid #45664e;background:#ecdfb8;box-shadow:0 0 0 3px #45664e24}
+.ap-stand-phase[data-state=done] i{background:#385b41;border-color:#385b41;color:#f0efd2}
+.ap-stand-phase[data-state=done] i::before{content:'✓'}
+.ap-stand-counter{font:600 13px/1.5 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:#e8d298}
+.ap-stand-plate{font:600 11px/1.5 Inter,system-ui,sans-serif;letter-spacing:.05em}
+.ap-stand-input-hint{font-size:12px;color:#334e3d}
+.ap-tuner{font:12px/1.5 Inter,system-ui,sans-serif}.ap-tuner output{font-variant-numeric:tabular-nums;color:#2b4834}
+.ap-tuner input,.ap-weather-control input,.ap-breaker input{min-height:44px;margin:0}
+.ap-weather-control,.ap-breaker{font:12px/1.5 Inter,system-ui,sans-serif}
+.ap-placement-slot small{font:11px/1.4 Inter,system-ui,sans-serif;letter-spacing:.03em}
+.ap-patch-board .ap-placement-piece strong,.ap-patch-board .ap-placement-slot strong,.ap-patch-board .ap-placement-slot small{font-size:12px;line-height:1.4}
+.ap-patch-board .ap-placement-piece,.ap-patch-board .ap-placement-slot{min-height:68px}
+.ap-stand :is(button):disabled{cursor:default}
+.ap-stand-action:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #16332a}
+.ap-stand-action:disabled{opacity:.7;box-shadow:none}
+.ap-placement-piece:active:not(:disabled){box-shadow:0 1px 0 #8f927b}
+@media(max-width:640px){
+ .ap-stand-phases{gap:8px;padding-bottom:12px}.ap-stand-phase{gap:6px;font-size:11px;align-items:flex-start}.ap-stand-phase i{margin-top:1px;flex-basis:14px;height:14px;font-size:10px}
+ .ap-stand-input-hint{font-size:12px}.ap-stand-plate{font-size:10px}.ap-tuner{font-size:11px}
+ .ap-patch-board{gap:24%;min-height:344px}
+ .ap-patch-board .ap-placement-piece strong,.ap-patch-board .ap-placement-slot strong,.ap-patch-board .ap-placement-slot small{font-size:11px}
+ .ap-patch-board .ap-placement-piece,.ap-patch-board .ap-placement-slot{padding:8px 5px}
+}

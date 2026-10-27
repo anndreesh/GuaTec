@@ -1,5 +1,6 @@
 import type { ApolloBonusCheckpoint } from './ApolloState';
 import { apolloText } from './ApolloLocale';
+import { getLanguage } from '@/core/language';
 import { FUSE_RATINGS, FUSE_SOCKETS, TELEMETRY_REFERENCE, CABLE_CHANNELS, CABLE_TARGET_ORDER, FLIGHT_CARDS, slotsCorrect, moveIntoSlot, readingsAligned, weatherAligned, advanceScan, restoreStandDraft, type StandDraft } from './ApolloStandRules';
 import './ApolloStands.css';
 import {mountCredentialImprinter} from './ApolloCredentialImprinter';
@@ -19,6 +20,13 @@ const descriptions: Record<ApolloBonusCheckpoint['kind'], { code: string; title:
   weather: { code: 'WX / 06', title: 'Parte de observación', verb: 'Alinea la veleta y ajusta la placa de nubosidad.', note: 'Referencia del ejercicio: rumbo 225° y placa al 35 %. No son mediciones históricas.' },
   beacons: { code: 'SAFE / 07', title: 'Barrido del perímetro', verb: 'Mueve el visor sobre cada baliza y mantén el encuadre.', note: 'Inspecciona B1, B2 y B3. También puedes mover el visor con las flechas.' },
 };
+
+// Phase copy is presentation-only; completion still uses the stand rules below.
+const PHASE_COPY = {
+  es: { label: 'Protocolo', sequence: ['Encajar', 'Comprobar', 'Energizar'], 'flight-plan': ['Ordenar', 'Revisar', 'Sellar'], telemetry: ['Sintonizar', 'Superponer', 'Fijar'], cables: ['Conectar', 'Comprobar', 'Registrar'], 'crew-manifest': ['Elegir', 'Imprimir', 'Registrar'], weather: ['Orientar', 'Comparar', 'Sellar'], beacons: ['Apuntar', 'Mantener', 'Registrar'] },
+  en: { label: 'Protocol', sequence: ['Fit', 'Check', 'Power'], 'flight-plan': ['Order', 'Review', 'Stamp'], telemetry: ['Tune', 'Match', 'Lock'], cables: ['Connect', 'Check', 'Record'], 'crew-manifest': ['Choose', 'Print', 'Record'], weather: ['Point', 'Compare', 'Stamp'], beacons: ['Aim', 'Hold', 'Record'] },
+  fr: { label: 'Protocole', sequence: ['Insérer', 'Vérifier', 'Alimenter'], 'flight-plan': ['Ordonner', 'Vérifier', 'Tamponner'], telemetry: ['Régler', 'Superposer', 'Verrouiller'], cables: ['Brancher', 'Vérifier', 'Consigner'], 'crew-manifest': ['Choisir', 'Imprimer', 'Consigner'], weather: ['Orienter', 'Comparer', 'Tamponner'], beacons: ['Viser', 'Maintenir', 'Consigner'] },
+} as const;
 
 export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoint, options: BonusMissionOptions): BonusMissionHandle {
   const abort = new AbortController(), timers = new Set<number>(), frames = new Set<number>();
@@ -44,6 +52,20 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   rail.append(progress, counter, node('small', 'ap-stand-footnote', 'OPERACIONES DE APOYO · RECREACIÓN EDUCATIVA'));
   const workspace = node('div', 'ap-stand-workspace'), plate = node('header', 'ap-stand-plate');
   plate.append(node('span', '', 'APOLLO 11'), node('span', '', 'AS-506 / LC-39A'), node('span', 'ap-stand-led', '● EN SERVICIO')); workspace.append(plate);
+  const phaseCopy = PHASE_COPY[getLanguage()], phases = node('ol', 'ap-stand-phases');
+  phases.setAttribute('aria-label', phaseCopy.label);
+  const phaseNodes = phaseCopy[bonus.kind].map(label => { const item = document.createElement('li'); item.className = 'ap-stand-phase'; const light = node('i'); light.setAttribute('aria-hidden', 'true'); const text = document.createElement('span'); text.textContent = label; item.append(light, text); phases.append(item); return item; });
+  workspace.append(phases);
+  let shownPhase = -1, shownComplete = false;
+  const setPhase = (index: number) => {
+    if (index === shownPhase && complete === shownComplete) return;
+    shownPhase = index; shownComplete = complete; stage.dataset.phase = String(index);
+    phaseNodes.forEach((item, i) => {
+      item.dataset.state = complete || i < index ? 'done' : i === index ? 'active' : 'pending';
+      if (!complete && i === index) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current');
+    });
+  };
+  setPhase(0);
   const feedback = node('p', 'ap-stand-feedback', 'Manipula las piezas para comenzar.'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
   const footer = node('footer', 'ap-stand-footer'), back = node('button', 'ap-button', 'Volver al recorrido'); back.type = 'button'; listen(back, 'click', options.onCancel);
   footer.append(back, feedback); stage.append(rail, workspace, footer); host.append(stage);
@@ -54,7 +76,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   };
   const finish = (message: string) => {
     if (complete || disposed) return;
-    complete = true; stage.dataset.feedback = 'complete'; update(1, '✓ REGISTRO VALIDADO'); feedback.textContent = apolloText(message); options.onFeedback?.('success');
+    complete = true; setPhase(2); stage.dataset.feedback = 'complete'; update(1, '✓ REGISTRO VALIDADO'); feedback.textContent = apolloText(message); options.onFeedback?.('success');
     workspace.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach(control => control.disabled = true);
     later(options.onComplete, 900);
   };
@@ -81,6 +103,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     const render = () => {
       chips.forEach((chip, i) => { chip.dataset.placed = String(slots.includes(i)); chip.setAttribute('aria-pressed', String(selected === i)); });
       destinations.forEach((slot, i) => { const value = slots[i]; slot.dataset.filled = String(value !== null); slot.querySelector('strong')!.textContent = value === null ? '—' : apolloText(items[value!]!); });
+      setPhase(slots.every(value => value !== null) ? 1 : 0);
       onChange([...slots]); board.dispatchEvent(new Event('placementchange'));draftChanged();
     };
     const place = (item: number, slot: number) => { if (complete) return; slots = moveIntoSlot(slots, item, slot); selected = null; render(); feedback.textContent = apolloText('Pieza colocada · puedes cambiarla antes de verificar.'); };
@@ -124,7 +147,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   if (bonus.kind === 'sequence') {
     let fitted = false;
     placement(FUSE_RATINGS.map(rating => rating + ' A'), FUSE_SOCKETS.map(rating => rating + ' A / PORTAFUSIBLE'), 'ap-fuse-board', slots => {
-      fitted = slotsCorrect(slots.map(i => i === null ? null : FUSE_RATINGS[i]!), FUSE_SOCKETS); update(slots.filter(i => i !== null).length / 5, slots.filter(i => i !== null).length + ' / 4 FUSIBLES');
+      fitted = slotsCorrect(slots.map(i => i === null ? null : FUSE_RATINGS[i]!), FUSE_SOCKETS); if (fitted) setPhase(2); update(slots.filter(i => i !== null).length / 5, slots.filter(i => i !== null).length + ' / 4 FUSIBLES');
     });
     const leverBox = node('label', 'ap-breaker'), lever = node('input'); lever.type = 'range'; lever.min = '0'; lever.max = '100'; lever.value = '0'; lever.setAttribute('aria-label', apolloText('Palanca de alimentación'));
     listen(lever, 'input', () => { if (Number(lever.value) < 95) return; if (!fitted) { lever.value = '0'; fail('Circuito abierto · revisa el amperaje de cada fusible.'); } else finish('Alimentación estable · banco de apoyo energizado.'); });
@@ -134,20 +157,20 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   if (bonus.kind === 'flight-plan') {
     const items=[FLIGHT_CARDS[2].title,FLIGHT_CARDS[0].title,FLIGHT_CARDS[3].title,FLIGHT_CARDS[1].title];
     const labels=['01 / PREPARACIÓN','02 / EMBARQUE','03 / MOTORES','04 / SALIDA'];
-    const deck=placement(items,labels,'ap-timeline-board',slots=>update(slots.filter(v=>v!==null).length/4*.85,slots.filter(v=>v!==null).length+' / 4 DOCUMENTOS'));
+    const deck=placement(items,labels,'ap-timeline-board',slots=>{update(slots.filter(v=>v!==null).length/4*.85,slots.filter(v=>v!==null).length+' / 4 DOCUMENTOS');if(slotsCorrect(slots,[1,3,0,2]))setPhase(2);});
     action('Sellar plan de vuelo',()=>slotsCorrect(deck.get(),[1,3,0,2])?finish('Cronología validada · registro archivado.'):fail('Hay documentos pendientes o fuera de lugar. Revisa las placas de destino.'));
   }
 
   if(bonus.kind==='crew-manifest'){
     const imprinter=mountCredentialImprinter(workspace,{draft,signal:abort.signal,onDraft:()=>draftChanged(),onRead:count=>{
-      update(count/3,count+' / 3 CREDENCIALES');
+      update(count/3,count+' / 3 CREDENCIALES'); setPhase(count === 3 ? 2 : count ? 1 : 0);
       if(count)feedback.textContent=apolloText('Credencial impresa · función registrada en el manifiesto.');
     },onReject:fail,onComplete:()=>finish('Tripulación identificada · manifiesto cotejado.')});
     snapshot=imprinter.snapshot;
   }
 
   if (bonus.kind === 'cables') {
-    const deck = placement(CABLE_CHANNELS.map((channel, i) => channel + ' / CANAL ' + (i + 1)), CABLE_TARGET_ORDER.map(channel => 'BORNE ' + channel), 'ap-patch-board', slots => update(slots.filter(v => v !== null).length / 4 * .85, slots.filter(v => v !== null).length + ' / 4 CONECTORES'));
+    const deck = placement(CABLE_CHANNELS.map((channel, i) => channel + ' / CANAL ' + (i + 1)), CABLE_TARGET_ORDER.map(channel => 'BORNE ' + channel), 'ap-patch-board', slots => {update(slots.filter(v => v !== null).length / 4 * .85, slots.filter(v => v !== null).length + ' / 4 CONECTORES');if(slotsCorrect(slots.map(i => i === null ? null : CABLE_CHANNELS[i]!), CABLE_TARGET_ORDER))setPhase(2);});
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.classList.add('ap-patch-wires'); svg.setAttribute('viewBox', '0 0 1000 400'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true'); deck.board.prepend(svg);
     const draw = () => {
       svg.replaceChildren();
@@ -164,8 +187,8 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     snapshot=()=>({version:1,kind:bonus.kind,controls:[...values]});
     TELEMETRY_REFERENCE.forEach((reference, index) => {
       const dial = node('label', 'ap-tuner'), face = node('div', 'ap-tuner-face'), needle = node('span'), input = node('input'), out = node('output');
-      face.append(needle); input.type = 'range'; input.min = '0'; input.max = '100'; input.value = String(values[index]); input.setAttribute('aria-label', ['S-IVB', 'Enlace', 'Plataforma'][index]!);
-      const render = () => { values[index] = Number(input.value); face.style.setProperty('--dial-angle', (-130 + values[index]! * 2.6) + 'deg'); out.textContent = input.value + ' / REF ' + reference; dial.dataset.aligned = String(Math.abs(values[index]! - reference) <= 3); update(values.filter((v, i) => Math.abs(v - TELEMETRY_REFERENCE[i]!) <= 3).length / 3 * .9, 'AJUSTE DE SEÑAL');draftChanged(); };
+      face.append(needle); input.type = 'range'; input.min = '0'; input.max = '100'; input.value = String(values[index]); input.setAttribute('aria-label', apolloText(['S-IVB', 'Enlace', 'Plataforma'][index]!));
+      const render = () => { values[index] = Number(input.value); face.style.setProperty('--dial-angle', (-130 + values[index]! * 2.6) + 'deg'); out.textContent = input.value + ' / REF ' + reference; dial.dataset.aligned = String(Math.abs(values[index]! - reference) <= 3); setPhase(readingsAligned(values) ? 2 : values.some((v, i) => Math.abs(v - TELEMETRY_REFERENCE[i]!) <= 3) ? 1 : 0); update(values.filter((v, i) => Math.abs(v - TELEMETRY_REFERENCE[i]!) <= 3).length / 3 * .9, 'AJUSTE DE SEÑAL');draftChanged(); };
       listen(input, 'input', render); dial.append(node('strong', '', ['S-IVB', 'Enlace', 'Plataforma'][index]), face, out, input); controls.append(dial); render();
       let turn: { pointer: number; y: number; value: number } | null = null;
       listen<PointerEvent>(face,'pointerdown',event=>{if(complete||event.button!==0)return;turn={pointer:event.pointerId,y:event.clientY,value:Number(input.value)};face.setPointerCapture(event.pointerId);input.focus({preventScroll:true});});
@@ -192,7 +215,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     snapshot=()=>({version:1,kind:bonus.kind,controls:[heading,cloud]});
     const addControl = (label: string, max: number, initial: number, callback: (v: number) => void) => {
       const row = node('label', 'ap-weather-control'), input = node('input'), output = node('output'); input.type = 'range'; input.min = '0'; input.max = String(max); input.value = String(initial); input.setAttribute('aria-label', apolloText(label));
-      const render = () => { output.textContent = input.value + (max === 359 ? '°' : ' %'); callback(Number(input.value)); update(weatherAligned(heading, cloud) ? .9 : .25, weatherAligned(heading, cloud) ? 'PARTE PREPARADO' : 'COMPARANDO REFERENCIA');draftChanged(); };
+      const render = () => { output.textContent = input.value + (max === 359 ? '°' : ' %'); callback(Number(input.value)); setPhase(weatherAligned(heading, cloud) ? 2 : heading !== (draft.controls?.[0] ?? 65) || cloud !== (draft.controls?.[1] ?? 75) ? 1 : 0); update(weatherAligned(heading, cloud) ? .9 : .25, weatherAligned(heading, cloud) ? 'PARTE PREPARADO' : 'COMPARANDO REFERENCIA');draftChanged(); };
       listen(input, 'input', render); row.append(node('span', '', label), input, output); controls.append(row); render();return input;
     };
     const headingControl=addControl('Rumbo de veleta', 359, heading, v => { heading = v; needle.style.transform = 'rotate(' + v + 'deg)'; });
@@ -215,7 +238,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     update(recorded.filter(Boolean).length/3,recorded.filter(Boolean).length+' / 3 BALIZAS REGISTRADAS');
     let aim = { x: .5, y: .7 };
     let active=true;
-    const suspendScan=()=>{active=false;keys.clear();lock.fill(0);};
+    const suspendScan=()=>{active=false;keys.clear();lock.fill(0);if(!complete)setPhase(0);};
     listen(window,'blur',suspendScan);listen(window,'focus',()=>{active=!document.hidden;});
     listen(document,'visibilitychange',()=>{if(document.hidden)suspendScan();else active=true;});
     const pointer = (event: PointerEvent) => { const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return; aim = { x: Math.max(0, Math.min(1, (event.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (event.clientY - r.top) / r.height)) }; };
@@ -228,13 +251,16 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
       const c = canvas.getContext('2d')!; c.fillStyle = '#122a28'; c.fillRect(0, 0, 800, 400); c.strokeStyle = '#2c4940'; c.lineWidth = 1;
       for (let x = 0; x < 800; x += 50) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 400); c.stroke(); } for (let y = 0; y < 400; y += 50) { c.beginPath(); c.moveTo(0, y); c.lineTo(800, y); c.stroke(); }
       c.strokeStyle = '#8d815b'; c.setLineDash([8, 7]); c.strokeRect(85, 48, 620, 295); c.setLineDash([]);
+      let scanPhase = 0;
       points.forEach((point, i) => {
         const aligned = Math.hypot((aim.x - point.x) * 2, aim.y - point.y) < .09;
         lock[i] = recorded[i] ? 1 : advanceScan(lock[i]!, dt, aligned);
         if (!recorded[i] && lock[i]! >= 1) { recorded[i] = true; options.onFeedback?.('success'); update(recorded.filter(Boolean).length / 3, recorded.filter(Boolean).length + ' / 3 BALIZAS REGISTRADAS');draftChanged(); }
+        if (aligned) scanPhase = recorded[i] ? 2 : lock[i]! > 0 ? 1 : 0;
         const x = point.x * 800, y = point.y * 400; c.fillStyle = recorded[i] ? '#9bd4a8' : '#e4b76c'; c.beginPath(); c.arc(x, y, 7 + Math.sin(time * 2) * 1, 0, Math.PI * 2); c.fill();
         c.lineWidth = 3; c.strokeStyle = recorded[i] ? '#9bd4a8' : '#e4b76c'; c.beginPath(); c.arc(x, y, 20, -Math.PI / 2, -Math.PI / 2 + lock[i]! * Math.PI * 2); c.stroke(); c.font = 'bold 15px monospace'; c.fillText((recorded[i] ? '✓ ' : '') + 'B' + (i + 1), x + 26, y + 5);
       });
+      setPhase(scanPhase);
       const x = aim.x * 800, y = aim.y * 400; c.strokeStyle = '#e1dfbf'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 35, 0, Math.PI * 2); c.moveTo(x - 48, y); c.lineTo(x + 48, y); c.moveTo(x, y - 48); c.lineTo(x, y + 48); c.stroke();
       if (recorded.every(Boolean)) finish('Perímetro inspeccionado · traslado a observación autorizado.');
     });
