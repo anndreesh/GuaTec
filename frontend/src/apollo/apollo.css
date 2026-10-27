@@ -4,7 +4,19 @@
 @media(prefers-reduced-motion:reduce){.ap-radio,.ap-button,.ap-cinema{transition:none}}
 
 body.apollo-cinematic .language-menu{visibility:hidden}
+body.apollo-active .language-menu{display:none}
+.ap-pause-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 14px}
+.ap-pause-control{display:flex;align-items:center;gap:12px;min-height:76px;padding:14px;background:#162e35;border-color:#718b8755}
+.ap-pause-control:hover{background:#294850;border-color:#e7c18b}
+.ap-pause-icon{display:grid;place-items:center;width:32px;height:32px;color:#f1c77f;font-size:24px}
+.ap-pause-control strong{font-size:12px;font-weight:550}
+.ap-language-options{display:flex;gap:6px;grid-column:1 / -1;padding:4px 0}
+.ap-language-option{min-width:54px;padding:9px 12px;text-align:center}
+.ap-language-option[aria-pressed="true"]{border-color:#e7c18b;color:#f1c77f;background:#2b4a4d}
+.ap-pause-map-title{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d7c59f;margin:4px 0}
+.ap-pause-map{display:block;width:100%;height:220px;object-fit:cover;background:#101e23;border:1px solid #718b8755}
 @media(max-width:520px){.ap-mark{flex:0 0 65px}.ap-mark b{font-size:15px;letter-spacing:.12em}.ap-mark b span{display:block}.ap-controls{margin-right:72px;flex-shrink:0}.ap-controls .ap-button{font-size:9px;padding:7px;min-width:38px}.ap-objective>small:first-child{display:block;font-size:8px}.ap-progress{float:none;display:block;margin-top:5px;font-size:10px}}
+@media(max-width:520px){.ap-pause-control{min-height:68px;padding:10px;gap:7px}.ap-pause-control strong{font-size:10px}.ap-pause-icon{width:26px;font-size:20px}.ap-pause-map{height:170px}}
 
 /* Lift the checkpoint panel while preserving its existing dimensions. */
 .ap-objective{top:4px}

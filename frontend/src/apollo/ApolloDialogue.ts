@@ -64,6 +64,9 @@ export class ApolloDialogue {
     const text=document.createElement('p');text.textContent=apolloText(line.text);
     content.append(header,text);this.host.append(avatar,content);this.host.classList.add('ap-radio-visible');
   }
+  refreshLanguage() {
+    if (this.active) this.render(this.active);
+  }
   clear() {
     this.queue=[];this.active=null;this.remaining=0;this.voice?.stop();
     this.host.replaceChildren();this.host.classList.remove('ap-radio-visible');

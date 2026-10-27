@@ -44,6 +44,7 @@ export class GameApp {
     this.menuBackdrop = document.getElementById("menu-backdrop");
     this.languageMenu = this.createLanguageMenu();
     document.getElementById("app")?.append(this.languageMenu);
+    window.addEventListener("languagechange", () => void this.refreshForLanguage());
     this.chooseMenuBackground();
   }
 
@@ -74,7 +75,6 @@ export class GameApp {
           render();
           list.classList.remove("language-menu-list--open");
           button.setAttribute("aria-expanded", "false");
-          void this.refreshForLanguage();
         });
         list.append(option);
       });
@@ -251,6 +251,12 @@ export class GameApp {
   }
 
   private async refreshForLanguage(): Promise<void> {
+    // Apollo 11 owns a live Three.js world. Refresh its DOM and localized
+    // textures in place so changing language never tears down gameplay.
+    if (this.activeView === "mission1" && this.currentScreen?.refreshLanguage) {
+      await this.currentScreen.refreshLanguage();
+      return;
+    }
     switch (this.activeView) {
       case "splash":
         await this.showSplash();

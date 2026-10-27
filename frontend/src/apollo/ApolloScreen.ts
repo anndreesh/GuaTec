@@ -11,6 +11,7 @@ import './apollo.css';
 import './apollo-start-error.css';
 import { apolloText, apolloLanguage } from './ApolloLocale';
 import { ApolloVoice } from './ApolloVoice';
+import { setLanguage } from '@/core/i18n';
 import { mountInstrument, type InstrumentHandle, type InstrumentKind } from './ApolloInstruments';
 import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts } from './ApolloFieldProgress';
 
@@ -79,6 +80,7 @@ export class ApolloScreen implements Screen {
   private prompt!: HTMLButtonElement;
   private map!: HTMLCanvasElement;
   private modal: HTMLElement | null = null;
+  private modalKind: 'welcome'|'pause'|'map'|'end'|'credits'|'sketchfab'|'reset'|'station'|null = null;
   private movie: 'intro'|'crew'|'launch'|null = null;
   private movieTime=0;
   private movieOverlay: HTMLElement | null=null;
@@ -91,7 +93,7 @@ export class ApolloScreen implements Screen {
   private syncTime=0;
   private hudTime=0;
   private activeIndex=-1;
-  private quality:Quality='medium';
+  private quality:Quality='high';
   private zoom=false;
   private stepDistance=0;
   private audio=new ApolloAudio();
@@ -130,6 +132,7 @@ export class ApolloScreen implements Screen {
     return {...this.state.toJSON(),fieldDrafts:this.fieldDrafts,resumeInstrument:!!this.instrument};
   }
   async mount(container:HTMLElement) {
+    document.body.classList.add('apollo-active');
     this.root=el('div','apollo-screen');
     const loading=el('div','ap-loading','PREPARANDO OPERACIONES · APOLLO 11'); this.root.append(loading); container.append(this.root);
     let saved:unknown=this.initialState;
@@ -196,20 +199,18 @@ export class ApolloScreen implements Screen {
   private buildHud() {
     const top=el('div','ap-topbar');
     const mark=el('div','ap-mark'); mark.innerHTML='<b>APOLLO <span>11</span></b><small>KENNEDY SPACE CENTER · 16 JUL 1969</small>';
-    const actions=el('div','ap-controls');
-    actions.append(this.button('Mapa · M',()=>this.openMap()),this.button('Radio · R',()=>this.dialogue.repeat()),this.button('Zoom',()=>{this.zoom=!this.zoom;this.world.setZoom(this.zoom);}),this.button('Pausa',()=>this.openPause()));
-    top.append(mark,actions); this.root.append(top);
+    top.append(mark); this.root.append(top);
     this.hud=el('section','ap-objective'); this.hud.setAttribute('aria-label',apolloText('Objetivo actual')); this.root.append(this.hud);
     this.subtitle=el('div','ap-radio'); this.subtitle.setAttribute('aria-live','polite'); this.root.append(this.subtitle);
     this.prompt=this.button('',()=>this.interact(),'ap-interact'); this.root.append(this.prompt);
     const mapButton=this.button('',()=>this.openMap(),'ap-minimap'); mapButton.setAttribute('aria-label',apolloText('Abrir mapa de Kennedy'));
     this.map=el('canvas'); this.map.width=240; this.map.height=200;
     mapButton.append(this.map,el('span','','LC-39A · MAPA / M')); this.root.append(mapButton);
-    const help=el('div','ap-help','WASD / Flechas · Moverse     Shift · Caminar rápido     Arrastrar · Mirar     E · Interactuar'); this.root.append(help);
     this.uiTarget=el('div','ap-waypoint'); this.root.append(this.uiTarget);
     this.renderObjective();
   }
   private showWelcome() {
+    this.modalKind='welcome';
     const box=this.openModal('APOLLO 11','El comienzo de una nueva era');
     box.append(el('p','','16 de julio de 1969 · Centro Espacial Kennedy, Florida. Eres un técnico ficticio de apoyo a operaciones terrestres. Observa, documenta y comunica: tu trabajo termina en un punto seguro, antes del despegue de las 9:32 a. m. EDT.'));
     box.append(el('p','ap-note','Recreación educativa. Daniel Carter y los diálogos son ficticios. Las rutas se han acortado; no hay interiores accesibles. Los trajes Mercenary son una adaptación artística, no réplicas del A7L.'));
@@ -232,6 +233,9 @@ export class ApolloScreen implements Screen {
     this.hud.append(checklist,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
     this.world?.setTarget(this.state.done?null:cp.target);
     this.world?.setStationStatus(this.state.completed,cp.id);
+    const mapButton=this.root.querySelector<HTMLElement>('.ap-minimap');
+    mapButton?.setAttribute('aria-label',apolloText('Abrir mapa de Kennedy'));
+    const mapLabel=mapButton?.querySelector('span'); if(mapLabel)mapLabel.textContent=apolloText('LC-39A · MAPA / M');
   }
   private enterCheckpoint() {
     this.activeIndex=this.state.checkpoint; this.dialogue.enter(); this.renderObjective();
@@ -360,6 +364,7 @@ export class ApolloScreen implements Screen {
     else this.enterCheckpoint();
   }
   private showEnd() {
+    this.modalKind='end';
     const box=this.openModal(this.state.done?'MISIÓN 01 COMPLETADA':'EPÍLOGO · 16 DE JULIO DE 1969','Apollo 11 dejó la Tierra');
     box.append(el('p','','Cuatro días después, el 20 de julio, Neil Armstrong y Buzz Aldrin alunizaron en el Eagle. Michael Collins permaneció en órbita lunar a bordo del Columbia. Esos acontecimientos pertenecen al próximo capítulo.'));
     box.append(el('p','ap-resume','PRÓXIMO CAPÍTULO: EL VIAJE HACIA LA LUNA'));
@@ -391,28 +396,32 @@ export class ApolloScreen implements Screen {
   }
   private closeModal() {
     this.disposeInstrument();
-    this.modal?.remove();this.modal=null;this.paused=false;this.voice.pause(false);
+    this.modal?.remove();this.modal=null;this.modalKind=null;this.paused=false;this.voice.pause(false);
     this.world?.setSuspended(!this.started || !!this.movie);this.audio.pause(!this.started);
     if(this.started) this.world?.renderer.domElement.focus({preventScroll:true});
   }
   private openPause() {
     if(!this.world || !this.started || this.modal)return;
+    this.modalKind='pause';
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
-    box.append(this.button('Continuar',()=>this.closeModal(),'ap-button ap-primary'));
-    const select=el('select'); select.setAttribute('aria-label',apolloText('Calidad gráfica'));
-    ([['low','Baja'],['medium','Media'],['high','Alta']] as const).forEach(([value,text])=>{const o=el('option','',text);o.value=value;o.selected=value===this.quality;select.append(o);});
-    select.addEventListener('change',()=>{this.quality=select.value as Quality;this.world.setQuality(this.quality);});
-    const label=el('label','ap-quality','Calidad gráfica ');label.append(select);box.append(label);
-    const mute=this.button(this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();mute.textContent=apolloText(this.audio.muted?'Activar audio':'Silenciar audio');this.voice.setVolume(this.audio.muted?0:.82);});box.append(mute);
-    const voiceButton=this.button(`${apolloText('Voces sintéticas')} · ${apolloText(this.voice.enabled?'Activadas':'Desactivadas')}`,()=>{
-      this.voice.setEnabled(!this.voice.enabled);
-      voiceButton.textContent=`${apolloText('Voces sintéticas')} · ${apolloText(this.voice.enabled?'Activadas':'Desactivadas')}`;
-      if(this.voice.enabled){this.voice.pause(false);this.voice.speak(apolloText('Voz del navegador · sin grabación histórica'));}
-    });box.append(voiceButton,el('small','ap-note',this.voice.status()));
-    box.append(this.button('Inspección 3D · modelo Sketchfab',()=>this.openSketchfab()),this.button('Fuentes y créditos',()=>this.openCredits()));
-    box.append(this.button('Reiniciar solo Misión 01',()=>this.confirmReset()),this.button('Guardar y volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());}));
+    const grid=el('div','ap-pause-grid');
+    const mute=this.pauseControl(this.audio.muted?'🔇':'🔊',this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();this.voice.setVolume(this.audio.muted?0:.82);this.openPause();});
+    const restart=this.pauseControl('↻','Reiniciar misión',()=>this.confirmReset());
+    const missions=this.pauseControl('⌂','Volver a misiones',()=>{void this.save().then(()=>this.app.showMissionSelect());});
+    const language=this.pauseControl('文','Idioma',()=>this.togglePauseLanguage(language));
+    grid.append(mute,restart,missions,language); box.append(grid);
+    const mapCanvas=el('canvas','ap-pause-map'); mapCanvas.width=720; mapCanvas.height=300; this.drawMap(mapCanvas); box.append(el('h2','ap-pause-map-title','Mapa de operaciones'),mapCanvas);
+  }
+  private pauseControl(icon:string,label:string,callback:()=>void):HTMLElement { const b=this.button('',callback,'ap-pause-control'); b.append(el('span','ap-pause-icon',icon),el('strong','',label)); return b; }
+  private togglePauseLanguage(host:HTMLElement) {
+    const existing=this.modal?.querySelector('.ap-language-options');
+    if(existing){existing.remove();return;}
+    const options=el('div','ap-language-options');
+    (['es','en','fr'] as const).forEach(language=>{const button=this.button(language.toUpperCase(),()=>setLanguage(language),'ap-language-option');button.setAttribute('aria-pressed',String(apolloLanguage()===language));options.append(button);});
+    host.append(options);
   }
   private confirmReset() {
+    this.modalKind='reset';
     const box=this.openModal('REINICIAR MISIÓN 01','Volver al comienzo');
     box.append(el('p','','Se reiniciarán únicamente los checkpoints y diálogos de Apollo 11. El progreso de otras misiones se conserva.'));
     box.append(this.button('Reiniciar Apollo 11',()=>void (async()=>{
@@ -426,7 +435,7 @@ export class ApolloScreen implements Screen {
     if(!this.started || this.movie || !this.world)return;
     if(this.instrument){this.notify('Cierra el instrumento para abrir el mapa.');return;}
     if(this.state.checkpoint===0)this.act('map');
-    const box=this.openModal('MAPA DE OPERACIONES · GEOGRAFÍA COMPRIMIDA','Centro Espacial Kennedy');
+    this.modalKind='map'; const box=this.openModal('MAPA DE OPERACIONES · GEOGRAFÍA COMPRIMIDA','Centro Espacial Kennedy');
     const canvas=el('canvas','ap-large-map');canvas.width=720;canvas.height=540;this.drawMap(canvas);
     box.append(canvas,el('p','ap-note','N ↑ · Verde: completado · Ámbar: destino activo · Rojo: perímetro restringido. Las coordenadas del mapa corresponden al escenario. Las conexiones son una adaptación jugable de las distancias reales.'));
     const cp=this.state.current;box.append(el('p','',`${apolloText(cp.title)} · ${Math.round(this.distance())} ${apolloText('m de recorrido simulado')}`));
@@ -449,8 +458,8 @@ export class ApolloScreen implements Screen {
     c.fillStyle='#667978';
     for(const [x,z,bw,bd] of [[-125,200,26,21],[116,250,22,17],[-118,338,28,19],[120,130,24,17]]){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);}
     const [rx,rz]=p(0,0);c.fillStyle='#b55c4a30';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#c37463';c.lineWidth=1;c.stroke();
-    c.font=`${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#afc1c2';c.fillText('N ↑',10,20);c.fillText('39A',rx+10,rz+4);
-    c.fillStyle='#a7b9b5';c.fillText('↖ VAB · 1 km',8,Math.max(36,h*.18));
+    c.font=`${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#afc1c2';c.fillText(apolloText('N ↑'),10,20);c.fillText('39A',rx+10,rz+4);
+    c.fillStyle='#a7b9b5';c.fillText(apolloText('↖ VAB · 1 km'),8,Math.max(36,h*.18));
     CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);c.fillStyle=this.state.completed.includes(cp.id)?'#8eba9d':i===this.state.checkpoint?'#f4be67':'#597275';c.beginPath();c.arc(x,z,i===this.state.checkpoint?6:3,0,Math.PI*2);c.fill();if(w>300)c.fillText(`${i+1}. ${apolloText(cp.title)}`,x+10,z+5);});
     const target=this.state.current.target;
     const remote=this.world.player.z>5000;
@@ -460,6 +469,7 @@ export class ApolloScreen implements Screen {
     c.save();c.translate(px,pz);c.rotate(-this.world.yaw);c.fillStyle='#fff1d5';c.beginPath();c.moveTo(0,-7);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.restore();
   }
   private openSketchfab() {
+    this.modalKind='sketchfab';
     const box=this.openModal('VISOR OFICIAL EXTERNO · NO INTEGRADO EN EL ESCENARIO','Saturn V de HUuser2024');
     box.append(el('p','','LEGO Animated Saturn V Apollo 11 Rocket launch · 1 animación · 10.291.703 caras. Licencia Standard, sin descarga autorizada disponible. El lanzamiento del escenario utiliza una recreación original independiente.'));
     const frame=el('iframe','ap-sketchfab');frame.title='Visor oficial Sketchfab del Saturn V de HUuser2024';
@@ -476,6 +486,7 @@ export class ApolloScreen implements Screen {
     box.append(this.button('Volver',()=>{this.closeModal();if(!this.started)this.showWelcome();}));
   }
   private openCredits() {
+    this.modalKind='credits';
     const box=this.openModal('FUENTES, LICENCIAS Y ADAPTACIONES','Una recreación de un día real');
     box.append(el('p','','Hechos documentados: Apollo 11, Saturn V AS-506, lanzamiento desde 39A el 16 de julio de 1969 a las 09:32 EDT. Traslado de la tripulación a las 06:27 EDT. Epílogo lunar del 20 de julio.'));
     const links=[['NASA · Apollo 11','https://www.nasa.gov/mission/apollo-11/'],['NASA · El día del lanzamiento','https://www.nasa.gov/history/50-years-ago-apollo-11-off-to-the-moon/'],['Mercenary Astronaut · Peter_D · CC BY 4.0','https://sketchfab.com/3d-models/mercenary-astronaut-7fd399d488ae4576a0fc62715892956c'],['Licencia CC BY 4.0','https://creativecommons.org/licenses/by/4.0/']];
@@ -486,6 +497,24 @@ export class ApolloScreen implements Screen {
   private notify(text:string) {
     this.root.querySelector('.ap-toast')?.remove();const n=el('div','ap-toast',text);n.setAttribute('role','status');this.root.append(n);
     clearTimeout(this.flashTimer);this.flashTimer=window.setTimeout(()=>n.remove(),4800);
+  }
+  refreshLanguage(): void {
+    this.world.refreshLanguage();
+    this.dialogue?.refreshLanguage();
+    if (this.movie) { this.renderMovie(); return; }
+    this.renderObjective(); this.updateNavigation();
+    const kind=this.modalKind;
+    if (!kind) return;
+    this.captureInstrumentDraft();
+    if (this.instrument) { this.disposeInstrument(); this.modal?.remove(); this.modal=null; this.modalKind=null; this.openFieldInstrument(); return; }
+    this.modal?.remove(); this.modal=null; this.modalKind=null;
+    if (kind==='welcome') this.showWelcome();
+    else if (kind==='pause') this.openPause();
+    else if (kind==='map') this.openMap();
+    else if (kind==='end') this.showEnd();
+    else if (kind==='credits') this.openCredits();
+    else if (kind==='sketchfab') this.openSketchfab();
+    else if (kind==='reset') this.confirmReset();
   }
   private async save() {
     if(this.disposed || !this.started)return;
@@ -545,6 +574,7 @@ export class ApolloScreen implements Screen {
     return {...this.world.diagnostics(),checkpoint:this.state.checkpoint,checks:this.state.checks,completed:this.state.completed,movie:this.movie,movieTime:this.movieTime,quality:this.quality,frameMs:average,fps:average?1000/average:0,samples:times.length};
   }
   unmount() {
+    document.body.classList.remove('apollo-active');
     document.body.classList.remove('apollo-cinematic');
     this.disposeInstrument();this.voice.dispose();clearTimeout(this.draftTimer);
     this.disposed=true;cancelAnimationFrame(this.raf);clearTimeout(this.flashTimer);

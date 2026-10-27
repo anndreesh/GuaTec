@@ -4,6 +4,10 @@ import type { Language } from '@/core/i18n';
  * independent; translated dynamic fragments are composed rather than sent to a service. */
 const rows: readonly (readonly [string, string, string])[] = [
   ['Instrumentos de campo','Field instruments','Instruments de terrain'],
+  ['Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.','Kennedy Space Center in 1969. Apollo 11 3D scene.','Centre spatial Kennedy en 1969. Scène 3D d’Apollo 11.'],
+  ['Misión 01: Apollo 11','Mission 01: Apollo 11','Mission 01 : Apollo 11'],
+  ['El comienzo de una nueva era · 16 de julio de 1969','The beginning of a new era · July 16, 1969','Le début d’une nouvelle ère · 16 juillet 1969'],
+  ['Kennedy Space Center. Completa operaciones de apoyo, observa el traslado de la tripulación y presencia el lanzamiento del Saturn V.','Kennedy Space Center. Complete support operations, observe the crew transfer and witness the Saturn V launch.','Centre spatial Kennedy. Accomplissez les opérations de soutien, observez le transfert de l’équipage et assistez au lancement de Saturn V.'],
   ['Reconocimiento óptico','Optical survey','Reconnaissance optique'],
   ['Clasificación de registros','Record classification','Classement des registres'],
   ['Sintonización de enlace','Link tuning','Réglage de la liaison'],
@@ -21,6 +25,7 @@ const rows: readonly (readonly [string, string, string])[] = [
   ['Cierra el instrumento para abrir el mapa.','Close the instrument to open the map.','Fermez l’instrument pour ouvrir la carte.'],
 
   ['Mapa · M','Map · M','Carte · M'], ['Radio · R','Radio · R','Radio · R'], ['Pausa','Pause','Pause'],
+  ['Idioma','Language','Langue'], ['Reiniciar misión','Restart mission','Recommencer la mission'], ['Mapa de operaciones','Operations map','Carte des opérations'],
   ['Continuar','Resume','Reprendre'], ['Volver','Back','Retour'], ['Cancelar','Cancel','Annuler'],
   ['Baja','Low','Faible'], ['Media','Medium','Moyenne'], ['Alta','High','Élevée'],
   ['Tres','Three','Trois'], ['Cuatro','Four','Quatre'], ['Cinco','Five','Cinq'],
@@ -101,6 +106,12 @@ const rows: readonly (readonly [string, string, string])[] = [
   ['No se pudo reiniciar en el servidor. Comprueba la conexión.','The server could not restart the mission. Check your connection.','Le serveur n’a pas pu réinitialiser la mission. Vérifiez la connexion.'],
   ['MAPA DE OPERACIONES · GEOGRAFÍA COMPRIMIDA','OPERATIONS MAP · COMPRESSED GEOGRAPHY','CARTE DES OPÉRATIONS · GÉOGRAPHIE COMPRIMÉE'],
   ['Centro Espacial Kennedy','Kennedy Space Center','Centre spatial Kennedy'],
+  ['CENTRO ESPACIAL KENNEDY','KENNEDY SPACE CENTER','CENTRE SPATIAL KENNEDY'],
+  ['OPERACIONES TERRESTRES · 1969','GROUND OPERATIONS · 1969','OPÉRATIONS AU SOL · 1969'],
+  ['PLATAFORMA 39A','LAUNCH PAD 39A','PAS DE TIR 39A'],
+  ['ÁREA RESTRINGIDA · NO PASAR','RESTRICTED AREA · DO NOT ENTER','ZONE INTERDITE · NE PAS ENTRER'],
+  ['OBSERVACIÓN DEL LANZAMIENTO','LAUNCH OBSERVATION','OBSERVATION DU LANCEMENT'],
+  ['DISTANCIA DE SEGURIDAD · 5,6 KM','SAFETY DISTANCE · 5.6 KM','DISTANCE DE SÉCURITÉ · 5,6 KM'],
   ['N ↑ · Verde: completado · Ámbar: destino activo · Rojo: perímetro restringido. Las coordenadas del mapa corresponden al escenario. Las conexiones son una adaptación jugable de las distancias reales.','N ↑ · Green: complete · Amber: active destination · Red: restricted perimeter. Map coordinates match the scene. Connections adapt real distances for gameplay.','N ↑ · Vert : terminé · Ambre : destination active · Rouge : périmètre interdit. Les coordonnées correspondent à la scène. Les liaisons adaptent les distances réelles au jeu.'],
   ['Volver a operaciones','Return to operations','Retour aux opérations'],
   ['OBSERVACIÓN · 5,6 km','OBSERVATION · 5.6 km','OBSERVATION · 5,6 km'],

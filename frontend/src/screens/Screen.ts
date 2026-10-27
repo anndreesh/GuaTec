@@ -4,4 +4,5 @@ export interface Screen {
   unmount(): void;
   /** Optional in-memory snapshot used when the app re-renders for a language change. */
   languageRefreshState?(): unknown;
+  refreshLanguage?(): void | Promise<void>;
 }

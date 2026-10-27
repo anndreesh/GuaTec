@@ -6,6 +6,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { loadProp, scatter, type PropOptions } from './ApolloProps';
 import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
 import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
+import { apolloText } from './ApolloLocale';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -41,6 +42,8 @@ export class ApolloWorld {
   private cinematicElapsed = 0;
   private clock = 0;
   private playerRoot = new THREE.Group();
+  private verticalVelocity = 0;
+  private grounded = true;
   private crewRoot = new THREE.Group();
   private rocket = new THREE.Group();
   private van = new THREE.Group();
@@ -74,6 +77,7 @@ export class ApolloWorld {
   private lateProps = new THREE.Group();
   private nasaTexture: THREE.Texture | null = null;
   private cloudSprites = new THREE.Group();
+  private localizedSigns: { title: string; subtitle: string; planes: THREE.Mesh[]; width: number }[] = [];
 
   constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void }) {
     this.furniture = {
@@ -91,7 +95,7 @@ export class ApolloWorld {
       precision: conservativeRenderer ? 'mediump' : 'highp',
     });
     this.renderer.domElement.className = 'apollo-world-canvas';
-    this.renderer.domElement.setAttribute('aria-label', 'Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.');
+    this.renderer.domElement.setAttribute('aria-label', apolloText('Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.'));
     this.renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;touch-action:none';
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -125,14 +129,14 @@ export class ApolloWorld {
     this.flushStatic();
     this.scene.add(this.playerRoot, this.crewRoot);
     this.playerRoot.position.copy(this.player);
-    this.camera.position.set(this.player.x, 4.8, this.player.z + 11); this.camera.lookAt(0, 58, 0);
+    this.camera.position.set(this.player.x, 3.8, this.player.z + 8); this.camera.lookAt(this.player.x, 1.4, this.player.z);
     this.buildMarker();
     const smokeMaterial = new THREE.MeshBasicMaterial({ map:createSmokeTexture(), color:0xe8e3d6, transparent:true, opacity:.72, depthWrite:false, side:THREE.DoubleSide });
     this.smoke = new THREE.InstancedMesh(new THREE.PlaneGeometry(2,2), smokeMaterial, this.smokeCount);
     this.smoke.frustumCulled = false;
     this.smoke.visible = false;
     this.scene.add(this.smoke);
-    this.setQuality('medium');
+    this.setQuality('high');
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(host);
     this.resize();
@@ -146,9 +150,18 @@ export class ApolloWorld {
     this.ready = Promise.all([this.loadAstronauts(), this.loadProps()]).then(() => undefined);
   }
 
-  /** The world has no localized DOM labels, but keeps the screen refresh contract. */
+  /** Refresh only language-dependent canvas textures; geometry and player state stay intact. */
   refreshLanguage(): void {
-    // Scene geometry and materials are language-independent.
+    this.renderer.domElement.setAttribute('aria-label', apolloText('Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.'));
+    for (const sign of this.localizedSigns) {
+      for (const plane of sign.planes) {
+        const material = plane.material as THREE.MeshBasicMaterial;
+        const previous = material.map;
+        material.map = this.textTexture(`${apolloText(sign.title)}\n${apolloText(sign.subtitle)}`, '#f2e8cb', true);
+        material.needsUpdate = true;
+        previous?.dispose();
+      }
+    }
   }
 
   private async loadProps(): Promise<void> {
@@ -292,8 +305,8 @@ export class ApolloWorld {
       this.groundPlane(30 + (i % 3) * 13, 100 + i * 7, -150 - (i % 3) * 50, 90 + i * 80, water, -0.04);
     }
     this.groundPlane(26, 920, 195, 220, water, -0.03);
-    this.sign('KENNEDY SPACE CENTER', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
-    this.sign('PAD 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
+    this.sign('CENTRO ESPACIAL KENNEDY', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
+    this.sign('PLATAFORMA 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
   }
   private buildPad(): void {
     const steel = this.material('tower', 0x8f3c30, 0.64, 0.45);
@@ -503,13 +516,14 @@ export class ApolloWorld {
     // Use a separate, rotated plane for the rear face. Rendering one plane
     // with DoubleSide would expose the same UVs from behind and mirror the
     // lettering instead of giving the player a readable sign.
-    const front = this.textPlane(title + '\n' + sub, w - .12, 1.13, '#f2e8cb', true);
+    const front = this.textPlane(`${apolloText(title)}\n${apolloText(sub)}`, w - .12, 1.13, '#f2e8cb', true);
     front.position.z = .046;
     group.add(front);
-    const rear = this.textPlane(title + '\n' + sub, w - .12, 1.13, '#f2e8cb', true);
+    const rear = this.textPlane(`${apolloText(title)}\n${apolloText(sub)}`, w - .12, 1.13, '#f2e8cb', true);
     rear.position.z = -.046;
     rear.rotation.y = Math.PI;
     group.add(rear);
+    this.localizedSigns.push({ title, subtitle: sub, planes: [front, rear], width: w - .12 });
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), -w * 0.36, -y / 2, -0.08, group);
     this.box(0.08, y + 0.45, 0.08, this.material('sign-post', 0x697c78, 0.5, 0.6), w * 0.36, -y / 2, -0.08, group);
     this.scene.add(group);
@@ -521,6 +535,10 @@ export class ApolloWorld {
     this.colliders.push({ x, z, w: halfWidth, d: halfDepth });
   }
   private textPlane(text: string, w: number, h: number, color: string, background: boolean): THREE.Mesh {
+    const tex = this.textTexture(text, color, background);
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.FrontSide }));
+  }
+  private textTexture(text: string, color: string, background: boolean): THREE.CanvasTexture {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
     if (background) { ctx.fillStyle = '#243d3d'; ctx.fillRect(0, 0, 1024, 256); ctx.strokeStyle = '#b8bc9d'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, 1012, 244); }
@@ -528,7 +546,7 @@ export class ApolloWorld {
     const lines = text.split('\n');
     lines.forEach((line, i) => { ctx.font = `${i ? 31 : 58}px Arial`; ctx.fillText(line, 512, lines.length > 1 ? 92 + i * 86 : 128, 940); });
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.FrontSide }));
+    return tex;
   }
   private buildVegetation(): void {
     const count = 100;
@@ -802,7 +820,9 @@ export class ApolloWorld {
     // Substeps cap wall crossings even after a slow frame.
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.25));
     for (let i = 0; i < steps; i++) { if (this.canMove(this.player.x + dx / steps, this.player.z)) this.player.x += dx / steps; if (this.canMove(this.player.x, this.player.z + dz / steps)) this.player.z += dz / steps; }
-    this.playerRoot.rotation.y = Math.atan2(-dx, -dz);
+    // Face the actual displacement vector, not the input axes, so camera
+    // relative movement and the walk animation always agree visually.
+    this.playerRoot.rotation.y = Math.atan2(dx, dz);
     return true;
   }
   update(dt: number): void {
@@ -810,7 +830,16 @@ export class ApolloWorld {
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
     dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
     this.cloudSprites.position.x += dt * .8;
-    const moving = this.move(dt); this.playerRoot.position.copy(this.player);
+    const moving = this.move(dt);
+    if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
+      this.verticalVelocity = 6.4; this.grounded = false; this.keys.delete(' ');
+    }
+    if (!this.grounded) {
+      this.verticalVelocity -= 18 * dt;
+      this.player.y = Math.max(0, this.player.y + this.verticalVelocity * dt);
+      if (this.player.y === 0) { this.verticalVelocity = 0; this.grounded = true; }
+    }
+    this.playerRoot.position.copy(this.player);
     // The observation site is genuinely 5.6 km away: keep humid distance haze
     // subtle enough for the long lens instead of hiding the rocket in dense fog.
     if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.density = this.player.z > 5000 || this.mode === 'launch' ? 0.00004 : 0.00038;
@@ -828,8 +857,8 @@ export class ApolloWorld {
       this.inspectionPosition.set(this.inspectionTarget==='vab'?-1000:this.inspectionTarget==='tower'?-17:0,this.inspectionTarget==='vab'?81:65,this.inspectionTarget==='vab'?-100:0);
       this.camera.lookAt(this.inspectionPosition);this.camera.fov=this.inspectionTarget==='vab'?18:35;this.camera.updateProjectionMatrix();
     } else {
-      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 11, 4.5 + this.pitch, this.player.z + Math.cos(this.yaw) * 11);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 12, 6 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 12);
+      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 8, this.player.y + 3.7 + this.pitch, this.player.z + Math.cos(this.yaw) * 8);
+      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 8.5, this.player.y + 1.45 + this.pitch * 2, this.player.z - Math.cos(this.yaw) * 8.5);
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
       this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 70; this.camera.updateProjectionMatrix();
