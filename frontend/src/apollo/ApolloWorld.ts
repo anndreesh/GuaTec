@@ -478,6 +478,21 @@ export class ApolloWorld {
           this.cylinder(0.18, 0.18, 0.08, nodeMaterial, x - 1.5 + node * 1, 1.52, z + 0.55);
           this.box(0.62, 0.035, 0.035, trim, x - 1 + node * 1, 1.53, z + 0.55);
         }
+        const cable = this.material('bonus-cable', 0x9a493c, 0.55, 0.35);
+        for (let node = 0; node < 3; node++) this.beam(new THREE.Vector3(x - 1.5 + node, 1.58, z + 0.55), new THREE.Vector3(x - 0.5 + node, 1.58, z + 0.55), 0.045, cable);
+      } else if (bonus.kind === 'sequence') {
+        const relayGlow = this.material('bonus-relay-glow', 0xd77d47, 0.38, 0.25);
+        for (let relay = 0; relay < 4; relay++) {
+          this.cylinder(0.12, 0.12, 0.18, relayGlow, x - 1.25 + relay * 0.84, 1.98, z - 1.2);
+          this.beam(new THREE.Vector3(x - 1.25 + relay * 0.84, 1.98, z - 1.2), new THREE.Vector3(x - 1.25 + relay * 0.84, 1.98, z - 0.4), 0.035, relayGlow);
+        }
+      } else if (bonus.kind === 'telemetry') {
+        const dial = this.material('bonus-dial', 0xd8d0b6, 0.6, 0.25);
+        const needle = this.material('bonus-needle', 0xb75242, 0.45, 0.35);
+        for (let meter = 0; meter < 3; meter++) {
+          this.cylinder(0.42, 0.42, 0.12, dial, x - 1.15 + meter * 1.15, 1.58, z + 0.65, undefined, 20);
+          this.beam(new THREE.Vector3(x - 1.15 + meter * 1.15, 1.63, z + 0.65), new THREE.Vector3(x - 1.15 + meter * 1.15 + 0.2, 1.86, z + 0.65), 0.045, needle);
+        }
       } else if (bonus.kind === 'weather') {
         this.cylinder(0.42, 0.42, 1.25, panel, x - 2.1, 0.72, z + 0.9);
         this.cylinder(0.31, 0.31, 0.08, trim, x - 2.1, 1.38, z + 0.9);
@@ -495,6 +510,11 @@ export class ApolloWorld {
           this.box(0.5, 0.018, 0.035, trim, x - 1.15 + card * 1.15, 1.53, z + 0.72);
         }
         this.box(2.9, 0.08, 0.08, trim, x, 1.7, z + 1.15);
+        const badge = this.material('bonus-crew-badge', 0x6f8da0, 0.55, 0.3);
+        for (let astronaut = 0; astronaut < 3; astronaut++) {
+          this.cylinder(0.16, 0.16, 0.55, badge, x - 1.15 + astronaut * 1.15, 1.05, z + 1.3);
+          this.cylinder(0.21, 0.21, 0.06, manifest, x - 1.15 + astronaut * 1.15, 1.38, z + 1.3);
+        }
       }
       this.box(0.16, 1.7, 0.16, trim, x - 2.7, 0.9, z + 1.2);
       this.box(0.16, 1.7, 0.16, trim, x + 2.7, 0.9, z + 1.2);
@@ -503,7 +523,7 @@ export class ApolloWorld {
       accent.position.set(x, 1.72, z + 1.2);
       this.scene.add(accent);
       this.bonusAccents.push({ mesh: accent, phase: index * 1.8, id: bonus.id });
-      this.sign(bonus.title, 'SUBMISIÓN · OPERACIONES APOLLO 11', x + 0.5, 2.5, z - 2.25, 0, 5.5);
+      this.sign(bonus.title, 'STAND · OPERACIONES APOLLO 11', x + 0.5, 2.5, z - 2.25, 0, 5.5);
     });
   }
   private station(x: number, z: number, title: string, subtitle: string, type: StationKind): void {

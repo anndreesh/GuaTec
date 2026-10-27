@@ -210,6 +210,7 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
 
   const cancel = node('button', 'ap-button ap-bonus-cancel', 'Volver a operaciones'); cancel.type = 'button';
   listen(cancel, 'click', () => options.onCancel()); stage.append(cancel); host.append(stage);
+  stage.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true });
 
   return {
     dispose() {

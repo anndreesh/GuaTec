@@ -63,6 +63,7 @@ body.apollo-active .language-menu{display:none}
 .ap-bonus-feedback{margin:0;color:#d9c18c;font-size:11px;letter-spacing:.04em;min-height:18px}
 .ap-bonus-feedback--success{color:#9bd0a9}
 .ap-bonus-stage--error{animation:ap-bonus-shake .23s ease}
+.ap-bonus-stage--complete{box-shadow:inset 0 0 0 1px #9bd0a955,0 0 28px #79c59a20}
 @keyframes ap-bonus-shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 .ap-bonus-readout{padding:10px 12px;color:#9bc9ad;background:#08191e;border:1px solid #80a5933d;font:11px ui-monospace,SFMono-Regular,monospace;letter-spacing:.12em}
 .ap-bonus-relay-bank,.ap-bonus-beacon-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -78,7 +79,8 @@ body.apollo-active .language-menu{display:none}
 .ap-bonus-beacon-row{grid-template-columns:repeat(3,1fr)}
 .ap-bonus-beacon{min-height:72px;font-size:14px;letter-spacing:.08em}
 .ap-bonus-cable-nodes,.ap-bonus-flight-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.ap-bonus-cable-node,.ap-bonus-flight-card{min-height:60px;border:1px solid #9db6a466;background:linear-gradient(#234448,#0c242b);color:#d7e2cf;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.ap-bonus-cable-node,.ap-bonus-flight-card{min-height:60px;border:1px solid #9db6a466;background:linear-gradient(#234448,#0c242b);color:#d7e2cf;cursor:grab;transition:transform .15s,border-color .15s,background .15s}
+.ap-bonus-cable-node:active,.ap-bonus-flight-card:active,.ap-bonus-crew-card:active{cursor:grabbing}
 .ap-bonus-cable-node{border-radius:50%;font:600 12px ui-monospace,SFMono-Regular,monospace}
 .ap-bonus-flight-card{padding:10px;font-size:10px;line-height:1.4;text-align:left}
 .ap-bonus-cable-node:hover,.ap-bonus-cable-node:focus-visible,.ap-bonus-flight-card:hover,.ap-bonus-flight-card:focus-visible{transform:translateY(-2px);border-color:#e8c579;outline:2px solid #e8c57955;outline-offset:2px}
