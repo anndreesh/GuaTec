@@ -69,7 +69,6 @@ export class ApolloWorld {
   private geometries = new Map<string, THREE.BufferGeometry>();
   private resizeObserver: ResizeObserver;
   private frameDurations: number[] = [];
-  private palmLeaves: THREE.InstancedMesh | null = null;
   private furniture: Kit;
   private inspectionTarget:'rocket'|'tower'|'vab'|null=null;
   private inspectionPosition=new THREE.Vector3();
@@ -121,7 +120,6 @@ export class ApolloWorld {
     this.buildSaturn();
     this.buildBuildings();
     this.buildStations();
-    this.buildVegetation();
     this.buildVehicles();
     this.buildClouds();
     this.buildServiceDetails();
@@ -239,15 +237,15 @@ export class ApolloWorld {
     }
     this.staticBuffers.clear();
   }
-  private texture(type: 'grass' | 'concrete' | 'asphalt' | 'gravel', repeat: number): THREE.CanvasTexture {
+  private texture(type: 'soil' | 'concrete' | 'asphalt' | 'gravel', repeat: number): THREE.CanvasTexture {
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
-    const palette = { grass: [103, 113, 65], concrete: [164, 160, 145], asphalt: [58, 62, 61], gravel: [161, 147, 118] }[type];
+    const palette = { soil: [139, 132, 108], concrete: [164, 160, 145], asphalt: [58, 62, 61], gravel: [161, 147, 118] }[type];
     let seed = 109;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     const img = ctx.createImageData(256, 256);
     for (let i = 0; i < img.data.length; i += 4) {
-      const n = (rand() - 0.5) * (type === 'grass' ? 42 : 28);
+      const n = (rand() - 0.5) * (type === 'soil' ? 20 : 28);
       img.data[i] = palette[0] + n; img.data[i + 1] = palette[1] + n; img.data[i + 2] = palette[2] + n; img.data[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
@@ -266,23 +264,28 @@ export class ApolloWorld {
     this.scene.add(plane);
   }
   private buildGround(): void {
-    const grass = new THREE.MeshStandardMaterial({ map: this.texture('grass', 180), roughness: 1 });
-    this.groundPlane(16000, 16000, 0, 0, grass, -0.12);
+    const soil = new THREE.MeshStandardMaterial({ map: this.texture('soil', 95), roughness: 1 });
+    this.groundPlane(16000, 16000, 0, 0, soil, -0.12);
     this.groundPlane(42, 35, 0, 5600, new THREE.MeshStandardMaterial({ map: this.texture('concrete', 3), roughness: 1 }), 0.04);
     this.sign('OBSERVACIÓN DEL LANZAMIENTO', 'DISTANCIA DE SEGURIDAD · 5,6 KM', -8, 2.2, 5590, 0, 8);
     const concrete = new THREE.MeshStandardMaterial({ map: this.texture('concrete', 7), roughness: 0.95 });
     this.groundPlane(132, 130, 0, 0, concrete, 0.01);
-    const asphalt = new THREE.MeshStandardMaterial({ map: this.texture('asphalt', 22), roughness: 0.98 });
-    this.groundPlane(13, 510, 0, 215, asphalt, 0.03);
-    this.groundPlane(180, 11, 0, 145, asphalt, 0.04);
-    this.groundPlane(165, 10, 0, 250, asphalt, 0.04);
-    this.groundPlane(100, 10, -40, 210, asphalt, 0.04);
-    this.groundPlane(130, 10, 0, 365, asphalt, 0.04);
+    const asphalt = new THREE.MeshStandardMaterial({ map: this.texture('asphalt', 15), roughness: 0.98 });
     const gravel = new THREE.MeshStandardMaterial({ map: this.texture('gravel', 50), roughness: 1 });
+    // A clear north-south access road with three service-road junctions gives
+    // the compressed launch complex a readable circulation pattern.
+    this.groundPlane(24, 470, 0, 270, gravel, 0.015);
+    this.groundPlane(16, 460, 0, 270, asphalt, 0.03);
+    for (const [z, width] of [[150, 190], [235, 220], [355, 150]] as const) {
+      this.groundPlane(width + 10, 22, 0, z, gravel, 0.02);
+      this.groundPlane(width, 12, 0, z, asphalt, 0.04);
+    }
     for (const offset of [-11, 11]) this.groundPlane(13, 1800, -220 + offset, -300, gravel, 0.02);
     const mark = this.material('road-line', 0xdacb9b);
-    for (let z = 85; z < 465; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
-    for (const x of [-6, 6]) this.box(0.1, 0.02, 410, mark, x, 0.07, 250);
+    for (let z = 55; z < 500; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
+    for (const [z, width] of [[150, 190], [235, 220], [355, 150]] as const) {
+      for (let x = -width / 2 + 10; x < width / 2; x += 13) this.box(4.8, 0.015, 0.18, mark, x, 0.07, z);
+    }
     this.sign('CENTRO ESPACIAL KENNEDY', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
     this.sign('PLATAFORMA 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
   }
@@ -526,32 +529,6 @@ export class ApolloWorld {
     const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
-  private buildVegetation(): void {
-    const count = 100;
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.13, 0.25, 6.8, 6), this.material('palm-trunk', 0x77664d), count);
-    const leaves = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 3), this.material('palm-leaf', 0x455c31), count * 7);
-    const scrub = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), this.material('scrub', 0x52663a), 500);
-    let seed = 229;
-    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < count; i++) {
-      const x = (i % 2 ? -1 : 1) * (150 + rand() * 800); const z = -240 + rand() * 1250;
-      const height = 5 + rand() * 4;
-      this.dummy.position.set(x, height / 2, z); this.dummy.scale.set(1, height / 6.8, 1); this.dummy.rotation.set(0, rand() * 6, (rand() - 0.5) * 0.1); this.dummy.updateMatrix(); trunks.setMatrixAt(i, this.dummy.matrix);
-      for (let j = 0; j < 7; j++) {
-        const a = j * Math.PI * 2 / 7;
-        this.dummy.position.set(x + Math.sin(a) * 1.8, height - 0.3, z + Math.cos(a) * 1.8);
-        this.dummy.rotation.set(0.16 * Math.sin(a), a, 0.22); this.dummy.scale.set(0.55, 0.13, 2.7); this.dummy.updateMatrix(); leaves.setMatrixAt(i * 7 + j, this.dummy.matrix);
-      }
-    }
-    for (let i = 0; i < 500; i++) {
-      const side = i % 2 ? -1 : 1;
-      this.dummy.position.set(side * (95 + rand() * 1000), 0.3, -220 + rand() * 1500);
-      this.dummy.scale.set(0.8 + rand() * 2.8, 0.45 + rand() * 1, 0.8 + rand() * 2.3); this.dummy.rotation.set(0, rand() * 6, 0); this.dummy.updateMatrix(); scrub.setMatrixAt(i, this.dummy.matrix);
-    }
-    trunks.instanceMatrix.needsUpdate = leaves.instanceMatrix.needsUpdate = scrub.instanceMatrix.needsUpdate = true;
-    this.scene.add(trunks, leaves, scrub); this.palmLeaves = leaves;
-    trunks.castShadow = true;
-  }
   private vehicle(x: number, z: number, crew = false): THREE.Group {
     const kind: CarKind = crew ? 'van' : (Math.abs(x) > 80 ? 'suv' : 'sedan');
     const decal = crew ? new THREE.TextureLoader().load('/icon-512.png') : undefined;
@@ -589,25 +566,6 @@ export class ApolloWorld {
       for(let i=0;i<18;i++)this.box(.025,.08,.26,curb,x-3.3+i*.39,.16,z-3.5);
       this.cylinder(.29, .29, .88, metal, x + 4.3, .48, z - 2.6);
     }
-    // Repeated foreground grass uses a single authored crossed-blade geometry.
-    const blades:number[]=[];
-    for(let i=0;i<3;i++) {
-      const angle=i*Math.PI/3,c=Math.cos(angle),n=Math.sin(angle);
-      for(const [x,y,z] of [[-.07,0,0],[.07,0,0],[.025,.55,.06]])blades.push(x*c+z*n,y,z*c-x*n);
-    }
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(blades,3));geometry.computeVertexNormals();
-    const material=new THREE.MeshStandardMaterial({color:0x68774b,roughness:1,side:THREE.DoubleSide});
-    const tufts=new THREE.InstancedMesh(geometry,material,3600);let seed=9231,placed=0;
-    const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-    const stations=[[-35,130],[-70,165],[-100,220],[70,235],[0,150],[0,355]];
-    for(let tries=0;placed<3600 && tries<30000;tries++) {
-      const x=-143+rand()*288,z=102+rand()*300;
-      if(Math.abs(x)<8 || Math.abs(z-145)<7 || Math.abs(z-250)<7 || (x<15&&x>-95&&Math.abs(z-210)<7)||Math.abs(z-365)<7)continue;
-      if(stations.some(([sx,sz])=>Math.hypot(sx-x,sz-z)<8))continue;
-      if(this.colliders.some(c=>Math.abs(x-c.x)<c.w+1&&Math.abs(z-c.z)<c.d+1))continue;
-      this.dummy.position.set(x,0,z);this.dummy.rotation.set(0,rand()*Math.PI*2,0);const scale=.2+rand()*.9;this.dummy.scale.set(scale,scale,scale);this.dummy.updateMatrix();tufts.setMatrixAt(placed++,this.dummy.matrix);
-    }
-    tufts.count=placed;tufts.instanceMatrix.needsUpdate=true;tufts.receiveShadow=true;this.scene.add(tufts);
     // Low drainage aprons and pipe work give the service buildings a functional edge.
     for(const [x,z]of[[-125,200],[116,250],[-118,338],[120,130]]) {
       this.box(25,.12,3,grit,x,.015,z+12);
