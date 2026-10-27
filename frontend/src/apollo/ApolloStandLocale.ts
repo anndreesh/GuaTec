@@ -80,5 +80,4 @@ export const STAND_TRANSLATIONS: readonly (readonly [string,string,string])[] = 
   ['Stand pendiente de autorización','Station awaiting clearance','Poste en attente d’autorisation'],
   ['STAND OBLIGATORIO · OPERACIÓN DE APOYO','REQUIRED STATION · GROUND SUPPORT','POSTE OBLIGATOIRE · SOUTIEN AU SOL'],
   ['Continuar operaciones','Resume operations','Reprendre les opérations'],
-  ['Activar audio','Enable audio','Activer le son'], ['Silenciar audio','Mute audio','Couper le son'],
 ];

@@ -17,6 +17,16 @@ test('menus, mission copy and language labels use one in-memory preference', () 
   } finally { setLanguage('es'); }
 });
 
+test('French copy covers account errors, story navigation and mission reports', () => {
+  try {
+    setLanguage('fr');
+    assert.equal(t('Historia anterior'), 'Article précédent');
+    assert.equal(t('Siguiente historia'), 'Article suivant');
+    assert.equal(t('No se encontró un informe para esta misión.'), 'Aucun rapport n’a été trouvé pour cette mission.');
+    assert.match(t('No se pudo guardar el nombre de usuario. Intenta de nuevo.'), /Impossible d’enregistrer/);
+  } finally { setLanguage('es'); }
+});
+
 test('denied browser storage never prevents a language change or splits menu and mission languages', () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError'); } });

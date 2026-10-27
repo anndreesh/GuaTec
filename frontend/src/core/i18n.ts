@@ -107,6 +107,12 @@ const translations: Record<string, string> = {
 };
 
 const frenchTranslations: Record<string, string> = {
+  "No se pudo guardar el nombre de usuario. Intenta de nuevo.": "Impossible d’enregistrer le nom d’utilisateur. Réessayez.",
+  "Historia anterior": "Article précédent",
+  "Siguiente historia": "Article suivant",
+  "No se encontró un informe para esta misión.": "Aucun rapport n’a été trouvé pour cette mission.",
+  "La telemetría y la observación directa determinarán la calidad del informe.": "La télémétrie et l’observation directe détermineront la qualité du rapport.",
+  "Completa primero la revisión de sistemas antes de preparar el lanzamiento.": "Terminez la vérification des systèmes avant de préparer le lancement.",
   "Simulador educativo de exploración marciana: gestiona recursos, toma decisiones y recolecta ciencia real.":
     "Simulateur éducatif d’exploration martienne : gérez les ressources, prenez des décisions et collectez de vraies données scientifiques.",
   Comenzar: "Commencer",

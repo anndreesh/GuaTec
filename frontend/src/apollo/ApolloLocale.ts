@@ -1,5 +1,6 @@
 import { getLanguage, type Language } from '@/core/language';
 import { STAND_TRANSLATIONS } from './ApolloStandLocale';
+import { MISSION_TRANSLATIONS } from './ApolloMissionLocale';
 
 /** Spanish is the authored source. Exact source strings keep content and persistent IDs
  * independent; translated dynamic fragments are composed rather than sent to a service. */
@@ -261,7 +262,8 @@ const rows: readonly (readonly [string, string, string])[] = [
   ['Iniciar lanzamiento sin comprobaciones','Start launch without checks','Lancer sans vérifications'],
 ];
 
-export const APOLLO_TRANSLATIONS = new Map([...rows,...STAND_TRANSLATIONS].map(([source,en,fr]) => [source, { en, fr }]));
+export const APOLLO_TRANSLATION_ROWS = [...rows, ...STAND_TRANSLATIONS, ...MISSION_TRANSLATIONS];
+export const APOLLO_TRANSLATIONS = new Map(APOLLO_TRANSLATION_ROWS.map(([source,en,fr]) => [source, { en, fr }]));
 export function apolloLanguage(): Language {
   return getLanguage();
 }

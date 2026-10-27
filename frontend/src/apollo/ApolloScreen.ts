@@ -35,6 +35,7 @@ type SceneStartFailure = {
   kind: 'webgl' | 'scene';
   title: string;
   message: string;
+  detail?: string;
   steps: string[];
 };
 
@@ -60,11 +61,11 @@ function sceneStartFailure(error: unknown): SceneStartFailure {
     };
   }
 
-  const detail = error instanceof Error && error.message ? ` (${error.message})` : '';
   return {
     kind: 'scene',
     title: 'La misión no pudo preparar el escenario',
-    message: `WebGL está disponible, pero la escena encontró un problema al cargar sus recursos${detail}. Tu progreso no se ha perdido.`,
+    message: 'WebGL está disponible, pero la escena encontró un problema al cargar sus recursos. Tu progreso no se ha perdido.',
+    detail: error instanceof Error ? error.message : undefined,
     steps: [
       'Vuelve a intentarlo para reconstruir el escenario.',
       'Si vuelve a ocurrir, actualiza el navegador y comprueba tu conexión.',
@@ -90,6 +91,7 @@ export class ApolloScreen implements Screen {
   private paused=false;
   private started=false;
   private disposed=false;
+  private startFailure:SceneStartFailure|null=null;
   private raf=0;
   private lastTime=0;
   private mapTime=0;
@@ -175,30 +177,19 @@ export class ApolloScreen implements Screen {
       const savedDraft=(standDrafts as Record<string,unknown>)[bonus.id];
       if(savedDraft&&!this.state.bonusCompleted.includes(bonus.id))this.standDrafts[bonus.id]=restoreStandDraft(bonus.kind,savedDraft);
     }
+    const sceneLanguage=apolloLanguage();
     try {
       this.world=new ApolloWorld(this.root,{onInteract:()=>this.interact(),onMap:()=>{}});
       await this.world.ready;
     } catch (error) {
       const failure=sceneStartFailure(error);
       console.error('[ApolloScreen] mission 01 scene start failed', { kind: failure.kind, error });
-      loading.classList.add('ap-loading--error');
-      loading.replaceChildren();
-      const panel=document.createElement('div'); panel.className='ap-start-error';
-      panel.setAttribute('role','alert');
-      panel.append(el('span','ap-kicker',failure.kind==='webgl'?'DIAGNÓSTICO DE GRÁFICOS':'DIAGNÓSTICO DE MISIÓN'),el('h1','',failure.title),el('p','',failure.message));
-      const steps=el('ul','ap-start-error-steps');
-      failure.steps.forEach(step=>steps.append(el('li','',step)));
-      panel.append(steps);
-      const actions=el('div','ap-start-error-actions');
-      actions.append(
-        this.button('Reintentar misión',()=>void this.app.showMission1(this.initialState),'ap-button ap-primary'),
-        this.button('Volver a misiones',()=>void this.app.showMissionSelect()),
-      );
-      panel.append(actions);
-      loading.append(panel);
+      this.startFailure=failure;
+      this.renderStartFailure(loading,failure);
       return;
     }
     if (this.disposed) { this.world.dispose(); return; }
+    if(sceneLanguage!==apolloLanguage())this.world.refreshLanguage();
     this.world.renderer.domElement.tabIndex=0;
     this.world.setQuality(this.quality);
     // A resume starts at the last validated checkpoint, never inside a restricted area.
@@ -210,6 +201,15 @@ export class ApolloScreen implements Screen {
     this.world.setSuspended(true);
     this.lastTime=performance.now(); this.raf=requestAnimationFrame(this.frame);
     this.showWelcome();
+  }
+  private renderStartFailure(loading:HTMLElement,failure:SceneStartFailure) {
+    loading.classList.add('ap-loading--error');loading.replaceChildren();
+    const panel=el('div','ap-start-error');panel.setAttribute('role','alert');
+    panel.append(el('span','ap-kicker',failure.kind==='webgl'?'DIAGNÓSTICO DE GRÁFICOS':'DIAGNÓSTICO DE MISIÓN'),el('h1','',failure.title),el('p','',failure.message));
+    const steps=el('ul','ap-start-error-steps');failure.steps.forEach(step=>steps.append(el('li','',step)));panel.append(steps);
+    if(failure.detail){const details=el('details','ap-start-error-detail');details.append(el('summary','','Detalles técnicos'),el('pre','',failure.detail));panel.append(details);}
+    const actions=el('div','ap-start-error-actions');actions.append(this.button('Reintentar misión',()=>void this.app.showMission1(this.initialState),'ap-button ap-primary'),this.button('Volver a misiones',()=>void this.app.showMissionSelect()));
+    panel.append(actions);loading.append(panel);
   }
   private button(text:string, callback:()=>void, cls='ap-button') {
     const b=el('button',cls,text); b.type='button'; b.addEventListener('click',callback); return b;
@@ -536,7 +536,7 @@ export class ApolloScreen implements Screen {
     c.fillStyle='#28474b';c.strokeStyle='#78a39a';c.lineWidth=2;
     for(const [x,z,bw,bd] of [[-125,200,26,21],[116,250,22,17],[-118,338,28,19],[120,130,24,17]]){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);c.strokeRect(a,b,bw*sx,bd*sz);}
     const [rx,rz]=p(0,0);c.fillStyle='#9b4f4b33';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#d47c6e';c.setLineDash([7,5]);c.lineWidth=2;c.stroke();c.setLineDash([]);
-    c.font=`600 ${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#f0e7c9';c.fillText(apolloText('N ↑'),12,24);c.fillText('39A · RESTRINGIDO',rx+12,rz+5);
+    c.font=`600 ${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#f0e7c9';c.fillText(apolloText('N ↑'),12,24);c.fillText(apolloText('39A · RESTRINGIDO'),rx+12,rz+5);
     c.fillStyle='#b8d1c6';c.fillText(apolloText('↖ VAB · 1 km'),12,Math.max(42,h*.18));
     c.font=`600 ${Math.max(10,w/52)}px sans-serif`;
     CHECKPOINTS.slice(0,6).forEach((cp,i)=>{const [x,z]=p(cp.target.x,cp.target.z);const completed=this.state.completed.includes(cp.id),active=!this.state.requiredStand && i===this.state.checkpoint;c.fillStyle=completed?'#76d49b':active?'#ffd166':'#86a8ae';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.arc(x,z,active?8:5,0,Math.PI*2);c.fill();c.stroke();if(active){c.strokeStyle='#ffd166';c.lineWidth=2;c.beginPath();c.arc(x,z,13,0,Math.PI*2);c.stroke();}if(w>300){c.fillStyle=completed?'#a9e7be':active?'#ffe29a':'#d5e4df';c.fillText(`C${i+1}`,x+13,z+5);}});
@@ -579,11 +579,14 @@ export class ApolloScreen implements Screen {
     clearTimeout(this.flashTimer);this.flashTimer=window.setTimeout(()=>n.remove(),4800);
   }
   refreshLanguage(): void {
+    if(this.startFailure){const loading=this.root.querySelector<HTMLElement>('.ap-loading');if(loading)this.renderStartFailure(loading,this.startFailure);return;}
+    if(!this.root.classList.contains('ap-ready')){const loading=this.root.querySelector('.ap-loading');if(loading)loading.textContent=apolloText('PREPARANDO OPERACIONES · APOLLO 11');return;}
     this.world.refreshLanguage();
     this.dialogue?.refreshLanguage();
-    if (this.movie) { this.renderMovie(); return; }
+    if (this.movie) {const caption=this.movieOverlay?.querySelector<HTMLElement>('.ap-cinema-caption');if(caption)caption.dataset.signature='';this.movieVoiceKey='';this.renderMovie();return;}
     this.renderObjective(); this.updateNavigation();
     const kind=this.modalKind;
+    const bonusId=this.bonusKey;
     if (!kind) return;
     this.captureInstrumentDraft();
     this.bonusMission?.dispose(); this.bonusMission=null;
@@ -596,7 +599,7 @@ export class ApolloScreen implements Screen {
     else if (kind==='credits') this.openCredits();
     else if (kind==='sketchfab') this.openSketchfab();
     else if (kind==='reset') this.confirmReset();
-    else if (kind==='bonus') this.closeModal();
+    else if (kind==='bonus') this.openBonusMission(bonusId);
   }
   private async save() {
     if(this.disposed || !this.started)return;
