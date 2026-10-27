@@ -283,14 +283,6 @@ export class ApolloWorld {
     const mark = this.material('road-line', 0xdacb9b);
     for (let z = 85; z < 465; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
     for (const x of [-6, 6]) this.box(0.1, 0.02, 410, mark, x, 0.07, 250);
-    const water = this.material('water', 0x4e9ba8, 0.3, 0.22);
-    this.groundPlane(3200, 10000, 3000, 0, water, -0.09);
-    const sand = this.material('sand', 0xcdbd91);
-    this.groundPlane(100, 10000, 1375, 0, sand, -0.07);
-    for (let i = 0; i < 11; i++) {
-      this.groundPlane(30 + (i % 3) * 13, 100 + i * 7, -150 - (i % 3) * 50, 90 + i * 80, water, -0.04);
-    }
-    this.groundPlane(26, 920, 195, 220, water, -0.03);
     this.sign('CENTRO ESPACIAL KENNEDY', 'OPERACIONES TERRESTRES · 1969', -18, 2.2, 118, 0, 7);
     this.sign('PLATAFORMA 39A', 'ÁREA RESTRINGIDA · NO PASAR', -11, 1.9, 91, 0, 4.5);
   }
