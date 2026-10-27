@@ -777,7 +777,7 @@ export class ApolloWorld {
       this.crewRoot.visible = false;
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
       // high-poly clone. They remain silhouettes appropriate to support operations.
-      for(const [id,dx,dz]of[['complex',-3,-2],['documentation',-3,-1],['communications',2.5,1.4],['observation',3,0]] as const){
+      for(const [id,dx,dz]of[['complex',-3.5,1.4],['documentation',-3,-1],['communications',2.5,1.4],['observation',3,0]] as const){
         const plot=SITE_PLOTS.find(p=>p.id===id)!;this.addTechnician(plot.target.x+dx,plot.target.z+dz,id);
       }
       this.flushStatic();
@@ -798,13 +798,17 @@ export class ApolloWorld {
     const addCylinder=(rt:number,rb:number,h:number,mat:THREE.Material,px:number,py:number,pz:number,parent:THREE.Group=group)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,10),mat);mesh.position.set(px,py,pz);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
     const addSphere=(r:number,mat:THREE.Material,px:number,py:number,pz:number,parent:THREE.Group=group)=>{const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,12,9),mat);mesh.position.set(px,py,pz);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
     const beam=(a:THREE.Vector3,b:THREE.Vector3,width:number,mat:THREE.Material,parent:THREE.Group)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(width,width*.9,a.distanceTo(b),8),mat);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(UP,b.clone().sub(a).normalize());mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
-    addCylinder(.25,.22,.6,shirt,0,1.19,0).scale.z=.65;
+    const shirtProfile=[[.22,.91],[.20,1.02],[.195,1.15],[.235,1.34],[.26,1.38],[.20,1.43],[.08,1.47]];
+    const tailoredShirt=new THREE.Mesh(new THREE.LatheGeometry(shirtProfile.map(([r,y])=>new THREE.Vector2(r,y)),16),shirt);
+    tailoredShirt.scale.z=.65;tailoredShirt.receiveShadow=true;group.add(tailoredShirt);
     addBox(.42,.08,.28,this.material('worker-belt',0x4b4d3e),0,.91,0);
     const head=new THREE.Group();head.position.set(0,1.69,0);group.add(head);addSphere(.15,skin,0,0,0,head).scale.set(1,1.2,.93);addCylinder(.074,.074,.13,skin,0,-.21,0,head);
     const cap=addSphere(.16,shirt,0,1.77-1.69,0,head);cap.scale.set(1,0.65,1);addBox(.27,.025,.15,shirt,0,.08,.13,head);
     for(const dx of [-.052,.052])addBox(.022,.016,.009,shoe,dx,.02,.137,head);
     addBox(.13,.1,.012,shirt,-.11,1.27,.166);addBox(.07,.028,.013,badge,-.11,1.29,.18);
     addSphere(.027,skin,0,-.025,.143,head).scale.set(.7,1,1.2);
+    addSphere(.09,skin,0,-.102,.012,head).scale.set(1,.75,1.04);
+    addBox(.057,.006,.008,shoe,0,-.09,.14,head);
     for (const side of [-1,1]) {
       addSphere(.03,skin,side*.145,0,0,head).scale.set(.6,1,.7);
       addBox(.041,.009,.012,shoe,side*.052,.047,.136,head);
