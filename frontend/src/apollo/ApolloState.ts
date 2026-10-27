@@ -37,37 +37,37 @@ export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
   {
     id: 'power-bus', title: 'Banco de alimentación',
     objective: 'Coloca los fusibles correctos y acciona la palanca del banco eléctrico de apoyo.',
-    target: { x: -48, z: 190 }, kind: 'sequence',
+    target: { x: -49, z: 135 }, kind: 'sequence',
   },
   {
     id: 'flight-record', title: 'Plan de vuelo',
     objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
-    target: { x: 42, z: 180 }, kind: 'flight-plan', requires: ['power-bus'], afterCheckpoint: 'orientation',
+    target: { x: -66, z: 183 }, kind: 'flight-plan', requires: ['power-bus'], afterCheckpoint: 'orientation',
   },
   {
     id: 'telemetry-rack', title: 'Rack de telemetría',
     objective: 'Ajusta tres lecturas analógicas para estabilizar el enlace de datos de la plataforma.',
-    target: { x: 40, z: 290 }, kind: 'telemetry', requires: ['flight-record'], afterCheckpoint: 'complex',
+    target: { x: -84, z: 218 }, kind: 'telemetry', requires: ['flight-record'], afterCheckpoint: 'complex',
   },
   {
     id: 'umbilical-check', title: 'Conexiones umbilicales',
     objective: 'Conecta cada canal con el borne de su letra y comprueba la continuidad del panel de práctica.',
-    target: { x: -45, z: 285 }, kind: 'cables', requires: ['telemetry-rack'], afterCheckpoint: 'complex',
+    target: { x: -100, z: 201 }, kind: 'cables', requires: ['telemetry-rack'], afterCheckpoint: 'complex',
   },
   {
     id: 'crew-manifest', title: 'Manifiesto de tripulación',
     objective: 'Asocia las credenciales de Armstrong, Collins y Aldrin con sus funciones en el Apollo 11.',
-    target: { x: 18, z: 170 }, kind: 'crew-manifest', requires: ['umbilical-check'], afterCheckpoint: 'communications',
+    target: { x: -25, z: 188 }, kind: 'crew-manifest', requires: ['umbilical-check'], afterCheckpoint: 'communications',
   },
   {
     id: 'weather-window', title: 'Ventana meteorológica',
     objective: 'Coteja la veleta y la placa de nubosidad con las referencias del ejercicio meteorológico.',
-    target: { x: 95, z: 315 }, kind: 'weather', requires: ['crew-manifest'], afterCheckpoint: 'crew',
+    target: { x: -36, z: 379 }, kind: 'weather', requires: ['crew-manifest'], afterCheckpoint: 'crew',
   },
   {
     id: 'pad-safety', title: 'Perímetro de seguridad',
     objective: 'Mantén el visor sobre cada baliza para confirmar el perímetro de observación.',
-    target: { x: 44, z: 365 }, kind: 'beacons', requires: ['weather-window'], afterCheckpoint: 'crew',
+    target: { x: 15, z: 379 }, kind: 'beacons', requires: ['weather-window'], afterCheckpoint: 'crew',
   },
 ];
 
@@ -106,7 +106,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
   {
     id: 'communications', title: 'Comunicaciones terrestres',
     objective: 'Reconoce las antenas y verifica el enlace simulado de apoyo.',
-    target: { x: 70, z: 235 }, requirements: ['documentation'],
+    target: { x: 70, z: 252 }, requirements: ['documentation'],
     actions: [
       { id: 'antenna', label: 'Reconocer las antenas', description: 'Las comunicaciones terrestres enlazan estaciones especializadas. Este terminal exterior es una adaptación educativa de consulta.' },
       { id: 'signal', label: 'Identificar la señal', description: 'Escucha y reconoce el patrón de identificación del enlace local antes de comunicar su estado.' },
@@ -124,7 +124,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
   {
     id: 'observation', title: 'Punto de observación',
     objective: 'Alcanza la estación de traslado, prepara cámara y audio y viaja al punto seguro.',
-    target: { x: 0, z: 355 }, requirements: ['crew'],
+    target: { x: -10, z: 379 }, requirements: ['crew'],
     actions: [
       { id: 'camera', label: 'Preparar la cámara', description: 'Orienta la cámara de seguimiento hacia 39A. Los recorridos y la distancia del área de observación se comprimen por jugabilidad.' },
       { id: 'audio', label: 'Confirmar audio', description: 'Verifica el enlace de radio. El sonido directo de los motores llegará después de la luz debido a la distancia.' },

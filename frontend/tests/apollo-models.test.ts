@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { buildStandModel, standCollisionProxies, type StandModelKind } from '../src/apollo/ApolloStandModels';
 import { buildCar, CAR_SPECS } from '../src/apollo/ApolloVehicles';
+import {STAND_DESIGNS} from '../src/apollo/ApolloStandDesigns';
 
 test('every stand builds finite human-scale geometry with bounded shared material batches', () => {
   const atlas = new THREE.Texture(), materials = new Map<string,THREE.MeshStandardMaterial>();
@@ -13,11 +14,21 @@ test('every stand builds finite human-scale geometry with bounded shared materia
   const kinds:StandModelKind[]=['sequence','flight-plan','telemetry','cables','crew-manifest','weather','beacons','orientation','survey','records','radio','crew','tracking'];
   for(const kind of kinds){
     const model=buildStandModel(kind,factory,atlas,0),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
-    assert.ok(size.x>=5&&size.x<7,`${kind}: width is in metres`);assert.ok(size.y>2.5&&size.y<5,`${kind}: height is in metres`);
+    assert.ok(size.x>=5&&size.x<7,`${kind}: width is in metres`);assert.ok(size.y>1.8&&size.y<5,`${kind}: height is in metres`);
     assert.ok(model.children.length<=9,`${kind}: material batches stay bounded`);
     model.traverse(node=>{if(node instanceof THREE.Mesh){const position=node.geometry.getAttribute('position');for(let i=0;i<position.array.length;i++)assert.ok(Number.isFinite(position.array[i]),`${kind}: finite vertices`);node.geometry.dispose();}});
   }
   assert.ok(materials.size<=9);materials.forEach(material=>material.dispose());atlas.dispose();
+});
+
+test('working forms differ by function and open instruments have no phantom canopy posts',()=>{
+  assert.equal(new Set(Object.values(STAND_DESIGNS).map(design=>design.silhouette)).size,13);
+  for(const kind of Object.keys(STAND_DESIGNS) as StandModelKind[]){
+    const design=STAND_DESIGNS[kind],proxies=standCollisionProxies(kind,0,0);
+    assert.ok(proxies.some(c=>c.x===design.deskX&&c.w>=design.width/2));
+    const hasAwningPosts=proxies.some(c=>Math.abs(c.x)===1.88&&c.z===-1.2);
+    assert.equal(hasAwningPosts,design.canopy!=='none',kind+' canopy collision follows visible structure');
+  }
 });
 
 test('stand proxies cover side equipment while leaving the approach open',()=>{

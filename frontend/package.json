@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-mission.mjs",
     "qa:apollo": "node scripts/qa-apollo-stands.mjs",
-    "qa:apollo-locales": "node scripts/qa-apollo-locales.mjs"
+    "qa:apollo-locales": "node scripts/qa-apollo-locales.mjs",
+    "qa:apollo-site": "node scripts/qa-apollo-site.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^7.35.1",

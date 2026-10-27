@@ -9,6 +9,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
 import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
 import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind } from './ApolloStandModels';
+import {SITE_PLOTS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
+import {standIndicatorPosition,standUsesPower} from './ApolloStandDesigns';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -286,15 +288,14 @@ export class ApolloWorld {
     const gravel = new THREE.MeshStandardMaterial({ map: this.texture('gravel', 50), roughness: 1 });
     // A clear north-south access road with three service-road junctions gives
     // the compressed launch complex a readable circulation pattern.
-    this.groundPlane(24, 470, 0, 270, gravel, 0.015);
-    this.groundPlane(16, 460, 0, 270, asphalt, 0.03);
-    for (const [z, width] of [[150, 190], [235, 220], [355, 150]] as const) {
-      this.groundPlane(width + 10, 22, 0, z, gravel, 0.02);
-      this.groundPlane(width, 12, 0, z, asphalt, 0.04);
+    for(const [i,road]of SITE_ROADS.entries()){
+      const vertical=road.from.x===road.to.x,length=Math.hypot(road.to.x-road.from.x,road.to.z-road.from.z),x=(road.from.x+road.to.x)/2,z=(road.from.z+road.to.z)/2;
+      this.groundPlane(vertical?road.shoulder:length+10,vertical?length+10:road.shoulder,x,z,gravel,i? .02:.015);
+      this.groundPlane(vertical?road.width:length,vertical?length:road.width,x,z,asphalt,i? .04:.03);
     }
     for (const offset of [-11, 11]) this.groundPlane(13, 1800, -220 + offset, -300, gravel, 0.02);
     const mark = this.material('road-line', 0xdacb9b);
-    for (let z = 55; z < 500; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
+    for (let z = 55; z < 350; z += 13) this.box(0.18, 0.015, 4.8, mark, 0, 0.07, z);
     for (const [z, width] of [[150, 190], [235, 220], [355, 150]] as const) {
       for (let x = -width / 2 + 10; x < width / 2; x += 13) this.box(4.8, 0.015, 0.18, mark, x, 0.07, z);
     }
@@ -462,23 +463,23 @@ export class ApolloWorld {
     this.fence(-150, -80, 325);
   }
   private buildStations(): void {
-    this.station(-35, 130, 'ORIENTACIÓN', '01 · OPERACIONES DE APOYO', 'map');
-    this.station(-70, 165, 'RECONOCIMIENTO', '02 · OBSERVACIÓN DEL COMPLEJO', 'camera');
-    this.station(-100, 220, 'DOCUMENTACIÓN', '03 · REGISTRO DE COMUNICACIONES', 'desk');
-    this.station(70, 235, 'COMUNICACIONES', '04 · ESTACIÓN DE APOYO', 'radio');
-    this.station(-24, 170, 'LA TRIPULACIÓN', '05 · RECREACIÓN HISTÓRICA', 'crew');
-    this.station(0, 355, 'OBSERVACIÓN', '06 · CÁMARA DE SEGUIMIENTO', 'camera');
+    const labels:readonly (readonly [string,string,StationKind])[]=[
+      ['ORIENTACIÓN','01 · OPERACIONES DE APOYO','map'],['RECONOCIMIENTO','02 · OBSERVACIÓN DEL COMPLEJO','camera'],
+      ['DOCUMENTACIÓN','03 · REGISTRO DE COMUNICACIONES','desk'],['COMUNICACIONES','04 · ESTACIÓN DE APOYO','radio'],
+      ['LA TRIPULACIÓN','05 · RECREACIÓN HISTÓRICA','crew'],['OBSERVACIÓN','06 · CÁMARA DE SEGUIMIENTO','camera'],
+    ];
+    SITE_PLOTS.slice(0,6).forEach((plot,i)=>this.station(plot.target.x,plot.target.z,...labels[i]!));
     const steel = this.material('galvanized', 0xa4aaa5, 0.58, 0.7);
     // Deep-space style parabolic dish, original geometry; visual educational approximation.
-    const g = new THREE.Group(); g.position.set(82, 0, 236);
+    const g = new THREE.Group(); g.position.set(83, 0, 254);
     this.cylinder(0.6, 1, 7, steel, 0, 3.5, 0, g);
     const dish = new THREE.Mesh(new THREE.SphereGeometry(4.8, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.43), this.material('dish', 0xd0d1c5, 0.6, 0.45));
     dish.rotation.z = 0.6; dish.position.y = 8; g.add(dish);
     this.beam(new THREE.Vector3(0, 8, 0), new THREE.Vector3(0, 12, 0), 0.1, steel, g);
     this.scene.add(g);
-    this.colliders.push({ x: 82, z: 236, w: 3.8, d: 3.8 });
+    this.colliders.push({ x: 83, z: 254, w: 3.8, d: 3.8 });
     // Tracking tripod at the spectator area is a distinct authored piece.
-    for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
+    for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 398, 0, 3.2, i % 2 === 0));
   }
   private buildBonusStations(): void {
     const atlas = this.standAtlas ??= createStandAtlas();
@@ -487,8 +488,9 @@ export class ApolloWorld {
       const model = buildStandModel(bonus.kind, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, index);
       model.position.set(x, 0, z); this.addStaticModel(model);
       this.colliders.push(...standCollisionProxies(bonus.kind,x,z));
-      const accent = new THREE.Mesh(new THREE.SphereGeometry(.10, 10, 6), new THREE.MeshBasicMaterial({ color: 0xc99550 }));
-      accent.position.set(x + 1.82, 2.31, z - 1.10); this.scene.add(accent);
+      const indicator=standIndicatorPosition(bonus.kind);
+      const accent = new THREE.Mesh(new THREE.SphereGeometry(.065,10,6),new THREE.MeshBasicMaterial({color:0xc99550}));
+      accent.position.set(x+indicator.x,indicator.y,z+indicator.z);this.scene.add(accent);
       this.bonusAccents.push({ mesh: accent, phase: index * 1.8, id: bonus.id });
     });
   }
@@ -557,7 +559,7 @@ export class ApolloWorld {
   private buildVehicles(): void {
     this.van = this.vehicle(-17, 75, true);
     this.van.visible = false;
-    for (const [x, z] of [[-88, 220], [90, 264], [-88, 345], [90, 139]]) {
+    for (const [x, z] of [[-71, 218], [90, 264], [-88, 345], [90, 139]]) {
       const kind: CarKind = 'sedan';
       const car = this.vehicle(x, z); car.rotation.y = Math.PI / 2;
       this.colliders.push({ x, z, w: CAR_SPECS[kind].length / 2 + .35, d: CAR_SPECS[kind].width / 2 + .35 });
@@ -576,26 +578,27 @@ export class ApolloWorld {
     const grit=this.material('service-gravel',0x9d967e,.98,0);
     const curb=this.material('curb',0xb9b69d,.92,.08);
     const metal=this.material('utility-pipe',0x6d7d76,.65,.5);
-    const stations=[[-35,130],[-70,165],[-100,220],[70,235],[-24,170],[0,355],...BONUS_CHECKPOINTS.map(stand=>[stand.target.x,stand.target.z])];
     const path = this.material('service-walkway',0xb8b49e,.96);
-    for(const [x,z] of stations) {
-      this.groundPlane(10,8,x,z,grit,-.015);
-      // Connect every work area to the nearest authored road instead of stranding
-      // technical benches in the sand. The front of every bench stays open.
-      const cross=[150,235,355].reduce((nearest,candidate)=>Math.abs(z-candidate)<Math.abs(z-nearest)?candidate:nearest,150);
-      if(Math.abs(x)-8<Math.abs(z-cross)-6) {
-        const end=Math.sign(x)*9,span=Math.abs(x-end);
-        if(span>6)this.groundPlane(span,2.1,(x+end)/2,z+2.5,path,.025);
-      }else{
-        const end=cross+Math.sign(z-cross)*7,span=Math.abs(z-end);
-        if(span>4)this.groundPlane(2.1,span,x+3.3,(z+end)/2,path,.025);
+    // Shared yards unite related activities; corner curbs leave each walkway open.
+    for(const zone of SITE_ZONES){
+      const area=zoneBounds(zone.members);this.groundPlane(area.width,area.depth,area.x,area.z,grit,.005);
+      for(const side of[-1,1])for(const end of[-1,1]){
+        this.box(1.8,.12,.12,curb,area.x+side*(area.width/2-.9),.07,area.z+end*area.depth/2);
+        this.box(.12,.12,1.8,curb,area.x+side*area.width/2,.07,area.z+end*(area.depth/2-.9));
       }
-      for(const dx of [-5.1,5.1])this.box(.16,.15,8.3,curb,x+dx,.07,z);
-      this.box(10.3,.15,.16,curb,x,.07,z-4.1);
+    }
+    for(const points of SITE_WALKWAYS)for(let i=1;i<points.length;i++){
+      const a=points[i-1]!,b=points[i]!,vertical=a.x===b.x,length=Math.hypot(a.x-b.x,a.z-b.z);
+      this.groundPlane(vertical?2.2:length+2.2,vertical?length+2.2:2.2,(a.x+b.x)/2,(a.z+b.z)/2,path,.025);
+    }
+    for(const plot of SITE_PLOTS){
+      const {x,z}=plot.target;
       // Low cable tray and conduit follow the back of the station; approach stays open.
-      this.box(7,.09,.28,metal,x,.14,z-3.5);
-      for(let i=0;i<18;i++)this.box(.025,.08,.26,curb,x-3.3+i*.39,.16,z-3.5);
-      this.cylinder(.29, .29, .88, metal, x + 4.3, .48, z - 2.6);
+      if(standUsesPower(plot.kind)){
+        this.box(7,.09,.28,metal,x,.14,z-3.5);
+        this.box(.045,.045,2.2,metal,x+2.15,.14,z-2.4);
+        for(let i=0;i<18;i++)this.box(.025,.08,.26,curb,x-3.3+i*.39,.16,z-3.5);
+      }
     }
     // Low drainage aprons and pipe work give the service buildings a functional edge.
     for(const [x,z,depth]of[[-125,200,21],[116,250,17],[-118,338,19],[120,130,17]]) {
@@ -715,7 +718,9 @@ export class ApolloWorld {
       this.crewRoot.visible = false;
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
       // high-poly clone. They remain silhouettes appropriate to support operations.
-      for (const [x, z] of [[-73, 163], [-103, 219], [72, 237], [-16, 350]]) this.addTechnician(x, z);
+      for(const [id,dx,dz]of[['complex',-3,-2],['documentation',-3,-1],['communications',2.5,1.4],['observation',3,0]] as const){
+        const plot=SITE_PLOTS.find(p=>p.id===id)!;this.addTechnician(plot.target.x+dx,plot.target.z+dz);
+      }
       this.flushStatic();
     } catch (error) {
       this.assetErrors.push(`Mercenary Astronaut: ${String(error)}`);
@@ -726,6 +731,7 @@ export class ApolloWorld {
     }
   }
   private addTechnician(x: number, z: number): void {
+    this.colliders.push({x,z,w:.29,d:.22});
     const shirt=this.material('technician-shirt',0xd9d4bd,.96,0),pants=this.material('technician-pants',0x42585f,.94,0),skin=this.material('skin',0xb98e67,.85,0),shoe=this.material('worker-shoe',0x303a35,.8,.05);
     const torso=new THREE.Mesh(new THREE.CylinderGeometry(.25,.22,.6,8),shirt);torso.position.set(x,1.19,z);torso.scale.z=.65;this.addStatic(torso);
     this.box(.42,.08,.28,this.material('worker-belt',0x4b4d3e),x,.91,z);

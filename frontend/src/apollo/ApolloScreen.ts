@@ -17,6 +17,7 @@ import { mountInstrument, type InstrumentHandle, type InstrumentKind } from './A
 import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts } from './ApolloFieldProgress';
 import { mountBonusMission, type BonusMissionHandle } from './ApolloBonusMissions';
 import { restoreStandDraft, type StandDraft } from './ApolloStandRules';
+import {SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
 
 const SLUG = MISSION_SLUGS.mission1;
 const el = <K extends keyof HTMLElementTagNameMap>(tag:K, cls='', text='') => {
@@ -531,8 +532,11 @@ export class ApolloScreen implements Screen {
     c.strokeStyle='#08171d';c.lineCap='square';c.lineWidth=Math.max(11,w*.028);
     // Same soil, service roads and building footprints as ApolloWorld.buildGround().
     const road=(x1:number,z1:number,x2:number,z2:number)=>{const [a,b]=p(x1,z1),[d,e]=p(x2,z2);c.beginPath();c.moveTo(a,b);c.lineTo(d,e);c.stroke();c.strokeStyle='#c7b779';c.lineWidth=Math.max(6,w*.014);c.stroke();c.strokeStyle='#08171d';c.lineWidth=Math.max(11,w*.028);};
-    road(0,40,0,500);c.lineWidth=Math.max(8,w*.02);
-    road(-95,150,95,150);road(-110,235,110,235);road(-75,355,75,355);
+    for(const segment of SITE_ROADS)road(segment.from.x,segment.from.z,segment.to.x,segment.to.z);
+    c.fillStyle='#37534b';
+    for(const zone of SITE_ZONES){const area=zoneBounds(zone.members),[x,z]=p(area.x-area.width/2,area.z-area.depth/2);c.fillRect(x,z,area.width*sx,area.depth*sz);}
+    c.strokeStyle='#7d9482';c.lineWidth=Math.max(1,w*.003);c.lineCap='round';
+    for(const points of SITE_WALKWAYS){c.beginPath();points.forEach((point,i)=>{const[x,z]=p(point.x,point.z);if(i)c.lineTo(x,z);else c.moveTo(x,z)});c.stroke();}
     c.fillStyle='#28474b';c.strokeStyle='#78a39a';c.lineWidth=2;
     for(const [x,z,bw,bd] of [[-125,200,26,21],[116,250,22,17],[-118,338,28,19],[120,130,24,17]]){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);c.strokeRect(a,b,bw*sx,bd*sz);}
     const [rx,rz]=p(0,0);c.fillStyle='#9b4f4b33';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#d47c6e';c.setLineDash([7,5]);c.lineWidth=2;c.stroke();c.setLineDash([]);
@@ -543,7 +547,8 @@ export class ApolloScreen implements Screen {
     BONUS_CHECKPOINTS.forEach((bonus,index)=>{const [x,z]=p(bonus.target.x,bonus.target.z);const completed=this.state.bonusCompleted.includes(bonus.id),active=this.state.requiredStand?.id===bonus.id;c.fillStyle=completed?'#76d49b':'#e99a61';c.strokeStyle='#07151b';c.lineWidth=3;c.beginPath();c.rect(x-6,z-6,12,12);c.fill();c.stroke();if(active){c.strokeStyle='#ffd166';c.lineWidth=2;c.strokeRect(x-10,z-10,20,20);}if(w>300){c.fillStyle=completed?'#a9e7be':'#ffc09a';c.fillText(`S${index+1}`,x+11,z+4);}});
     const target=this.state.requiredStand?.target ?? this.state.current.target;
     const remote=this.world.player.z>5000;
-    const [tx,tz]=p(target.x,remote?355:target.z),[px,pz]=p(this.world.player.x,remote?355:this.world.player.z);
+    const transfer=CHECKPOINTS[5].target;
+    const [tx,tz]=p(remote?transfer.x:target.x,remote?transfer.z:target.z),[px,pz]=p(remote?transfer.x:this.world.player.x,remote?transfer.z:this.world.player.z);
     c.strokeStyle='#ffd166';c.lineWidth=3;c.setLineDash([8,6]);c.beginPath();c.moveTo(px,pz);c.lineTo(tx,tz);c.stroke();c.setLineDash([]);
     c.save();c.translate(px,pz);c.rotate(-this.world.yaw);c.fillStyle='#07151b';c.beginPath();c.moveTo(0,-11);c.lineTo(8,8);c.lineTo(0,4);c.lineTo(-8,8);c.closePath();c.fill();c.fillStyle='#ffffff';c.beginPath();c.moveTo(0,-8);c.lineTo(5,6);c.lineTo(0,3);c.lineTo(-5,6);c.closePath();c.fill();c.restore();
     if(w>300){const legendY=h-16;c.font='600 11px sans-serif';c.fillStyle='#d5e4df';c.fillText('● HISTORIA',w-330,legendY);c.fillStyle='#ffc09a';c.fillText('■ SUBMISIÓN',w-230,legendY);c.fillStyle='#ffffff';c.fillText('◆ TÚ',w-112,legendY);}
