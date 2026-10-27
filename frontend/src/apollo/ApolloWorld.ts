@@ -890,7 +890,9 @@ export class ApolloWorld {
       this.cameraLook.lerp(this.lookGoal,1-Math.exp(-cameraDt*9));
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-cameraDt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
-      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
+      const normalFov = this.zoomed ? 22 : 62;
+      this.camera.fov = this.player.z > 5000 ? 3.4 : THREE.MathUtils.lerp(this.camera.fov, normalFov, 1 - Math.exp(-cameraDt * 7));
+      this.camera.updateProjectionMatrix();
     }
     // Static support furniture does not need a full shadow pass every frame.
     // Moving characters, jumps and cinematics keep their shadows live.

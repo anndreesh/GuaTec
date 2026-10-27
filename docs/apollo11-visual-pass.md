@@ -45,7 +45,7 @@ Estas relaciones corresponden a los colores de referencia, no constituyen una au
 
 - TypeScript, build de producción y revisión de whitespace pasan.
 - 65 pruebas automatizadas: progresión, guardado, audio, validación de tareas, recuperación de borradores, escala de modelos, vértices finitos y colisiones.
-- `npm run qa:apollo`: diez comprobaciones de aceptación de navegador con entrada real. Completa los siete stands, rechaza estados incompletos, comprueba teclado, drag touch nativo, cancelación y recuperación parcial.
+- `npm run qa:apollo`: once comprobaciones de aceptación de navegador con entrada real. Completa los siete stands, rechaza estados incompletos, comprueba teclado, drag touch nativo, cancelación y recuperación parcial. También mide el retorno gradual de la lente al salir del enfoque de un stand, incluso con el mundo suspendido.
 - Tamaños revisados: escritorio 1440×900, tablet 768×1024 y móvil 390×844. Sin desbordamiento horizontal en los paneles probados.
 - Flujo local con Invitado: caminar al banco, guardar un fusible con Escape, reabrir, completar y recargar. El progreso se conserva y no vuelve a reproducirse la introducción.
 - Menú ESC, selector de idioma y mute/unmute comprobados dentro de la app. Sin errores de página observados.

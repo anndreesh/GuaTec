@@ -63,6 +63,12 @@ const finish = async () => {await page.waitForFunction(()=>window.completed===1,
 try {
  await page.goto(new URL('/apollo-stand-acceptance',url).href);await page.waitForFunction(()=>window.ready,{timeout:60000});
  assert.deepEqual(await page.evaluate(()=>world.assetErrors),[]);
+ await open('sequence');await page.waitForTimeout(1000);
+ const focusedFov=await page.evaluate(()=>world.camera.fov);assert.ok(Math.abs(focusedFov-48)<.5,'Stand camera reaches its working lens.');
+ await page.evaluate(()=>world.setStandFocus(null));await page.waitForTimeout(60);
+ const returningFov=await page.evaluate(()=>world.camera.fov);assert.ok(returningFov>focusedFov&&returningFov<61,'Returning lens eases instead of snapping.');
+ await page.waitForTimeout(1000);assert.ok(Math.abs(await page.evaluate(()=>world.camera.fov)-62)<.1);
+ checks.push('Camera: station focus and return lens ease smoothly while world movement is suspended.');
  for(const kind of ['sequence','flight-plan','telemetry','cables','crew-manifest','weather','beacons']){
    await open(kind);await page.waitForTimeout(300);await page.screenshot({path:resolve(out,'desktop-'+kind+'.png')});
    assert.equal(await page.locator('.ap-dialog').evaluate(el=>el.scrollWidth>el.clientWidth),false,kind+' desktop overflow');
