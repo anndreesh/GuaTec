@@ -118,7 +118,55 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     put(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelSize: .025, bevelThickness: .025, bevelSegments: 1, steps: 1, curveSegments: 3 }), material, x, y, z);
   };
   const meter = (x: number, y: number, z: number, cell = 1) => { beveled(.63, .53, .1, dark, x, y, z); sheet(cell, .54, .45, x, y, z + .128); };
-  const knob = (x: number, y: number, z: number, r = .08) => { cyl(r, .095, dark, x, y, z, Math.PI / 2); box(.014, r * .7, .014, cream, x, y + r * .3, z + .052); };
+  const knob = (x: number, y: number, z: number, r = .08) => {
+    // A mounting washer, radial grip flutes and a raised index, all in existing batches.
+    cyl(r * 1.16, .018, steel, x, y, z - .045, Math.PI / 2);
+    cyl(r, .095, dark, x, y, z, Math.PI / 2);
+    for(let i=0;i<12;i++){
+      const a=i*Math.PI/6;
+      put(new THREE.BoxGeometry(r*.18,r*.28,.074),dark,x+Math.sin(a)*r,y+Math.cos(a)*r,z,0,0,-a);
+    }
+    box(r*.17,r*.7,.012,cream,x,y+r*.3,z+.052);
+  };
+  const handle = (x:number,y:number,z:number,w=.34,h=.10) => {
+    // Raised bail leaves an actual gap behind the grip instead of a solid bar.
+    for(const dx of[-w/2,w/2]){
+      box(.055,.07,.02,steel,x+dx,y,z);
+      cyl(.018,.035,dark,x+dx,y,z+.02,Math.PI/2);
+    }
+    tube([[x-w/2,y,z+.035],[x-w/2,y+h,z+.065],[x+w/2,y+h,z+.065],[x+w/2,y,z+.035]],.016,steel);
+  };
+  const caseHardware = (w:number,h:number,d:number,x:number,y:number,z:number) => {
+    const seamY=y+h*.27,front=z+d+.03;
+    box(w,.014,.016,dark,x,seamY,front);
+    for(const side of[-1,1]){
+      box(.014,.014,d,dark,x+side*(w/2+.026),seamY,z+d/2);
+      // Two rear hinge leaves and a horizontal pin joining lid to body.
+      box(.12,.11,.018,steel,x+side*w*.3,seamY,z-.032);
+      cyl(.023,.15,steel,x+side*w*.3,seamY,z-.05,0,Math.PI/2);
+      box(.055,.11,.028,steel,x+side*w*.31,seamY,front+.016);
+      box(.031,.035,.018,dark,x+side*w*.31,seamY-.018,front+.036);
+    }
+    handle(x,y+h*.36,front,.36,.07);
+  };
+  const multimeter = (x:number) => {
+    // Portable analogue test set: recessed scale, rotary range selector and two
+    // separate socket-to-probe leads. It stays on the existing electrical bench.
+    beveled(.46,.57,.16,dark,x,1.49,.05);
+    box(.39,.49,.018,cream,x,1.49,.243);
+    sheet(1,.34,.24,x,1.61,.254);knob(x,1.39,.282,.065);
+    handle(x,1.79,.12,.29,.07);
+    for(const side of[-1,1]){
+      const insulation=side===1?red:dark,sz=side===1?.57:.40;
+      cyl(.032,.026,copper,x+side*.125,1.285,.266,Math.PI/2);
+      cyl(.018,.038,insulation,x+side*.125,1.285,.282,Math.PI/2);
+      tube([[x+side*.125,1.285,.302],[x-.32+side*.035,1.22,.35],[x-.30,1.20,sz],[x-.08,1.20,sz]],.012,insulation);
+      cyl(.025,.20,insulation,x+.02,1.20,sz,0,Math.PI/2);
+      cyl(.035,.022,insulation,x+.12,1.20,sz,0,Math.PI/2);
+      cyl(.009,.13,steel,x+.195,1.20,sz,0,Math.PI/2);
+      for(let i=0;i<3;i++)cyl(.028,.009,dark,x-.04+i*.05,1.20,sz,0,Math.PI/2);
+    }
+  };
   const clipboard = (x: number, y: number, z: number, cell = 9, angle = -.12) => {
     box(.65, .035, .83, dark, x, y, z, angle); sheet(cell, .59, .77, x, y + .023, z, -Math.PI / 2,angle); box(.24, .028, .07, steel, x-Math.sin(angle)*.32, y + .04, z-Math.cos(angle)*.32,angle);
   };
@@ -181,9 +229,10 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     }
     cyl(.07,.10,steel,1.02,1.83,-.3,Math.PI/2);cyl(.025,.43,steel,.92,2.0,-.18,0,-.48);cyl(.065,.20,red,.82,2.20,-.18,0,Math.PI/2);
     beveled(.68,1.35,.65,paint,2.12,.85,-.64);
+    caseHardware(.68,1.35,.65,2.12,.85,-.64);
     for(let i=0;i<7;i++)box(.51,.025,.025,dark,2.12,.42+i*.14,.04);
     tube([[1.72,.35,-.5],[1.55,.18,-.9],[.8,.15,-.9],[.4,.45,-.6]],.035,red);
-    tools(.6);
+    tools(.6);multimeter(-1.02);
   } else if(kind==='telemetry') {
     // Three recessed CRT faces, control shelf and a full-height tape/data rack.
     beveled(2.95,.95,.45,paint,0,1.72,-.66);
@@ -192,7 +241,17 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
       box(.78,.06,.18,dark,x,2.15,-.13);
     }
     beveled(.73,2.23,.61,dark,2.02,1.31,-.70);
-    for(let i=0;i<5;i++){box(.63,.22,.06,paint,2.02,.5+i*.24,-.055);knob(2.23,.5+i*.24,-.015,.035);}
+    // Rack ears, repeated fixings and pull handles make the removable modules read.
+    for(const x of[1.68,2.36]){
+      box(.035,1.53,.035,steel,x,1.10,-.055);
+      for(let i=0;i<10;i++)cyl(.012,.014,dark,x,.40+i*.145,-.032,Math.PI/2);
+    }
+    for(let i=0;i<5;i++){
+      const y=.5+i*.24;
+      box(.63,.22,.06,paint,2.02,y,-.055);knob(2.23,y,-.015,.035);
+      handle(1.91,y-.025,.002,.20,.05);
+      for(let vent=0;vent<4;vent++)box(.014,.07,.012,dark,2.07+vent*.035,y,.009);
+    }
     for(const x of[1.85,2.18]){
       cyl(.17,.06,steel,x,2.11,-.02,Math.PI/2);cyl(.055,.075,dark,x,2.11,.022,Math.PI/2);
       for(let n=0;n<3;n++)put(new THREE.BoxGeometry(.025,.25,.014),dark,x,2.11,.025,0,0,n*Math.PI*2/3);
@@ -202,6 +261,8 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
   } else if(kind==='radio') {
     // A stacked receiver/transmitter, speaker grille and a wired handset.
     beveled(2.5,.59,.48,cream,-.12,1.56,-.64);beveled(2.22,.42,.43,paint,-.25,2.08,-.61);
+    for(const x of[-1.12,.87])handle(x,2.04,-.145,.12,.11);
+    for(const x of[-1.24,1.0])for(const y of[1.34,1.78])cyl(.022,.018,steel,x,y,-.125,Math.PI/2);
     sheet(10,1.24,.30,-.55,2.08,-.15);knob(.63,2.07,-.12,.12);
     meter(-.83,1.57,-.13,2);knob(-.17,1.57,-.10,.10);
     for(let i=0;i<8;i++)box(.025,.36,.018,dark,.2+i*.085,1.57,-.12);
@@ -217,12 +278,23 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     for(const x of[-1.39,1.29]){box(.065,1.25,.065,steel,x,1.75,-.7);tube([[x,1.3,-.4],[x,2.3,-.72],[x,.35,-1.3]],.025,steel);}
     for (let i = 0; i < 4; i++) {
       const x = -1 + i * .64;
-      for(const y of[1.62,2.0]){cyl(.095,.08,dark,x,y,-.43,Math.PI/2);cyl(.052,.10,copper,x,y,-.38,Math.PI/2);}
+      for(const y of[1.62,2.0]){
+        box(.25,.23,.025,steel,x,y,-.485);
+        cyl(.095,.08,dark,x,y,-.43,Math.PI/2);cyl(.052,.10,copper,x,y,-.38,Math.PI/2);
+        put(new THREE.TorusGeometry(.044,.012,6,12),steel,x,y,-.316);
+        // Recessed socket mouth and two screw heads distinguish the hardware
+        // from a painted dot without changing terminal labels or cable order.
+        cyl(.025,.012,dark,x,y,-.318,Math.PI/2);
+        for(const dx of[-.101,.101]){
+          cyl(.014,.014,dark,x+dx,y,-.463,Math.PI/2);
+          box(.017,.004,.004,steel,x+dx,y,-.454);
+        }
+      }
       terminalLabel(CABLE_CHANNELS[i]!,x,2.20);terminalLabel(CABLE_TARGET_ORDER[i]!,x,1.81);
       tube([[x,2,-.3],[x-.13,1.64,-.1],[x+.16,1.34,.04],[x+.12,1.21,.39]],.022,i%2?dark:red);
       cyl(.035,.15,copper,x+.12,1.21,.39,Math.PI/2);
     }
-    box(2.7,.10,.19,dark,-.05,1.29,-.15);tools(.57);
+    box(2.7,.10,.19,dark,-.05,1.29,-.15);tools(.57);multimeter(-.94);
   } else if(kind==='flight-plan') {
     put(new THREE.BoxGeometry(3.32,.065,1.22),cream,0,1.34,-.02,-.16);
     sheet(13,2.86,1.04,0,1.378,-.025,-Math.PI/2-.16);
@@ -265,7 +337,11 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     if(kind==='records')for(let i=0;i<2;i++)clipboard(-.82+i*.72,1.19+i*.006,.12,9,-.08+i*.06);
     if(kind==='records'){
       beveled(.83,.65,.61,paint,-1.13,.70,-.28);
-      for(const y of[.49,.76]){box(.77,.22,.045,cream,-1.13,y,.36);box(.24,.025,.055,steel,-1.13,y,.40);}
+      for(const y of[.49,.76]){
+        box(.77,.22,.045,cream,-1.13,y,.36);handle(-1.13,y-.025,.40,.24,.055);
+        box(.15,.055,.012,steel,-1.13,y+.065,.39);box(.12,.032,.014,paper,-1.13,y+.065,.399);
+      }
+      caseHardware(.83,.65,.61,-1.13,.70,-.28);
     }else{
       for(let i=0;i<3;i++){const x=-.9+i*.77;box(.6,.045,.19,dark,x,1.35,-.48);sheet(5,.44,.57,x,1.65,-.56);}
       box(2.55,.045,.045,steel,0,1.98,-.62);

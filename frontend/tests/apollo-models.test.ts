@@ -12,12 +12,32 @@ test('every stand builds finite human-scale geometry with bounded shared materia
     return materials.get(name)!;
   };
   const kinds:StandModelKind[]=['sequence','flight-plan','telemetry','cables','crew-manifest','weather','beacons','orientation','survey','records','radio','crew','tracking'];
+  let kitTriangles=0;
   for(const kind of kinds){
     const model=buildStandModel(kind,factory,atlas,0),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
     assert.ok(size.x>=5&&size.x<7,`${kind}: width is in metres`);assert.ok(size.y>1.8&&size.y<5,`${kind}: height is in metres`);
     assert.ok(model.children.length<=9,`${kind}: material batches stay bounded`);
-    model.traverse(node=>{if(node instanceof THREE.Mesh){const position=node.geometry.getAttribute('position');for(let i=0;i<position.array.length;i++)assert.ok(Number.isFinite(position.array[i]),`${kind}: finite vertices`);node.geometry.dispose();}});
+    const usedMaterials=new Set<THREE.Material>();let triangles=0;
+    model.traverse(node=>{if(node instanceof THREE.Mesh){
+      assert.ok(!Array.isArray(node.material),`${kind}: each batch has a single material`);
+      const material=node.material as THREE.MeshStandardMaterial;
+      assert.ok([...materials.values()].includes(material),`${kind}: detail reuses factory materials`);
+      assert.ok(!usedMaterials.has(material),`${kind}: static parts merge once per material`);usedMaterials.add(material);
+      assert.equal(material.map,material===materials.get('stand-instrument-atlas')?atlas:null,`${kind}: only the shared atlas is textured`);
+      assert.equal(node.geometry.groups.length,0,`${kind}: detail cannot add hidden material draw groups`);
+      const position=node.geometry.getAttribute('position'),uv=node.geometry.getAttribute('uv');
+      triangles+=(node.geometry.index?.count??position.count)/3;
+      for(let i=0;i<position.array.length;i++)assert.ok(Number.isFinite(position.array[i]),`${kind}: finite vertices`);
+      assert.equal(uv.count,position.count,`${kind}: all detail retains UVs for merging`);
+      for(let i=0;i<uv.array.length;i++){
+        assert.ok(Number.isFinite(uv.array[i]),`${kind}: finite UVs`);
+        if(material.map)assert.ok(uv.array[i]>=0&&uv.array[i]<=1,`${kind}: atlas UVs stay inside the shared texture`);
+      }
+      node.geometry.dispose();
+    }});
+    assert.ok(triangles<=10_000,`${kind}: functional detail stays within the 10k triangle station budget`);kitTriangles+=triangles;
   }
+  assert.ok(kitTriangles<=60_000,'the complete station kit stays within its triangle budget');
   assert.ok(materials.size<=9);materials.forEach(material=>material.dispose());atlas.dispose();
 });
 
