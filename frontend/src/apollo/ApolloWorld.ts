@@ -459,7 +459,7 @@ export class ApolloWorld {
     const deck = this.material('bonus-deck', 0x384b4a, 0.72, 0.45);
     const trim = this.material('bonus-trim', 0xa58a53, 0.42, 0.7);
     const panel = this.material('bonus-panel', 0x1b2b31, 0.44, 0.55);
-    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c];
+    const accentColors = [0xf0b45e, 0x8ec6a0, 0xb8d28c, 0xd9a56d, 0x8fc2b2, 0xd2c28a];
     BONUS_CHECKPOINTS.forEach((bonus, index) => {
       const { x, z } = bonus.target;
       this.groundPlane(8, 6, x, z, this.material(`bonus-grit-${index}`, 0x8e8772, 0.98), 0.02);
@@ -471,6 +471,23 @@ export class ApolloWorld {
       for (let relay = 0; relay < 4; relay++) {
         this.box(0.42, 0.34, 0.22, panel, x - 1.25 + relay * 0.84, 1.58, z - 1.2);
         this.box(0.2, 0.06, 0.05, trim, x - 1.25 + relay * 0.84, 1.78, z - 1.2);
+      }
+      if (bonus.kind === 'cables') {
+        const nodeMaterial = this.material('bonus-cable-node', 0xd2c69d, 0.45, 0.3);
+        for (let node = 0; node < 4; node++) {
+          this.cylinder(0.18, 0.18, 0.08, nodeMaterial, x - 1.5 + node * 1, 1.52, z + 0.55);
+          this.box(0.62, 0.035, 0.035, trim, x - 1 + node * 1, 1.53, z + 0.55);
+        }
+      } else if (bonus.kind === 'weather') {
+        this.cylinder(0.42, 0.42, 1.25, panel, x - 2.1, 0.72, z + 0.9);
+        this.cylinder(0.31, 0.31, 0.08, trim, x - 2.1, 1.38, z + 0.9);
+        this.cylinder(0.06, 0.06, 2.1, trim, x + 2.1, 1.15, z + 0.9);
+        this.beam(new THREE.Vector3(x + 2.1, 2.18, z + 0.9), new THREE.Vector3(x + 2.9, 2.18, z + 0.9), 0.045, trim);
+      } else if (bonus.kind === 'flight-plan') {
+        for (let card = 0; card < 4; card++) {
+          this.box(0.62, 0.08, 0.9, card % 2 ? trim : panel, x - 1.2 + card * 0.8, 1.42, z + 0.78);
+          this.box(0.42, 0.018, 0.035, trim, x - 1.2 + card * 0.8, 1.48, z + 0.78);
+        }
       }
       this.box(0.16, 1.7, 0.16, trim, x - 2.7, 0.9, z + 1.2);
       this.box(0.16, 1.7, 0.16, trim, x + 2.7, 0.9, z + 1.2);

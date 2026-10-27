@@ -16,7 +16,7 @@ export interface ApolloCheckpoint {
   readonly actions: readonly ApolloAction[];
 }
 
-export type ApolloBonusKind = 'sequence' | 'telemetry' | 'beacons';
+export type ApolloBonusKind = 'sequence' | 'telemetry' | 'beacons' | 'cables' | 'weather' | 'flight-plan';
 
 export interface ApolloBonusCheckpoint {
   readonly id: string;
@@ -42,6 +42,21 @@ export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
     id: 'pad-safety', title: 'Perímetro de seguridad',
     objective: 'Confirma los tres balizadores del perímetro antes de abrir la ruta de servicio.',
     target: { x: 44, z: 365 }, kind: 'beacons',
+  },
+  {
+    id: 'umbilical-check', title: 'Conexiones umbilicales',
+    objective: 'Une los cuatro nodos de servicio en el orden correcto para confirmar la continuidad del conjunto.',
+    target: { x: -45, z: 285 }, kind: 'cables',
+  },
+  {
+    id: 'weather-window', title: 'Ventana meteorológica',
+    objective: 'Ajusta viento, humedad y nubosidad para emitir el parte de condiciones de lanzamiento.',
+    target: { x: 95, z: 315 }, kind: 'weather',
+  },
+  {
+    id: 'flight-record', title: 'Plan de vuelo',
+    objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
+    target: { x: 42, z: 180 }, kind: 'flight-plan',
   },
 ];
 

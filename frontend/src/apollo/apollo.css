@@ -53,6 +53,12 @@ body.apollo-active .language-menu{display:none}
 .ap-bonus-action:hover,.ap-bonus-action:focus-visible{background:#f3d398;outline:2px solid #f3d39855;outline-offset:2px}
 .ap-bonus-beacon-row{grid-template-columns:repeat(3,1fr)}
 .ap-bonus-beacon{min-height:72px;font-size:14px;letter-spacing:.08em}
+.ap-bonus-cable-nodes,.ap-bonus-flight-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.ap-bonus-cable-node,.ap-bonus-flight-card{min-height:60px;border:1px solid #9db6a466;background:linear-gradient(#234448,#0c242b);color:#d7e2cf;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.ap-bonus-cable-node{border-radius:50%;font:600 12px ui-monospace,SFMono-Regular,monospace}
+.ap-bonus-flight-card{padding:10px;font-size:10px;line-height:1.4;text-align:left}
+.ap-bonus-cable-node:hover,.ap-bonus-cable-node:focus-visible,.ap-bonus-flight-card:hover,.ap-bonus-flight-card:focus-visible{transform:translateY(-2px);border-color:#e8c579;outline:2px solid #e8c57955;outline-offset:2px}
+.ap-bonus-cable-node--active,.ap-bonus-flight-card--active{background:#91c49d;color:#11231f;border-color:#c6e4ae;box-shadow:0 0 20px #9bd6a544}
 .ap-bonus-cancel{justify-self:start;margin-top:4px}
 @media(max-width:520px){.ap-bonus-stage{padding:12px;gap:11px}.ap-bonus-header{display:block}.ap-bonus-kicker{display:block;margin-bottom:8px}.ap-bonus-slider{grid-template-columns:88px 1fr 28px;font-size:10px}.ap-bonus-relay,.ap-bonus-beacon{min-height:54px}.ap-bonus-hint{font-size:9px}}
 

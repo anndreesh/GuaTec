@@ -4,7 +4,7 @@ import { ApolloState, BONUS_CHECKPOINTS } from '../src/apollo/ApolloState';
 
 test('bonus checkpoints are optional and complete independently of the historical route', () => {
   const state = new ApolloState();
-  assert.equal(BONUS_CHECKPOINTS.length, 3);
+  assert.equal(BONUS_CHECKPOINTS.length, 6);
   assert.deepEqual(state.bonusCompleted, []);
   assert.equal(state.completeBonus(BONUS_CHECKPOINTS[0]!.id), true);
   assert.equal(state.checkpoint, 0);
