@@ -1,5 +1,42 @@
 import * as THREE from 'three';
-import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+import { toCreasedNormals, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+export interface VehicleRig {
+  wheels: THREE.Group[];
+  wheelRadius: number;
+  headlamp: THREE.MeshStandardMaterial;
+  taillamp: THREE.MeshStandardMaterial;
+}
+
+/** Deterministic odometry also supports seeking/replaying the crew cinematic. */
+export function poseVehicle(root: THREE.Group, distance: number, speed: number, time: number, reducedMotion = false): void {
+  const rig = root.userData.vehicleRig as VehicleRig | undefined;
+  if (!rig) return;
+  for (const wheel of rig.wheels) wheel.rotation.x = -distance / rig.wheelRadius;
+  const rolling = Math.min(1, Math.abs(speed) / 2);
+  root.position.y = reducedMotion ? 0 : Math.sin(time * 7) * .008 * rolling;
+  root.rotation.z = reducedMotion ? 0 : Math.sin(time * 3.5) * .002 * rolling;
+  rig.headlamp.emissiveIntensity = rolling ? .45 : .18;
+  rig.taillamp.emissiveIntensity = Math.abs(speed) < .2 ? .55 : .18;
+}
+
+/** Merge rigid surfaces within each joint; never flatten the wheel hierarchy. */
+function batchRigidParts(root: THREE.Group): void {
+  const materials = new Map<THREE.Material, THREE.Mesh[]>();
+  for (const child of [...root.children]) {
+    if (child instanceof THREE.Group) { batchRigidParts(child); continue; }
+    if (!(child instanceof THREE.Mesh) || Array.isArray(child.material)) continue;
+    const meshes = materials.get(child.material) ?? []; meshes.push(child); materials.set(child.material, meshes);
+  }
+  for (const [material, meshes] of materials) {
+    const geometries = meshes.map(mesh => { mesh.updateMatrix(); return (mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone()).applyMatrix4(mesh.matrix); });
+    const merged = mergeGeometries(geometries, false);
+    geometries.forEach(geometry => geometry.dispose());
+    if (!merged) continue;
+    for (const mesh of meshes) { mesh.removeFromParent(); mesh.geometry.dispose(); }
+    const mesh = new THREE.Mesh(merged, material); mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh);
+  }
+}
 
 /**
  * Procedural, parametric road vehicles for the Kennedy support area.
@@ -118,8 +155,8 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
   const chrome = paint('car-chrome', 0xdfe5e7, 0.28, 0.5);
   const tire = paint('car-tire', 0x16181a, 0.9, 0);
   const brake = paint('car-brake', 0x3a3f42, 0.5, 0.7);
-  const headlamp = paint('car-headlamp', 0xf5f7ff, 0.2, 0.2); headlamp.emissive.setHex(0xdfe8ff); headlamp.emissiveIntensity = 0.7;
-  const taillamp = paint('car-taillamp', 0xb3141b, 0.3, 0.2); taillamp.emissive.setHex(0xff1822); taillamp.emissiveIntensity = 0.55;
+  const headlamp = paint('car-headlamp', 0xf5f7ff, 0.2, 0.2).clone(); headlamp.emissive.setHex(0xdfe8ff); headlamp.emissiveIntensity = 0.18;
+  const taillamp = paint('car-taillamp', 0xb3141b, 0.3, 0.2).clone(); taillamp.emissive.setHex(0xff1822); taillamp.emissiveIntensity = 0.55;
   const plate = paint('car-plate', 0xe9e6d8, 0.6, 0);
   const wheelGroups: THREE.Group[] = [];
 
@@ -170,7 +207,7 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
     for (const side of [-1, 1]) {
       const x = side * (width / 2 - 0.1), r = spec.wheelRadius;
       const wheel = new THREE.Group(); wheel.position.set(x, r, axle); group.add(wheel);
-      wheel.name = `wheel-${side < 0 ? 'left' : 'right'}-${axle > 0 ? 'front' : 'rear'}`;
+      wheel.name = `wheel-${side < 0 ? 'left' : 'right'}-${axle < 0 ? 'front' : 'rear'}`;
       wheelGroups.push(wheel);
       const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.26, 28), tire); tyre.rotation.z = Math.PI / 2; wheel.add(tyre);
       const face = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.66, r * 0.66, 0.27, 24), rim); face.rotation.z = Math.PI / 2; wheel.add(face);
@@ -186,6 +223,13 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
       for (const m of wheel.children) if (m instanceof THREE.Mesh) { m.castShadow = true; m.receiveShadow = true; }
       const arch = new THREE.Mesh(new THREE.CircleGeometry(r * 1.2, 28), trim);
       arch.rotation.y = side * Math.PI / 2; arch.position.set(side * (flank(r) + 0.006), r, axle); group.add(arch);
+      const lip = add(new THREE.TorusGeometry(r * 1.08, .024, 5, 24, Math.PI), chrome, side * (flank(r) + .024), r, axle);
+      lip.rotation.y = side * Math.PI / 2;
+      // Narrow moulded tyre grooves catch highlights without allocating textures.
+      for (const offset of [-.08,.08]) {
+        const groove = new THREE.Mesh(new THREE.TorusGeometry(r * .985,.008,4,24),trim);
+        groove.rotation.y=Math.PI/2;groove.position.x=offset;wheel.add(groove);
+      }
     }
   }
 
@@ -208,8 +252,7 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
     box(0.02, 0.1, 0.16, trim, side * (flank(belt + 0.12) + 0.105), belt + 0.12, Z(spec.windshieldBase - 0.2));
     // Period-correct side marker and a recessed door seam make the flank read as
     // assembled sheet metal instead of one continuous extrusion at gameplay distance.
-    const marker = box(0.025, 0.055, 0.13, headlamp, side * (flank(belt - 0.03) + 0.018), belt - 0.03, Z(half - 0.32));
-    marker.material = headlamp;
+    box(0.025, 0.055, 0.13, headlamp, side * (flank(belt - 0.03) + 0.018), belt - 0.03, Z(half - 0.32));
     box(0.018, 0.62, 0.012, trim, side * (flank(belt - 0.18) + 0.012), belt - 0.02, Z(-0.02));
     for (const s of [0.1, -0.7]) box(0.03, 0.025, 0.2, chrome, side * (flank(belt - 0.08) + 0.01), belt - 0.08, Z(s));
     if (spec.roofRails) {
@@ -222,6 +265,15 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
   box(0.52, 0.12, 0.03, plate, 0, gc + 0.38, tailZ + 0.015);
   box(width * 0.9, 0.1, 0.18, options.periodStyle?chrome:trim, 0, gc + 0.12, -half + 0.03);
   box(width * 0.9, 0.1, 0.18, options.periodStyle?chrome:trim, 0, gc + 0.12, half - 0.03);
+  // Windshield blades follow the sloping glass; hood shut-lines and the fuel
+  // hatch provide scale cues even when the transport is parked.
+  for (const side of [-1,1]) {
+    const blade = box(.38,.018,.025,trim,side*width*.23,beltTop+.09,Z(spec.windshieldBase-.11));
+    blade.rotation.y=side*.12;
+    const arm=box(.018,.13,.018,chrome,side*width*.19,beltTop+.04,Z(spec.windshieldBase-.05));arm.rotation.x=-.6;
+    box(.012,.018,Math.max(.3,half-spec.windshieldBase-.14),trim,side*width*.30,belt+.035,Z((half+spec.windshieldBase)/2));
+  }
+  box(.014,.15,.18,chrome,-flank(belt-.25)-.01,belt-.25,half-.62);
 
   if (options.decal) {
     const decal = new THREE.MeshBasicMaterial({ map: options.decal, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
@@ -235,6 +287,7 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
   }
   // Expose only the small amount of mutable state needed by the world animation
   // pass. The geometry and materials remain owned by this factory.
-  group.userData.vehicleRig = { wheels: wheelGroups, wheelRadius: spec.wheelRadius, headlamp, taillamp };
+  group.userData.vehicleRig = { wheels: wheelGroups, wheelRadius: spec.wheelRadius, headlamp, taillamp } satisfies VehicleRig;
+  batchRigidParts(group);
   return group;
 }

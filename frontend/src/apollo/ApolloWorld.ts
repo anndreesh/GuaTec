@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
+import { buildCar, poseVehicle, CAR_SPECS, type CarKind } from './ApolloVehicles';
 import { buildBench, type Kit, type StationKind } from './ApolloFurniture';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
@@ -60,7 +60,8 @@ export class ApolloWorld {
   private crewRoot = new THREE.Group();
   private rocket = new THREE.Group();
   private van = new THREE.Group();
-  private vehicleRigs: { root: THREE.Group; wheels: THREE.Group[]; wheelRadius: number; previousZ: number; phase: number; headlamp: THREE.MeshStandardMaterial; taillamp: THREE.MeshStandardMaterial }[] = [];
+  private vehicleRigs: THREE.Group[] = [];
+  private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private arms: THREE.Group[] = [];
   private crew: THREE.Group[] = [];
   private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null; run: THREE.AnimationAction | null; jump: THREE.AnimationAction | null }[] = [];
@@ -248,12 +249,14 @@ export class ApolloWorld {
       node.geometry.dispose();
     });
   }
-  private mergeAuthored(group: THREE.Group): void {
+  private mergeAuthored(group: THREE.Group, preserveJoints = false): void {
+    if (preserveJoints) for (const child of [...group.children]) if (child instanceof THREE.Group) this.mergeAuthored(child, true);
     group.updateMatrixWorld(true);
     const inverse = group.matrixWorld.clone().invert();
     const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const removals: THREE.Mesh[] = [];
     group.traverse(node => {
+      if (preserveJoints && node.parent !== group) return;
       if (!(node instanceof THREE.Mesh) || !(node.material instanceof THREE.MeshStandardMaterial)) return;
       const geometry = (node.geometry.index ? node.geometry.toNonIndexed() : node.geometry.clone()).applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse, node.matrixWorld));
       const list = batches.get(node.material) ?? []; list.push(geometry); batches.set(node.material, list); removals.push(node);
@@ -422,9 +425,19 @@ export class ApolloWorld {
     }
     const ribMesh = new THREE.Mesh(mergeGeometries(ribs)!, aluminum); this.rocket.add(ribMesh); ribs.forEach(g => g.dispose());
     for (const [x, z] of [[0, 0], [-2.9, -2.9], [-2.9, 2.9], [2.9, -2.9], [2.9, 2.9]]) {
-      this.cylinder(0.78, 1.52, 3.8, nozzle, x, 2.9, z, this.rocket, 32);
+      // Curved engine bells retain the original footprint and throat height.
+      // The flared profile reads under launch lighting at both close and wide views.
+      const profile = [[1.52,1],[1.48,1.18],[1.33,1.58],[1.1,2.25],[.87,3.0],[.72,3.8],[.73,4.35],[.78,4.8]];
+      const bell = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r,y])=>new THREE.Vector2(r,y)),32),nozzle);
+      bell.position.set(x,0,z);bell.castShadow=true;bell.receiveShadow=true;this.rocket.add(bell);
+      const interior = new THREE.Mesh(new THREE.CylinderGeometry(.68,.68,.08,24),black);
+      interior.position.set(x,4.37,z);this.rocket.add(interior);
       this.cylinder(1.57, 1.57, 0.16, aluminum, x, 1.02, z, this.rocket, 32);
       this.cylinder(0.7, 0.9, 2.8, aluminum, x, 5.2, z, this.rocket);
+      for(const [radius,y] of [[1.37,1.5],[1.19,2],[1.03,2.5],[.88,3],[.77,3.5]]){
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(radius,.022,4,32),aluminum);
+        ring.rotation.x=Math.PI/2;ring.position.set(x,y,z);this.rocket.add(ring);
+      }
       const flame = new THREE.Mesh(new THREE.ConeGeometry(1.6, 18, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xff9c22, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
       flame.rotation.z = Math.PI; flame.position.set(x, -7.9, z); flame.visible = false;
       this.rocket.add(flame); this.flames.push(flame);
@@ -579,8 +592,10 @@ export class ApolloWorld {
     const decal = crew ? new THREE.TextureLoader().load('/icon-512.png') : undefined;
     const group = buildCar(CAR_SPECS[kind], { kind, paint: crew ? 0xd9d6bd : Math.abs(x)>88?0xb8b8a2:0x546e73, decal, periodStyle:true }, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness));
     group.position.set(x, 0, z); this.scene.add(group);
-    const rig = group.userData.vehicleRig as { wheels: THREE.Group[]; wheelRadius: number; headlamp: THREE.MeshStandardMaterial; taillamp: THREE.MeshStandardMaterial };
-    this.vehicleRigs.push({ root: group, wheels: rig.wheels, wheelRadius: rig.wheelRadius, previousZ: z, phase: this.vehicleRigs.length * 1.73, headlamp: rig.headlamp, taillamp: rig.taillamp });
+    // Parked cars use the cheaper full-body batch. Only the moving transport
+    // needs individual wheel joints in the scene graph.
+    if (!crew) this.mergeAuthored(group);
+    this.vehicleRigs.push(group);
     return group;
   }
   private buildVehicles(): void {
@@ -788,12 +803,27 @@ export class ApolloWorld {
     const head=new THREE.Group();head.position.set(0,1.69,0);group.add(head);addSphere(.15,skin,0,0,0,head).scale.set(1,1.2,.93);addCylinder(.074,.074,.13,skin,0,-.21,0,head);
     const cap=addSphere(.16,shirt,0,1.77-1.69,0,head);cap.scale.set(1,0.65,1);addBox(.27,.025,.15,shirt,0,.08,.13,head);
     for(const dx of [-.052,.052])addBox(.022,.016,.009,shoe,dx,.02,.137,head);
-    addBox(.13,.1,.012,shirt,-.11,1.27,0);addBox(.07,.028,.013,badge,-.11,1.29,.18);
+    addBox(.13,.1,.012,shirt,-.11,1.27,.166);addBox(.07,.028,.013,badge,-.11,1.29,.18);
+    addSphere(.027,skin,0,-.025,.143,head).scale.set(.7,1,1.2);
+    for (const side of [-1,1]) {
+      addSphere(.03,skin,side*.145,0,0,head).scale.set(.6,1,.7);
+      addBox(.041,.009,.012,shoe,side*.052,.047,.136,head);
+      const collar=addBox(.09,.055,.025,shirt,side*.055,1.45,.12);collar.rotation.z=side*.4;
+    }
+    addBox(.005,.36,.015,this.material('worker-belt',0x4b4d3e),0,1.17,.168);
+    for (let button=0;button<3;button++)addSphere(.008,badge,.02,1.08+button*.10,.177);
     const legs=[-1,1].map(side=>{const hip=new THREE.Group();hip.position.set(side*.115,.9,0);group.add(hip);addCylinder(.095,.084,.42,pants,0,-.21,0,hip);const shin=new THREE.Group();shin.position.set(0,-.42,0);hip.add(shin);addCylinder(.083,.069,.43,pants,0,-.215,0,shin);addBox(.16,.12,.29,shoe,0,-.46,.055,shin);return hip;});
     const arms=[-1,1].map(side=>{const shoulder=new THREE.Group();shoulder.position.set(side*.24,1.37,0);group.add(shoulder);beam(new THREE.Vector3(0,0,0),new THREE.Vector3(side*.08,-.28,.025),.06,shirt,shoulder);const elbow=new THREE.Group();elbow.position.set(side*.08,-.28,.025);shoulder.add(elbow);beam(new THREE.Vector3(0,0,0),new THREE.Vector3(-side*.03,-.15,.21),.045,skin,elbow);addSphere(.06,skin,-side*.03,-.16,.21,elbow);return shoulder;});
     if(role==='documentation'){const board=addBox(.23,.32,.025,badge,.28,.98,.22);board.rotation.x=-.22;}
     if(role==='communications'){addCylinder(.018,.018,.22,badge,.22,1.44,.03);addSphere(.045,badge,.22,1.58,.03);}
-    group.userData.role = role; this.scene.add(group);
+    group.userData.role = role; this.mergeAuthored(group, true);
+    // At the map's shadow texel scale, fingers/buttons add draw calls without
+    // changing the ground silhouette. One torso proxy grounds each technician.
+    group.traverse(node=>{if(node instanceof THREE.Mesh)node.castShadow=false;});
+    const shadowMaterial=new THREE.MeshBasicMaterial({colorWrite:false,depthWrite:false});
+    const shadowProxy=new THREE.Mesh(new THREE.CapsuleGeometry(.23,1.12,3,8),shadowMaterial);
+    shadowProxy.name='technician-shadow-proxy';shadowProxy.position.y=.85;shadowProxy.scale.z=.7;shadowProxy.castShadow=true;group.add(shadowProxy);
+    this.scene.add(group);
     this.technicians.push({root:group,leftArm:arms[0]!,rightArm:arms[1]!,leftLeg:legs[0]!,rightLeg:legs[1]!,head,baseX:x,baseZ:z,radius:role==='observation'?.42:.28,phase:role==='communications'?.8:role==='documentation'?2.2:role==='observation'?3.4:1.1,speed:role==='documentation'?.55:.7,role});
   }
   private addFallbackSuit(root: THREE.Group): void {
@@ -895,34 +925,24 @@ export class ApolloWorld {
   }
   /** Small, frame-independent life pass for support hardware and field staff. */
   private updateActors(dt: number): void {
-    for (const rig of this.vehicleRigs) {
-      const deltaZ = rig.root.position.z - rig.previousZ;
-      if (Math.abs(deltaZ) > 0.00001) {
-        for (const wheel of rig.wheels) wheel.rotation.x += deltaZ / Math.max(rig.wheelRadius, 0.01);
-      }
-      rig.previousZ = rig.root.position.z;
-      const isCrewVan = rig.root === this.van;
-      const pulse = isCrewVan && this.mode === 'crew' ? .72 + Math.sin(this.clock * 8) * .18 : .22;
-      rig.headlamp.emissiveIntensity = pulse;
-      rig.taillamp.emissiveIntensity = isCrewVan && this.mode === 'crew' ? .42 + Math.max(0, Math.sin(this.clock * 5)) * .28 : .18;
-    }
+    if (this.suspended && !this.mode) return;
     for (const technician of this.technicians) {
       const phase = this.clock * technician.speed + technician.phase;
-      const nextX = technician.baseX + Math.cos(phase) * technician.radius;
-      const nextZ = technician.baseZ + Math.sin(phase) * technician.radius * .52;
-      const deltaX = nextX - technician.root.position.x;
-      const deltaZ = nextZ - technician.root.position.z;
-      technician.root.position.set(nextX, Math.abs(Math.sin(phase * 2)) * .012, nextZ);
-      if (Math.hypot(deltaX, deltaZ) > .0001) technician.root.rotation.y = Math.atan2(deltaX, deltaZ);
-      const stride = Math.sin(phase * 2) * .22;
-      technician.leftLeg.rotation.x = stride;
-      technician.rightLeg.rotation.x = -stride;
-      technician.leftArm.rotation.x = -stride * .72;
-      technician.rightArm.rotation.x = stride * .72;
+      // Station work is planted: feet and collider stay together while the upper
+      // body checks a clipboard, receiver or instrument. No tiny sliding orbit.
+      const motion = this.reducedMotion ? 0 : 1;
+      technician.root.position.y = Math.sin(phase) * .003 * motion;
+      technician.leftLeg.rotation.x = 0;
+      technician.rightLeg.rotation.x = 0;
+      technician.leftArm.rotation.x = -.14 + Math.sin(phase * 1.3) * .055 * motion;
+      technician.rightArm.rotation.x = (technician.role === 'communications' ? -.62 : -.24) + Math.sin(phase * .8) * .07 * motion;
       technician.leftArm.rotation.z = -.05 + Math.sin(phase * .5) * .02;
       technician.rightArm.rotation.z = .05 - Math.sin(phase * .5) * .02;
-      technician.head.rotation.y += (Math.sin(phase * .31) * .12 - technician.head.rotation.y) * (1 - Math.exp(-4 * dt));
-      technician.head.rotation.x += (Math.sin(phase * .22) * .025 - technician.head.rotation.x) * (1 - Math.exp(-3 * dt));
+      const dx = this.player.x - technician.baseX, dz = this.player.z - technician.baseZ;
+      const nearby = dx * dx + dz * dz < 36;
+      const look = nearby ? clamp(Math.atan2(dx, dz), -.55, .55) : Math.sin(phase * .31) * .12 * motion;
+      technician.head.rotation.y += (look - technician.head.rotation.y) * (1 - Math.exp(-4 * dt));
+      technician.head.rotation.x += ((nearby ? -.025 : .06) - technician.head.rotation.x) * (1 - Math.exp(-3 * dt));
     }
   }
   private applyDeadzone(value: number, deadzone = 0.14): number {
@@ -962,7 +982,7 @@ export class ApolloWorld {
     if (this.disposed) return;
     const cameraNow = performance.now(), cameraDt = Math.min(.05, Math.max(0, (cameraNow-this.lastCameraUpdate)/1000)); this.lastCameraUpdate=cameraNow;
     if (dt > 0) { this.frameDurations.push(dt * 1000); if (this.frameDurations.length > 300) this.frameDurations.shift(); }
-    dt = Math.min(Math.max(dt, 0), 0.05); this.clock += dt;
+    dt = Math.min(Math.max(dt, 0), 0.05); if (!this.suspended || this.mode) this.clock += dt;
     this.cloudSprites.position.x += dt * .8;
     this.bonusAccents.forEach(({ mesh, phase }) => {
       const material = mesh.material as THREE.MeshBasicMaterial;
@@ -993,14 +1013,22 @@ export class ApolloWorld {
       const p = this.people[i];
       const airborne = i === 0 && !this.grounded;
       const walking = i === 0 ? moving : this.mode === 'crew';
-      const running = i === 0 && walking && this.keys.has('shift');
-      p.walk?.setEffectiveWeight(!airborne && walking && !running ? 1 : 0);
-      p.run?.setEffectiveWeight(!airborne && running ? 1 : 0);
+      const running = i === 0 && walking && (this.keys.has('shift') || this.touchSprint || this.gamepadSprint);
+      const animationDt = this.suspended && !this.mode ? 0 : dt;
+      const blend = (action:THREE.AnimationAction|null,target:number) => {
+        if (!action) return;
+        const next = THREE.MathUtils.damp(action.getEffectiveWeight(),target,14,animationDt);
+        // A subnormal positive weight still evaluates every animation track.
+        // Finish the fade so inactive clips stop consuming CPU time.
+        action.setEffectiveWeight(Math.abs(next-target)<.001 ? target : next);
+      };
+      blend(p.walk,!airborne && walking && (!running || !p.run) ? 1 : 0);
+      blend(p.run,!airborne && running ? 1 : 0);
       // This asset has no jump clip. Keep its authored idle pose in the air
       // instead of giving every action zero weight and exposing the bind pose.
-      p.idle?.setEffectiveWeight((!airborne && !walking) || (airborne && !p.jump) ? 1 : 0);
+      blend(p.idle,(!airborne && !walking) || (airborne && !p.jump) ? 1 : 0);
       if (!p.jump || !airborne) p.jump?.setEffectiveWeight(0);
-      if (i === 0 || this.mode === 'crew') p.mixer.update(dt);
+      if (i === 0 || this.mode === 'crew') p.mixer.update(animationDt);
     }
     if (this.target.visible) { this.target.children[1].rotation.y += dt; this.target.children[1].position.y = 3.8 + Math.sin(this.clock * 2) * 0.22; }
     if (this.mode === 'intro') this.introCamera(this.cinematicElapsed);
@@ -1055,6 +1083,7 @@ export class ApolloWorld {
     const p = clamp(t / 24, 0, 1);
     this.crew.forEach((root, i) => { root.position.set(-8 + i * 2, 0, 77 - p * 48 + i * 2); root.rotation.y = Math.PI; });
     this.van.position.set(-16, 0, 76 - p * 44);
+    poseVehicle(this.van, p * 44, t > 0 && t < 24 ? 44 / 24 : 0, t, this.reducedMotion);
     if (t < 7) {
       this.camera.position.set(5, 3.1, 65 - p * 48);
       this.cameraLook.set(-5, 1.8, 77 - p * 48);
