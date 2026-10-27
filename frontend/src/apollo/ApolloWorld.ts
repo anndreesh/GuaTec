@@ -549,16 +549,16 @@ export class ApolloWorld {
     return tex;
   }
   private vehicle(x: number, z: number, crew = false): THREE.Group {
-    const kind: CarKind = crew ? 'van' : (Math.abs(x) > 80 ? 'suv' : 'sedan');
+    const kind: CarKind = crew ? 'van' : 'sedan';
     const decal = crew ? new THREE.TextureLoader().load('/icon-512.png') : undefined;
-    const group = buildCar(CAR_SPECS[kind], { kind, paint: crew ? 0xd9d6bd : 0x687e7b, decal }, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness));
+    const group = buildCar(CAR_SPECS[kind], { kind, paint: crew ? 0xd9d6bd : Math.abs(x)>88?0xb8b8a2:0x546e73, decal, periodStyle:true }, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness));
     group.position.set(x, 0, z); this.scene.add(group); return group;
   }
   private buildVehicles(): void {
     this.van = this.vehicle(-17, 75, true);
     this.van.visible = false;
     for (const [x, z] of [[-88, 220], [90, 264], [-88, 345], [90, 139]]) {
-      const kind: CarKind = Math.abs(x) > 80 ? 'suv' : 'sedan';
+      const kind: CarKind = 'sedan';
       const car = this.vehicle(x, z); car.rotation.y = Math.PI / 2;
       this.colliders.push({ x, z, w: CAR_SPECS[kind].length / 2 + .35, d: CAR_SPECS[kind].width / 2 + .35 });
     }

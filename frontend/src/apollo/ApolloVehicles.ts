@@ -46,8 +46,8 @@ export interface CarSpec {
 
 export const CAR_SPECS = {
   suv: { length: 4.72, width: 1.93, height: 1.68, wheelbase: 2.86, wheelRadius: 0.39, clearance: 0.2, belt: 1.0, windshieldBase: 1.18, roofFront: 0.38, roofRear: -1.82, rearGlassBase: -2.12, roofThickness: 0.1, corner: 0.2, tumblehome: 0.11, pillars: [-0.1, -0.78], roofRails: true, lightBar: true },
-  sedan: { length: 4.86, width: 1.88, height: 1.46, wheelbase: 2.9, wheelRadius: 0.35, clearance: 0.15, belt: 0.93, windshieldBase: 1.1, roofFront: 0.22, roofRear: -0.78, rearGlassBase: -1.86, roofThickness: 0.08, corner: 0.24, tumblehome: 0.13, pillars: [-0.12], lightBar: true },
-  van: { length: 5.95, width: 2.02, height: 2.42, wheelbase: 3.65, wheelRadius: 0.4, clearance: 0.22, belt: 1.12, windshieldBase: 2.08, roofFront: 1.58, roofRear: -2.9, rearGlassBase: -2.95, roofThickness: 0.42, corner: 0.16, tumblehome: 0.05, pillars: [0.55, -0.55], blindFrom: -1.45, lightBar: true },
+  sedan: { length: 4.98, width: 1.95, height: 1.46, wheelbase: 2.95, wheelRadius: 0.35, clearance: 0.15, belt: 0.93, windshieldBase: 1.08, roofFront: 0.55, roofRear: -0.9, rearGlassBase: -1.35, roofThickness: 0.08, corner: 0.09, tumblehome: 0.09, pillars: [-0.12], lightBar: false },
+  van: { length: 5.95, width: 2.02, height: 2.42, wheelbase: 3.65, wheelRadius: 0.4, clearance: 0.22, belt: 1.12, windshieldBase: 2.08, roofFront: 1.58, roofRear: -2.9, rearGlassBase: -2.95, roofThickness: 0.42, corner: 0.16, tumblehome: 0.05, pillars: [0.55, -0.55], blindFrom: -1.45, lightBar: false },
 } as const satisfies Record<string, CarSpec>;
 export type CarKind = keyof typeof CAR_SPECS;
 
@@ -56,6 +56,8 @@ export interface CarOptions {
   paint: number;
   /** Optional decal drawn on both flanks (e.g. the NASA insignia on the crew transport). */
   decal?: THREE.Texture;
+  /** Generic 1960s support livery and hardware, not a claimed vehicle replica. */
+  periodStyle?: boolean;
 }
 /** Shared, cached material factory supplied by the scene (so parts can be merged per material). */
 export type MaterialFactory = (name: string, color: number, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial;
@@ -173,6 +175,10 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
         const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, r * 1.2, r * 0.13), rim);
         spoke.position.x = side * 0.14; spoke.rotation.x = (k * Math.PI * 2) / 5 + Math.PI / 2; wheel.add(spoke);
       }
+      if(options.periodStyle){
+        const wall=new THREE.Mesh(new THREE.RingGeometry(r*.72,r*.86,24),plate);wall.rotation.y=side*Math.PI/2;wall.position.x=side*.139;wheel.add(wall);
+        const hub=new THREE.Mesh(new THREE.SphereGeometry(r*.55,12,8),chrome);hub.scale.set(.22,1,1);hub.position.x=side*.15;wheel.add(hub);
+      }
       for (const m of wheel.children) if (m instanceof THREE.Mesh) { m.castShadow = true; m.receiveShadow = true; }
       const arch = new THREE.Mesh(new THREE.CircleGeometry(r * 1.2, 28), trim);
       arch.rotation.y = side * Math.PI / 2; arch.position.set(side * (flank(r) + 0.006), r, axle); group.add(arch);
@@ -186,7 +192,13 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
     box(width * 0.7, 0.07, 0.04, taillamp, 0, belt - 0.09, tailZ);
   }
   for (const side of [-1, 1]) {
-    box(0.36, 0.1, 0.05, headlamp, side * width * 0.36, belt - 0.2, noseZ);
+    if(options.periodStyle){
+      for(const dx of[-.105,.105]){
+        const housing=add(new THREE.CylinderGeometry(.105,.105,.07,16),chrome,side*width*.34+dx,belt-.2,noseZ-.025);housing.rotation.x=Math.PI/2;
+        const lens=add(new THREE.CylinderGeometry(.079,.079,.08,16),headlamp,side*width*.34+dx,belt-.2,noseZ-.055);lens.rotation.x=Math.PI/2;
+      }
+      box(.018,.045,spec.length*.70,chrome,side*(width/2+.005),belt-.17,0);
+    }else box(0.36, 0.1, 0.05, headlamp, side * width * 0.36, belt - 0.2, noseZ);
     box(0.3, 0.12, 0.05, taillamp, side * width * 0.38, belt - 0.1, tailZ);
     box(0.1, 0.13, 0.2, body, side * (flank(belt + 0.12) + 0.05), belt + 0.12, Z(spec.windshieldBase - 0.2));
     box(0.02, 0.1, 0.16, trim, side * (flank(belt + 0.12) + 0.105), belt + 0.12, Z(spec.windshieldBase - 0.2));
@@ -199,8 +211,8 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
   for (let i = 0; i < 4; i++) box(width * 0.46, 0.012, 0.045, chrome, 0, gc + 0.27 + i * 0.045, noseZ - 0.002);
   box(0.52, 0.12, 0.03, plate, 0, gc + 0.2, noseZ - 0.015);
   box(0.52, 0.12, 0.03, plate, 0, gc + 0.38, tailZ + 0.015);
-  box(width * 0.9, 0.1, 0.18, trim, 0, gc + 0.12, -half + 0.03);
-  box(width * 0.9, 0.1, 0.18, trim, 0, gc + 0.12, half - 0.03);
+  box(width * 0.9, 0.1, 0.18, options.periodStyle?chrome:trim, 0, gc + 0.12, -half + 0.03);
+  box(width * 0.9, 0.1, 0.18, options.periodStyle?chrome:trim, 0, gc + 0.12, half - 0.03);
 
   if (options.decal) {
     const decal = new THREE.MeshBasicMaterial({ map: options.decal, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
