@@ -72,7 +72,7 @@ export class ApolloWorld {
   private standFocus: { x: number; z: number } | null = null;
   private lastCameraUpdate = performance.now();
   private shadowAge = 0;
-  private lastPointer: { x: number; y: number } | null = null;
+  private lastPointer: { id:number; x: number; y: number } | null = null;
   private loadedModel: Record<string, unknown> = {};
   private staticBuffers: Map<THREE.Material, THREE.BufferGeometry[]> = new Map();
   private materials = new Map<string, THREE.MeshStandardMaterial>();
@@ -166,6 +166,7 @@ export class ApolloWorld {
     this.renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
     this.renderer.domElement.addEventListener('pointercancel', this.onPointerUp);
+    this.renderer.domElement.addEventListener('lostpointercapture', this.onPointerUp);
     this.ready = this.loadAstronauts();
   }
 
@@ -800,7 +801,7 @@ export class ApolloWorld {
     return {x:this.navProjection.x,y:this.navProjection.y,behind:this.navProjection.z>1};
   }
   setZoom(value: boolean): void { this.zoomed = value; }
-  setSuspended(value: boolean): void { this.suspended = value; if (value) this.keys.clear(); }
+  setSuspended(value: boolean): void { this.suspended = value; if (value) this.onBlur(); }
   setQuality(value: ApolloQuality): void {
     this.quality = value;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, { low: 1, medium: 1.35, high: 1.75 }[value]));
@@ -903,7 +904,11 @@ export class ApolloWorld {
     } else {
       const followDistance = 5.8;
       this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * followDistance, this.player.y + 3.35 + this.pitch * 0.9, this.player.z + Math.cos(this.yaw) * followDistance);
-      this.lookGoal.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 6.3);
+      // Aim with an angle, rather than a small vertical offset that capped the
+      // old view at ~9 degrees up. Default framing stays slightly downward;
+      // the sky limit remains safely below the pole to avoid an inverted orbit.
+      const viewAngle=clamp(this.pitch-.34,-1.05,1.15);
+      this.lookGoal.set(this.player.x - Math.sin(this.yaw) * 6.3, this.cameraGoal.y+Math.tan(viewAngle)*(followDistance+6.3), this.player.z - Math.cos(this.yaw) * 6.3);
       this.cameraLook.lerp(this.lookGoal,1-Math.exp(-cameraDt*9));
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-cameraDt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
@@ -996,17 +1001,20 @@ export class ApolloWorld {
     if (key === 'm' && !event.repeat && !this.mode) this.callbacks.onMap();
   };
   private onKeyUp = (event: KeyboardEvent): void => { this.keys.delete(event.key.toLowerCase()); };
-  private onBlur = (): void => { this.keys.clear(); this.lastPointer = null; };
-  private onPointerDown = (event: PointerEvent): void => { if (this.suspended || this.mode) return; this.lastPointer = { x: event.clientX, y: event.clientY }; this.renderer.domElement.setPointerCapture(event.pointerId); };
+  private onBlur = (): void => {
+    this.keys.clear();const pointer=this.lastPointer;this.lastPointer=null;
+    if(pointer&&this.renderer.domElement.hasPointerCapture(pointer.id))this.renderer.domElement.releasePointerCapture(pointer.id);
+  };
+  private onPointerDown = (event: PointerEvent): void => { if (this.suspended || this.mode || this.lastPointer || event.button!==0 || !event.isPrimary) return; this.lastPointer = { id:event.pointerId,x: event.clientX, y: event.clientY }; this.renderer.domElement.setPointerCapture(event.pointerId); };
   private onPointerMove = (event: PointerEvent): void => {
-    if (!this.lastPointer || this.suspended || this.mode) return;
+    if (!this.lastPointer || event.pointerId!==this.lastPointer.id || this.suspended || this.mode) return;
     this.yaw -= (event.clientX - this.lastPointer.x) * 0.004;
     // Screen-up drag should look up. The wider range makes it possible to
     // follow the full Saturn V stack without allowing an upside-down view.
     this.pitch = clamp(this.pitch - (event.clientY - this.lastPointer.y) * 0.004, -0.65, 1.8);
-    this.lastPointer = { x: event.clientX, y: event.clientY };
+    this.lastPointer = { id:event.pointerId,x: event.clientX, y: event.clientY };
   };
-  private onPointerUp = (): void => { this.lastPointer = null; };
+  private onPointerUp = (event:PointerEvent): void => { if(this.lastPointer?.id===event.pointerId)this.lastPointer = null; };
   private disposeObject(root: THREE.Object3D): void {
     const geoms = new Set<THREE.BufferGeometry>(), mats = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
     root.traverse(node => { if (node instanceof THREE.Mesh) { geoms.add(node.geometry); for (const mat of Array.isArray(node.material) ? node.material : [node.material]) { mats.add(mat); for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value); } } });
@@ -1016,7 +1024,8 @@ export class ApolloWorld {
     this.disposed = true;
     this.resizeObserver.disconnect();
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp); window.removeEventListener('blur', this.onBlur);
-    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown); this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove); this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp); this.renderer.domElement.removeEventListener('pointercancel', this.onPointerUp);
+    this.onBlur();
+    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown); this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove); this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp); this.renderer.domElement.removeEventListener('pointercancel', this.onPointerUp); this.renderer.domElement.removeEventListener('lostpointercapture', this.onPointerUp);
     this.mixers.forEach(m => m.stopAllAction());
     this.disposeObject(this.scene); this.geometries.clear(); this.sun.shadow.map?.dispose();
     this.environmentTarget?.dispose();
