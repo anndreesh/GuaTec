@@ -1,409 +1,185 @@
-# GuaTec: NASA Space 2026
+# GuaTec — NASA Space Challenge 2026
 
-La **Misión 01 — Apollo 11: El comienzo de una nueva era** reconstruye el
-16 de julio de 1969 en exteriores del Centro Espacial Kennedy. El jugador es
-un técnico ficticio de apoyo terrestre: reconoce LC-39A, comprueba registros
-y comunicaciones, observa una retrospectiva del traslado de la tripulación
-y presencia el lanzamiento desde un punto remoto a 5,6 km.
+GuaTec es una experiencia web educativa e interactiva sobre exploración
+espacial. Su primera misión jugable, **Apollo 11: El comienzo de una nueva
+era**, recrea el 16 de julio de 1969 en el Centro Espacial Kennedy.
 
-La aplicación existente conserva TypeScript/Vite, autenticación, modo
-Invitado, backend Flask, catálogo y guardado. La misión nueva usa Three.js;
-el antiguo código Babylon.js de 1926 permanece como fuente heredada inactiva.
-La base original no usaba React: no se ha creado otro proyecto ni se ha
-introducido un segundo router. Las misiones posteriores permanecen como estaban.
+El jugador asume el papel de un técnico ficticio de apoyo terrestre. Explora
+el área de lanzamiento, inspecciona estaciones, completa comprobaciones,
+revisa comunicaciones y presencia el lanzamiento del Saturn V desde un punto
+remoto. La experiencia combina una escena 3D, narrativa histórica,
+actividades interactivas y un informe final.
 
-- Ocho checkpoints ordenados, comprobaciones educativas, diálogos en cola y
-  guardado local por usuario sincronizado con el backend existente.
-- Saturn V original a escala de 110,6 m, torre umbilical, VAB exterior,
-  crawlerway, costa, vegetación y estaciones de apoyo.
-- Tres NPC Mercenary Astronaut de Peter_D (CC BY 4.0), optimizados a 4,9 MB
-  desde el archivo autorizado de 500 MB, con animaciones preservadas.
-- Traslado retrospectivo de las 06:27, elipsis a negro de embarque y
-  cinematográfica de lanzamiento de las 09:32 EDT; epílogo del 20 de julio.
-- El LEGO Saturn V de HUuser2024 no permite descarga: se ofrece en su visor
-  oficial educativo, separado del cohete original integrado en el mundo.
-- Sonido y música sintetizados originales; subtítulos en español. Calidad
-  Baja/Media/Alta, zoom, mapa, pausa, audio y reinicio aislado de Misión 01.
+El proyecto tiene un propósito divulgativo: acercar al público a la historia y
+la complejidad de una misión espacial mediante una simulación accesible. Las
+actividades de ingeniería son abstracciones narrativas y educativas; no son
+instrucciones para construir, operar o modificar cohetes reales.
 
-Controles: **WASD/flechas**, **Shift**, arrastrar el ratón, **E** interactuar,
-**M** mapa, **R** repetir radio, **Escape** pausa. El botón Zoom permite
-examinar la plataforma. La versión jugable se orienta a escritorio; la
-interfaz se adapta a pantallas estrechas, sin prometer controles táctiles completos.
+## Qué incluye
 
-Fuentes, licencias y adaptaciones: [historia y assets](docs/APOLLO11_HISTORY_ASSETS.md).
-Arquitectura y verificación: [entrega Apollo 11](docs/APOLLO11_IMPLEMENTATION.md).
-Las secciones heredadas posteriores describen la infraestructura y algunos
-sistemas del prototipo de 1926; la descripción activa de Misión 01 es esta.
+- Misión 01 jugable con ocho etapas narrativas y quince operaciones conectadas.
+- Exploración 3D del área exterior del Centro Espacial Kennedy.
+- Estaciones de trabajo, instrumentos, diálogos, mapa y secuencias
+  cinematográficas del traslado de la tripulación y el lanzamiento.
+- Guardado automático del progreso, informe final y opción de repetir la
+  misión sin perder los desbloqueos de campaña.
+- Inicio de sesión por correo, Google, GitHub o modo Invitado.
+- Interfaz en español, inglés y francés, con subtítulos y controles de audio.
+- Misiones 02 y 03 visibles en el selector, pero todavía bloqueadas y sin
+  contenido jugable.
 
-## Estructura del proyecto
+## Tecnologías
 
-```
-.
-├── backend/               # API Flask + SQLAlchemy
-│   ├── app/
-│   │   ├── __init__.py    # Application factory
-│   │   ├── config.py      # Config por entorno, leída de variables de entorno
-│   │   ├── extensions.py  # db, migrate, cors
-│   │   ├── models/        # User, Mission, MissionProgress, InventoryItem, Sample, PlayStatistic
-│   │   ├── routes/        # Blueprints: auth, user, missions, progress, inventory, samples, statistics
-│   │   └── utils/         # seed de misiones, tokens JWT, clientes OAuth
-│   ├── wsgi.py            # Entrypoint WSGI (dev: `python wsgi.py`, prod: gunicorn wsgi:app)
-│   └── requirements.txt
-├── frontend/              # SPA TypeScript + Vite + Babylon.js
-│   └── src/
-│       ├── config/gameConfig.ts   # Configuración central única (API, recursos, decisiones, tema)
-│       ├── babylon/BackdropEngine.ts  # Fondo 3D con Babylon.js + fallback CSS/canvas2D
-│       ├── core/           # GameApp (router de pantallas), ApiClient, AuthStore, dom helper
-│       ├── api/            # Un módulo por recurso REST del backend
-│       ├── state/          # Lógica pura de la Misión 1 (independiente del DOM)
-│       ├── screens/        # Splash, Auth, Username, MissionSelect, Mission1, Report
-│       └── types/          # Tipos compartidos con el backend (DTOs)
-├── run.py                 # Orquestador raíz: levanta backend + frontend juntos
-├── docker-compose.yml      # backend (gunicorn) + frontend (build estático + nginx con proxy /api)
-└── .env.example            # Variables de entorno de ejemplo (sin secretos reales)
+| Capa | Tecnologías | Responsabilidad |
+| --- | --- | --- |
+| Frontend | TypeScript, Vite, Three.js y Babylon.js | Interfaz, escena 3D, controles y lógica de la misión |
+| Backend | Python, Flask y SQLAlchemy | API REST, autenticación, progreso e informes |
+| Persistencia | SQLite en local o PostgreSQL en producción | Usuarios, misiones, progreso y estadísticas |
+| Publicación | Vercel y Render | Frontend estático y API Flask |
+
+El frontend consume la API mediante rutas bajo `/api`. La API emite tokens JWT
+y mantiene el progreso por usuario. La clave de NASA, cuando se configura, se
+usa únicamente en el backend para cargar contenido complementario en el
+selector de misiones.
+
+## Estructura principal
+
+```text
+backend/                 API Flask, modelos, autenticación y rutas
+frontend/src/apollo/     Mundo, vehículos y contenido de Apollo 11
+frontend/src/screens/    Acceso, selector, misión y resultados
+frontend/src/state/      Estado, objetivos y reglas de juego
+frontend/src/api/        Clientes del backend
+frontend/src/config/     Configuración de misión y recursos
+docs/                    Diseño, historia, procedencia y verificación
+run.py                   Orquestador para desarrollo local
+docker-compose.yml       Servicios de backend y frontend en contenedores
 ```
 
 ## Requisitos
 
-- Python 3.10+ (probado con 3.9/3.12; usa `from __future__ import annotations` por compatibilidad)
-- Node.js 18+ y npm
-- (Opcional) Docker + Docker Compose para despliegue en contenedores
+- Python 3.10 o superior
+- Node.js 18 o superior y npm
+- Docker y Docker Compose (opcional)
 
-## Puesta en marcha rápida (desarrollo local)
+## Ejecutar en local
+
+Desde la raíz del repositorio:
 
 ```bash
-# 1) Backend: crear entorno virtual e instalar dependencias
+# Backend
 cd backend
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 cd ..
 
-# 2) Frontend: instalar dependencias
+# Frontend
 cd frontend
-npm install
+npm ci
 cd ..
 
-# 3) Variables de entorno (opcional para el MVP; usa defaults inseguros si se omite)
+# Variables de entorno opcionales
 cp .env.example .env
 
-# 4) Levantar todo desde la raíz
+# Iniciar backend y frontend
 python3 run.py
 ```
 
-Esto inicia:
-- Backend Flask en `http://localhost:5050` (rutas bajo `/api/...`)
-- Frontend Vite en `http://localhost:5173` (proxea `/api` al backend)
+Después, abre <http://localhost:5173>.
 
-Abre `http://localhost:5173` en el navegador.
+También puedes iniciar un solo servicio:
 
-> ⚠️ **macOS**: el backend usa el puerto `5050` por defecto porque el `5000`
-> suele estar ocupado por "AirPlay Receiver". Si necesitas otro puerto,
-> define `PORT=xxxx` (y ajusta el proxy en `frontend/vite.config.ts` y
-> `GOOGLE/GITHUB_REDIRECT_URI`).
-
-Ejecutar solo un servicio:
 ```bash
-python3 run.py --backend
-python3 run.py --frontend
+python3 run.py --backend   # API en http://localhost:5050
+python3 run.py --frontend  # Vite en http://localhost:5173
 ```
 
-## Variables de entorno (`.env.example`)
-
-Todas las credenciales OAuth y secretos se leen exclusivamente de variables
-de entorno; **no hay secretos reales en el repositorio**. Si
-`GOOGLE_CLIENT_ID`/`SECRET` o `GITHUB_CLIENT_ID`/`SECRET` están vacíos, esas
-rutas de login responden `501 google_not_configured` /
-`github_not_configured` y la pantalla de autenticación del frontend
-deshabilita ese botón automáticamente; el login como **Invitado** siempre
-funciona.
-
-También puedes crear una cuenta con correo y contraseña desde la pantalla de
-inicio. Las contraseñas se almacenan únicamente como hashes seguros en el
-backend. Para activar los botones de Google y GitHub, registra la aplicación
-en cada proveedor y completa `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-`GITHUB_CLIENT_ID` y `GITHUB_CLIENT_SECRET` en el `.env` local. Usa estas
-URLs de callback durante el desarrollo:
-
-```text
-http://localhost:5050/api/auth/google/callback
-http://localhost:5050/api/auth/github/callback
-```
-
-`NASA_API_KEY` se mantiene solo en el backend. La pantalla de selección
-consulta `/api/nasa/mission-briefing` para mostrar APOD y material marciano
-real sin exponer la clave al navegador.
-
-El carrusel también incorpora las noticias más recientes del feed oficial de
-NASA, ordenadas por fecha de publicación, además de investigaciones e
-imágenes marcianas actuales. Al terminar una misión aparece `Repetir misión`;
-esa opción reinicia el estado jugable y conserva los desbloqueos de campaña.
-
-Durante la Misión 1 puedes minimizar el panel con `− Minimizar` o pulsando
-`H` para explorar con mayor visibilidad. `☰ Abrir panel` lo restaura. El
-movimiento usa `WASD`, la cámara orbita con el mouse, `E` examina estaciones
-exteriores y `M` abre el mapa. El mapa muestra posición, orientación, objetivo,
-destino, distancia y una ruta orientativa.
-
-La Misión 1 usa geometría y texturas procedurales para mantener el prototipo
-ligero, reproducible y coherente con un campo rural de 1926: suelo con
-variación sutil de tierra, barro y hierba, pasarelas cortas, un refugio abierto
-para el equipo y un vehículo experimental ensamblado por piezas. Se quitaron
-árboles, casas y utilería dispersa que tapaban las estaciones. La
-procedencia aprobada para futuras referencias/modelos está registrada en
-`frontend/src/config/assetRegistry.ts`. NASA mantiene el catálogo oficial
-[NASA 3D Resources](https://science.nasa.gov/3d-resources/); no se descargan
-modelos de marketplaces ni sitios desconocidos en tiempo de ejecución.
-
-Las estaciones exteriores muestran qué se puede hacer allí antes de abrir un
-diálogo: el banco de ingeniería tiene mordaza, cámara de ensayo, mangueras y
-manómetro; la mesa de pruebas incorpora un registrador de tambor, diales y un
-panel de tres canales iluminados que corresponde al minijuego de señales; el
-puesto de observación tiene una cámara de placas con fuelle y trípode; y la
-mesa de análisis incluye bandeja de recuperación y lámpara. El soporte del
-vehículo, el cobertizo abierto y el toldo de análisis se construyen con piezas
-procedurales y modelos GLB optimizados cuando están disponibles.
-
-Los fondos variables del splash, login y selector de misiones son fotografías
-reales del programa espacial y viven en `frontend/public/images/`. Para
-agregar otro fondo basta con copiar allí un archivo (`.jpg`, `.jpeg`, `.png`,
-`.webp`, `.avif` o `.svg` son válidos) y añadir su ruta al arreglo
-`MENU_BACKGROUNDS` en `frontend/src/core/GameApp.ts`. Se selecciona una imagen
-al azar por carga y se evita repetir la anterior durante la sesión del
-navegador (`random.choice`-like, vía `sessionStorage`).
-
-El favicon (`frontend/public/favicon.svg` + `favicon.ico`, `favicon-16.png`,
-`favicon-32.png`, `apple-touch-icon.png`, `icon-512.png`) usa la insignia
-oficial de la NASA (el "meatball"), un vector de dominio público (obra del
-gobierno de EE. UU., 17 U.S.C. §105) tomado de Wikimedia Commons a partir del
-archivo `NASA Fav.png` que el usuario agregó en `frontend/public/images/`.
-El SVG es la fuente principal (`<link rel="icon" type="image/svg+xml">`) y
-los PNG/ICO son fallback para navegadores antiguos y iOS.
-
-## API REST (prefijo `/api`)
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/health` | Chequeo de salud |
-| GET | `/auth/providers` | Lista proveedores OAuth y si están configurados |
-| GET | `/auth/google/login`, `/auth/github/login` | Devuelve URL de autorización OAuth |
-| GET | `/auth/google/callback`, `/auth/github/callback` | Callback OAuth, emite JWT y redirige al frontend |
-| POST | `/auth/guest` | Crea sesión de invitado, emite JWT |
-| GET | `/user/me` | Perfil del usuario autenticado |
-| POST | `/user/username` | Define/actualiza el nombre de usuario (persistente) |
-| GET | `/missions` | Carrusel de misiones con estado por usuario |
-| GET/PUT | `/progress/<mission_slug>` | Obtiene / autoguarda el progreso de una misión |
-| POST | `/progress/<mission_slug>/complete` | Marca la misión completa, guarda informe, desbloquea la siguiente |
-| GET/PUT | `/inventory` | Lista / sincroniza el inventario de recursos |
-| GET/POST | `/samples` | Lista / registra muestras científicas recolectadas |
-| GET/POST | `/statistics` | Lista / registra métricas de telemetría |
-| GET | `/statistics/summary/<mission_slug>` | Métricas agregadas para el informe final |
-
-Todas las rutas (excepto `/health`, `/auth/*`) requieren
-`Authorization: Bearer <token>` con el JWT emitido por login.
-
-## Flujo del frontend
-
-`Splash → Auth (Google/GitHub/Invitado) → Username → Carrusel de misiones →`
-`Misión 1 (jugable) → Informe final → vuelta al carrusel`
-
-- **Misión 1** es completamente jugable: recursos que decaen por turno,
-  4 eventos de decisión con efectos en recursos y muestras, guardado
-  automático periódico (autosave a `/progress` e `/inventory`), y un informe
-  final con resultado (éxito/parcial/fallo). La zona de pruebas exige propulsión ficticia, circuitos, calibración de antena y lectura de una traza, en ese orden. El diagnóstico incluye comparar módulos y deslizar un recambio; la preparación de lanzamiento exige una secuencia de relés y una pulsación sostenida. Los errores permiten reintento y cerrar una tarea no otorga progreso.
-- **Misión 2 y 3** aparecen en el carrusel como bloqueadas
-  (`lockedByDefault=true`) hasta completar la anterior; su contenido
-  jugable queda fuera del alcance de este MVP.
-- Toda la configuración de balance (recursos, tasas de decaimiento,
-  eventos de decisión, duración de la misión, tema visual) vive en un único
-  archivo: [`frontend/src/config/gameConfig.ts`](frontend/src/config/gameConfig.ts).
-
-### Fallback sin Babylon.js
-
-El fondo 3D ambiental usa Babylon.js, cargado con `import()` dinámico. Si el
-paquete no está disponible (falla de instalación, entorno restringido,
-etc.), [`BackdropEngine.ts`](frontend/src/babylon/BackdropEngine.ts) captura el error y
-dibuja automáticamente un fondo de estrellas animado con Canvas 2D/CSS, sin
-que la aplicación deje de funcionar.
-
-## Despliegue con Docker Compose
+Para ejecutar la versión contenida en Docker:
 
 ```bash
 docker compose up --build
 ```
 
-- `backend`: imagen Python 3.12 + gunicorn, expuesta en `:5050` (host) → `:5000` (contenedor)
-- `frontend`: build estático de Vite servido por nginx en `:8080`, con
-  `/api/` proxied hacia el servicio `backend`
+## Configuración
 
-Configura las variables de entorno reales (OAuth, `SECRET_KEY`, `JWT_SECRET`,
-`DATABASE_URL`, etc.) en un archivo `.env` junto a `docker-compose.yml`
-(Docker Compose lo carga automáticamente) — nunca commitees ese archivo.
+Usa `.env.example` como referencia. No subas archivos `.env`, contraseñas ni
+claves privadas al repositorio.
 
-## Publicar con GitHub, Vercel y Supabase
+Las variables más importantes son:
 
-El frontend estático se publica en Vercel, la API Flask en Render y PostgreSQL
-en Supabase. El inicio de sesión continúa gestionándose en Flask (correo,
-Google, GitHub e invitado), no mediante Supabase Auth. [`render.yaml`](render.yaml)
-define el servicio web de Render; [`vercel.json`](vercel.json) configura el build
-estático de Vite.
-
-### 1. Subir el proyecto a GitHub
-
-El repositorio ignora los archivos `.env`, entornos virtuales, dependencias
-locales y builds generados. Sube el código desde la raíz del proyecto:
-
-```bash
-git add .
-git commit -m "Prepare deployment"
-git remote add origin https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-git push -u origin main
-```
-
-No agregues los archivos `.env` ni contraseñas, claves OAuth o claves de firma
-al repositorio. Si una clave real se subió anteriormente, rótala en el
-proveedor correspondiente. También se excluyen los modelos 3D originales de
-alta resolución (incluido uno que excede el límite de 100 MB de GitHub); el
-Proyecto carga las variantes `_optimized.glb`, que sí se incluyen.
-
-### 2. Conectar la base de datos de Supabase
-
-En Supabase, abre **Connect → Direct connection string** y copia la URI
-PostgreSQL. Guárdala como `DATABASE_URL` en el servicio web de Render; no la
-configures en Vercel ni la subas a GitHub. Render y Supabase admiten conexiones
-directas a PostgreSQL. Si la red donde corre el servicio necesita un pooler,
-usa el pooler de sesión de Supabase y su URI compatible con psycopg.
-
-Al iniciar la API se crean las tablas que falten. Conserva los permisos de
-escritura del usuario de base de datos usado por la aplicación.
-
-### 3. Desplegar el backend en Render
-
-En Render, crea un Blueprint desde este repositorio y usa `render.yaml`. El
-servicio necesita estas variables:
-
-   | Variable | Valor |
-   | --- | --- |
-   | `DATABASE_URL` | URI PostgreSQL de Supabase |
-   | `FRONTEND_URL` | Origen público Vercel, sin `/` final |
-   | `CORS_ORIGINS` | El mismo origen público Vercel |
-
-`render.yaml` genera `SECRET_KEY` y `JWT_SECRET` y configura `FLASK_ENV=production`.
-El chequeo de salud está en `/api/health`.
-
-### 4. Desplegar el frontend en Vercel
-
-Importa el repositorio conectado y deja **Root Directory** en `frontend`. El
-build es `npm ci && npm run build`, y la carpeta de salida es `dist`. Define
-`VITE_API_BASE_URL` en Vercel con la URL pública de Render seguida de `/api`,
-por ejemplo `https://guatec-api.onrender.com/api`. En Render, define
-`FRONTEND_URL` y `CORS_ORIGINS` con el dominio de Vercel. Las credenciales OAuth
-son opcionales; si se habilitan, registra las rutas `/api/auth/google/callback`
-y `/api/auth/github/callback` del dominio de Render en sus proveedores.
-
-Las variables con credenciales se administran en el proveedor correspondiente
-y nunca se suben al repositorio.
-
-## Validación realizada
-
-- ✅ `npx tsc --noEmit` (frontend) sin errores
-- ✅ `npm run build` (frontend) genera `dist/` correctamente
-- ✅ Backend probado con Flask test client: salud, proveedores OAuth,
-  login invitado, `/user/me`, username, misiones, autosave de progreso,
-  muestras, completar misión, resumen de estadísticas — todos responden
-  como se espera
-- ✅ Servidor de desarrollo Flask (`wsgi.py`) y Vite (`npm run dev`)
-  levantados juntos manualmente, con el proxy `/api` de Vite reenviando al
-  backend real (probado con `curl` a través del puerto 5173)
-- ✅ `docker-compose.yml` validado como YAML sintácticamente correcto
-  (Docker no estaba disponible en este entorno para un build completo)
-
-## Documentación legal y contacto
-
-La pantalla de acceso incluye enlaces a la política de privacidad, los términos
-y la página de contacto; cada documento se abre en una pestaña nueva y permite
-cambiar entre español, inglés y francés. Las páginas usan Bootstrap y describen
-el tratamiento de los datos y los servicios que utiliza el Proyecto.
-
-Antes de publicar estos documentos para usuarios reales, quien opere el
-Proyecto debe completar su identidad legal, domicilio postal y jurisdicción
-aplicable en la política de privacidad, además de verificar la documentación
-conforme a las leyes de los territorios en los que esté disponible el Proyecto.
-
-## Próximos pasos sugeridos
-
-- Implementar el contenido jugable de las Misiones 2 y 3
-- Sustituir el modelo de "eventos de decisión" hardcodeados por datos
-  cargados desde el backend (para poder editar el balance sin recompilar)
-- Añadir tests automatizados (pytest para el backend, vitest para el frontend)
-
-## Mission 01 — progreso de implementación
-
-La misión enlaza estaciones exteriores con una ruta de objetivos guardable:
-descubrimiento del proyecto, inspección del prototipo, configuración abstracta
-del vehículo, revisión de sistemas, decisión de lanzamiento y análisis del
-vuelo. Las actividades ocurren al aire libre junto a un refugio abierto; no
-existen edificios grandes ni interiores jugables. La estructura y la instrumentación modifican las métricas y el
-aspecto del prototipo; el lanzamiento tiene cuenta regresiva, humo, movimiento
-del vehículo y telemetría animada. El mapa presenta la distancia actual al
-siguiente objetivo. El informe distingue el resultado simulado de la referencia
-histórica de Auburn.
-
-La escena utiliza un personaje procedural de época, equipo exterior y personal
-de campo animado. La misión avanza de amanecer a media mañana según los hitos,
-con dirección e intensidad solar graduales y cuatro presets atmosféricos. Las
-opciones de ingeniería son abstracciones narrativas, no instrucciones de
-construcción. La duración de 30–40 minutos es orientativa y depende del ritmo de
-exploración y lectura del jugador; no se fuerza con esperas artificiales.
-
-### Actualización visual y procedencia
-
-El campo usa mapas PBR locales 1K de tierra agrícola, barro y hierba, con
-menos variación geométrica y pasarelas más limpias para mantener visibles las
-estaciones. Se conserva el refugio abierto de equipo, el marco de lanzamiento,
-los instrumentos y el vehículo con materiales envejecidos. La procedencia está en
-`frontend/src/config/assetRegistry.ts`. Las texturas y el HDRI se cargan
-desde archivos locales; no se descargan props al iniciar el juego.
-
-
-## Misión 01 actual: Apollo 11
-
-La experiencia actual está en `frontend/src/apollo/` y usa Three.js. Conserva ocho etapas narrativas y siete puestos obligatorios, conectados en seis áreas de trabajo. Las quince operaciones se completan en orden; el guardado mantiene la versión `apollo11-v1`. La implementación de Auburn/Babylon descrita más abajo se conserva como contenido anterior. Modelos, correcciones, mediciones y comandos de verificación: [puestos conectados y continuidad](docs/apollo11-connected-stations.md).
-
-La aceptación completa usa una build local, la API local y una cuenta Invitado nueva:
-
-```bash
-npm --prefix frontend run build
-npm --prefix frontend run preview -- --host 127.0.0.1 --port 4173
-# En otra terminal, con la API local en 5050:
-npm --prefix frontend run qa:apollo-story
-```
-
-Requiere Playwright en el entorno de QA (`PLAYWRIGHT_MODULE_PATH`) y permite seleccionar Chrome con `CHROME_BIN`. `APOLLO_STORY_URL` cambia la dirección local del preview y `APOLLO_STORY_OUTPUT` cambia el directorio de evidencia. El recorrido camina con WASD, manipula los instrumentos con entrada real, completa los quince hitos, comprueba la recuperación desde la API y reinicia solamente esta misión. No inyecta progreso ni publica atajos de prueba. El punto de entrada anterior `frontend/scripts/qa-apollo.cjs` ejecuta este mismo recorrido y admite los nombres de variables antiguos.
-
-Las comprobaciones más rápidas usan Vite local en 5173: `qa:apollo` (siete puestos, teclado/touch y borradores), `qa:apollo-instruments` (instrumentos y radio con cuadros lentos), `qa:apollo-site` (modelos y accesos), `qa:apollo-locales` (idioma durante carga/actividad), `qa:app-locales` (acceso y recuperación) y `qa:apollo-report` (informe actual y anterior). Las capturas e informes quedan en `frontend/artifacts/`, fuera de Git.
-
-## Misión 01 anterior: tareas de ingeniería y calidad gráfica
-
-La ampliación conserva Babylon.js, la narrativa de Auburn y los modelos existentes. Las consolas de antena y electrónica son módulos didácticos ficticios, identificados como simulaciones; no reconstruyen instrumentos de 1926 ni describen procedimientos reales de propulsión.
-
-| Actividad | Interacción y validación |
+| Variable | Uso |
 | --- | --- |
-| Propulsión | Acoplar el simulador, equilibrar dos indicadores y registrar la respuesta |
-| Circuitos | Arrastrar cuatro cables o seleccionar terminales con Tab y Enter |
-| Antena | Ajustar orientación y sintonía; confirmar dentro de ambas tolerancias |
-| Diagnóstico | Comparar tres módulos, aislar el defectuoso e insertar el recambio; después se conserva el diagnóstico mecánico narrativo |
-| Lanzamiento | Activar relés en orden y mantener el sello durante 1,2 s; después continúan briefing, cuenta regresiva y vuelo |
+| `DATABASE_URL` | Base de datos; por defecto se puede usar SQLite en local |
+| `SECRET_KEY` | Clave de sesión de Flask |
+| `JWT_SECRET` | Firma de los tokens de autenticación |
+| `VITE_API_BASE_URL` | URL pública de la API para el frontend |
+| `FRONTEND_URL` | Origen permitido para redirecciones y CORS |
+| `CORS_ORIGINS` | Orígenes autorizados para la API |
+| `NASA_API_KEY` | Acceso opcional a contenido complementario de NASA |
+| `GOOGLE_*` / `GITHUB_*` | Credenciales opcionales para OAuth |
 
-El HUD compacto muestra objetivo, próxima actividad, checkpoint y minimapa. El mapa completo, diario, recursos y controles anteriores siguen disponibles. Los perfiles Equilibrado y Alto ajustan resolución, sombras y polvo; el sonido se puede silenciar. Los diálogos y tareas suspenden movimiento y órbita y restauran los controles al cerrar. Los resultados validados se guardan con la progresión; las partidas antiguas conservan sus checkpoints ganados.
+Si no configuras OAuth, el modo Invitado sigue disponible para probar la
+experiencia.
 
-Verificación reproducible:
+## Controles
+
+- **WASD** o flechas: moverse
+- **Shift**: correr
+- **Arrastrar el mouse**: orbitar la cámara
+- **E**: interactuar o inspeccionar
+- **M**: abrir el mapa
+- **R**: repetir la comunicación de radio
+- **H**: minimizar o restaurar el panel de misión
+- **Escape**: pausar
+
+La experiencia está optimizada para escritorio. La interfaz se adapta a
+ventanas estrechas, pero no ofrece controles táctiles completos.
+
+## Pruebas y compilación
 
 ```bash
-npm --prefix frontend test
-node frontend/tests/mission01-character.test.mjs
+npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
 
-`frontend/scripts/qa-mission.cjs` recorre la build compilada mediante navegador real: invitado, diálogos, tareas, errores, cancelación, lanzamiento, análisis e informe. Requiere Playwright suministrado por el entorno de QA; no añade dependencias de ejecución al juego. Configuración: `QA_BASE_URL` (por defecto `http://127.0.0.1:4173`), `QA_OUTPUT_DIR`, `PLAYWRIGHT_MODULE` y, si hace falta, `CHROMIUM_EXECUTABLE`. Crea una cuenta invitada de prueba y guarda capturas/resultados en el directorio indicado. No incorpora atajos de prueba en la build.
+El frontend incluye comprobaciones de calidad para la misión Apollo 11. Los
+comandos `qa:apollo-*` requieren Playwright y un servidor local de la
+aplicación; sus resultados se guardan en `frontend/artifacts/` y no forman
+parte del producto publicado.
 
-La medición disponible usa Chrome headless en Apple M5 con 16 GB. El avatar existente ronda los 77 MB y la escena supera los presupuestos orientativos de llamadas de dibujo y texturas; 60 FPS en ese equipo no garantizan el mismo rendimiento en teléfonos. Evidencia y limitaciones: `artifacts/final-evidence.md`.
+## API principal
+
+La API usa el prefijo `/api` e incluye, entre otros, estos recursos:
+
+- `GET /health`: estado del servicio.
+- `POST /auth/guest`: crea una sesión de Invitado.
+- `GET /missions`: devuelve las misiones y su progreso.
+- `GET/PUT /progress/<mission_slug>`: consulta o guarda progreso.
+- `POST /progress/<mission_slug>/complete`: completa una misión y genera el
+  informe.
+- `GET/PUT /inventory`: consulta o sincroniza recursos.
+- `GET/POST /samples`: consulta o registra muestras.
+- `GET/POST /statistics`: consulta o registra métricas.
+
+Salvo las rutas públicas de salud y autenticación, la API requiere un token
+JWT en el encabezado `Authorization`.
+
+## Documentación adicional
+
+- [Historia y procedencia de Apollo 11](docs/APOLLO11_HISTORY_ASSETS.md)
+- [Implementación de la misión](docs/APOLLO11_IMPLEMENTATION.md)
+- [Diseño de la Misión 01](docs/MISSION_01_DESIGN_SPEC.md)
+- [Estaciones conectadas y continuidad](docs/apollo11-connected-stations.md)
+- [Descripción resumida del proyecto](DESCRIPCION_PROYECTO.md)
+
+## Estado del proyecto
+
+La Misión 01 es la experiencia principal disponible. Las misiones posteriores
+forman parte de la estructura de campaña, pero su contenido jugable todavía
+está pendiente.
+
+## Licencias y atribuciones
+
+La procedencia de modelos, texturas, referencias históricas y adaptaciones se
+documenta en [APOLLO11_HISTORY_ASSETS.md](docs/APOLLO11_HISTORY_ASSETS.md).
+Revisa esas atribuciones antes de redistribuir o reutilizar los recursos.
