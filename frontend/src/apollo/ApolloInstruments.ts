@@ -241,6 +241,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     });
     for (let i = 0; i < 3; i++) {
       const b = node('button', 'ap-inst-record-slot'); b.type = 'button'; b.dataset.slot = String(i); slots.push(b); slotTray.append(b);
+      listen(b,'focus',()=>{selectedSlot=i;renderSlots();});
       listen(b, 'click', () => { selectedSlot = i; if (selectedCard) assign(i, selectedCard); else { renderSlots(); b.focus(); } });
       listen(b, 'dragover', (e: Event) => { e.preventDefault(); b.classList.add('ap-inst-drop'); });
       listen(b, 'dragleave', () => b.classList.remove('ap-inst-drop'));
@@ -250,7 +251,8 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     listen(root, 'keydown', (e: Event) => {
       const event = e as KeyboardEvent;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectedSlot = (selectedSlot + (event.key === 'ArrowRight' ? 1 : 2)) % 3; renderSlots(); slots[selectedSlot].focus(); }
-      if (event.key === 'Enter' && selectedCard && (event.target as HTMLElement)?.dataset.slot !== undefined) { event.preventDefault(); assign(selectedSlot, selectedCard); }
+      const focusedSlot=(event.target as HTMLElement)?.dataset.slot;
+      if(event.key==='Enter'&&selectedCard&&focusedSlot!==undefined){event.preventDefault();assign(Number(focusedSlot),selectedCard);}
     });
     renderSlots();
     action = node('button', 'ap-inst-action ap-inst-stamp', copy.validate); action.type = 'button'; stage.append(action, node('small', 'ap-inst-keyhint', copy.keyboardRecords));
