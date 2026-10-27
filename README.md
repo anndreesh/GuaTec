@@ -164,13 +164,6 @@ La API usa el prefijo `/api` e incluye, entre otros, estos recursos:
 Salvo las rutas públicas de salud y autenticación, la API requiere un token
 JWT en el encabezado `Authorization`.
 
-## Documentación adicional
-
-- [Historia y procedencia de Apollo 11](docs/APOLLO11_HISTORY_ASSETS.md)
-- [Implementación de la misión](docs/APOLLO11_IMPLEMENTATION.md)
-- [Diseño de la Misión 01](docs/MISSION_01_DESIGN_SPEC.md)
-- [Estaciones conectadas y continuidad](docs/apollo11-connected-stations.md)
-- [Descripción resumida del proyecto](DESCRIPCION_PROYECTO.md)
 
 ## Estado del proyecto
 
@@ -178,8 +171,4 @@ La Misión 01 es la experiencia principal disponible. Las misiones posteriores
 forman parte de la estructura de campaña, pero su contenido jugable todavía
 está pendiente.
 
-## Licencias y atribuciones
 
-La procedencia de modelos, texturas, referencias históricas y adaptaciones se
-documenta en [APOLLO11_HISTORY_ASSETS.md](docs/APOLLO11_HISTORY_ASSETS.md).
-Revisa esas atribuciones antes de redistribuir o reutilizar los recursos.
