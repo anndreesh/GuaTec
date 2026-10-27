@@ -365,7 +365,24 @@ los instrumentos y el vehículo con materiales envejecidos. La procedencia está
 desde archivos locales; no se descargan props al iniciar el juego.
 
 
-## Misión 01: tareas de ingeniería y calidad gráfica
+## Misión 01 actual: Apollo 11
+
+La experiencia actual está en `frontend/src/apollo/` y usa Three.js. Conserva ocho etapas narrativas y siete puestos obligatorios, conectados en seis áreas de trabajo. Las quince operaciones se completan en orden; el guardado mantiene la versión `apollo11-v1`. La implementación de Auburn/Babylon descrita más abajo se conserva como contenido anterior.
+
+La aceptación completa usa una build local, la API local y una cuenta Invitado nueva:
+
+```bash
+npm --prefix frontend run build
+npm --prefix frontend run preview -- --host 127.0.0.1 --port 4173
+# En otra terminal, con la API local en 5050:
+npm --prefix frontend run qa:apollo-story
+```
+
+Requiere Playwright en el entorno de QA (`PLAYWRIGHT_MODULE_PATH`) y permite seleccionar Chrome con `CHROME_BIN`. `APOLLO_STORY_URL` cambia la dirección local del preview y `APOLLO_STORY_OUTPUT` cambia el directorio de evidencia. El recorrido camina con WASD, manipula los instrumentos con entrada real, completa los quince hitos, comprueba la recuperación desde la API y reinicia solamente esta misión. No inyecta progreso ni publica atajos de prueba. El punto de entrada anterior `frontend/scripts/qa-apollo.cjs` ejecuta este mismo recorrido y admite los nombres de variables antiguos.
+
+Las comprobaciones más rápidas usan Vite local en 5173: `qa:apollo` (siete puestos, teclado/touch y borradores), `qa:apollo-instruments` (instrumentos y radio con cuadros lentos), `qa:apollo-site` (modelos y accesos), `qa:apollo-locales` (idioma durante carga/actividad), `qa:app-locales` (acceso y recuperación) y `qa:apollo-report` (informe actual y anterior). Las capturas e informes quedan en `frontend/artifacts/`, fuera de Git.
+
+## Misión 01 anterior: tareas de ingeniería y calidad gráfica
 
 La ampliación conserva Babylon.js, la narrativa de Auburn y los modelos existentes. Las consolas de antena y electrónica son módulos didácticos ficticios, identificados como simulaciones; no reconstruyen instrumentos de 1926 ni describen procedimientos reales de propulsión.
 
