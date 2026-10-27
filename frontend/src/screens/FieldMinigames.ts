@@ -35,10 +35,14 @@ export function mountFieldTask(kind: FieldMinigameKind, host: HTMLElement, callb
   const root = el("section", { className: `field-task field-task--${kind}`, attrs: { "aria-label": fieldTaskLabel(kind), "data-field-task": kind } });
   const lamp = el("span", { className: "field-task__lamp", text: t("common.working") });
   const header = el("div", { className: "field-task__header", children: [el("strong", { text: fieldTaskLabel(kind) }), lamp] });
+  const protocol = el("div", { className: "field-task__protocol", children: [
+    el("span", { className: "field-task__protocol-code", text: `FICHA / ${kind.toUpperCase()}` }),
+    el("span", { className: "field-task__protocol-steps", text: "OBSERVAR  ·  OPERAR  ·  REGISTRAR" }),
+  ] });
   const board = el("div", { className: "field-task__board" });
   const progress = el("progress", { className: "field-task__progress", attrs: { max: "1", value: "0", "aria-label": t("common.progress") } });
   const status = el("p", { className: "field-task__status", attrs: { role: "status", "aria-live": "polite", "aria-atomic": "true" } });
-  root.append(header, el("p", { className: "field-task__instructions", text: t(`${kind}.instructions`) }), board, progress, status, el("small", { className: "field-task__note", text: t("common.abstract") }));
+  root.append(header, protocol, el("p", { className: "field-task__instructions", text: t(`${kind}.instructions`) }), board, progress, status, el("small", { className: "field-task__note", text: t("common.abstract") }));
   host.append(root);
 
   function listen<E extends Event>(node: EventTarget, eventName: string, listener: (event: E) => void) {

@@ -110,6 +110,7 @@ function sculpt(geometry: THREE.BufferGeometry, spec: CarSpec, tumble: number): 
 
 export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFactory): THREE.Group {
   const group = new THREE.Group();
+  group.userData.dynamicVehicle = true;
   const half = spec.length / 2, width = spec.width;
   const body = paint(`car-paint-${options.paint.toString(16)}`, options.paint, 0.38, 0.15);
   const glass = paint('car-glass', 0x24384a, 0.1, 0.35);
@@ -120,6 +121,7 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
   const headlamp = paint('car-headlamp', 0xf5f7ff, 0.2, 0.2); headlamp.emissive.setHex(0xdfe8ff); headlamp.emissiveIntensity = 0.7;
   const taillamp = paint('car-taillamp', 0xb3141b, 0.3, 0.2); taillamp.emissive.setHex(0xff1822); taillamp.emissiveIntensity = 0.55;
   const plate = paint('car-plate', 0xe9e6d8, 0.6, 0);
+  const wheelGroups: THREE.Group[] = [];
 
   const add = (geometry: THREE.BufferGeometry, material: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh => {
     const mesh = new THREE.Mesh(geometry, material);
@@ -168,6 +170,8 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
     for (const side of [-1, 1]) {
       const x = side * (width / 2 - 0.1), r = spec.wheelRadius;
       const wheel = new THREE.Group(); wheel.position.set(x, r, axle); group.add(wheel);
+      wheel.name = `wheel-${side < 0 ? 'left' : 'right'}-${axle > 0 ? 'front' : 'rear'}`;
+      wheelGroups.push(wheel);
       const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.26, 28), tire); tyre.rotation.z = Math.PI / 2; wheel.add(tyre);
       const face = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.66, r * 0.66, 0.27, 24), rim); face.rotation.z = Math.PI / 2; wheel.add(face);
       const disc = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.46, r * 0.46, 0.2, 20), brake); disc.rotation.z = Math.PI / 2; wheel.add(disc);
@@ -202,6 +206,11 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
     box(0.3, 0.12, 0.05, taillamp, side * width * 0.38, belt - 0.1, tailZ);
     box(0.1, 0.13, 0.2, body, side * (flank(belt + 0.12) + 0.05), belt + 0.12, Z(spec.windshieldBase - 0.2));
     box(0.02, 0.1, 0.16, trim, side * (flank(belt + 0.12) + 0.105), belt + 0.12, Z(spec.windshieldBase - 0.2));
+    // Period-correct side marker and a recessed door seam make the flank read as
+    // assembled sheet metal instead of one continuous extrusion at gameplay distance.
+    const marker = box(0.025, 0.055, 0.13, headlamp, side * (flank(belt - 0.03) + 0.018), belt - 0.03, Z(half - 0.32));
+    marker.material = headlamp;
+    box(0.018, 0.62, 0.012, trim, side * (flank(belt - 0.18) + 0.012), belt - 0.02, Z(-0.02));
     for (const s of [0.1, -0.7]) box(0.03, 0.025, 0.2, chrome, side * (flank(belt - 0.08) + 0.01), belt - 0.08, Z(s));
     if (spec.roofRails) {
       box(0.04, 0.04, (spec.roofFront - spec.roofRear) * 0.82, chrome, side * flank(top) * 0.78, top + 0.045, Z((spec.roofFront + spec.roofRear) / 2));
@@ -224,5 +233,8 @@ export function buildCar(spec: CarSpec, options: CarOptions, paint: MaterialFact
       group.add(plane);
     }
   }
+  // Expose only the small amount of mutable state needed by the world animation
+  // pass. The geometry and materials remain owned by this factory.
+  group.userData.vehicleRig = { wheels: wheelGroups, wheelRadius: spec.wheelRadius, headlamp, taillamp };
   return group;
 }

@@ -20,11 +20,15 @@ export function mountEngineeringTask(kind: EngineeringTaskKind, host: HTMLElemen
   let validated = false;
   const root = el("section", { className: `engineering-task engineering-task--${kind}`, attrs: { "aria-label": t("Banco de ingeniería experimental") } });
   const header = el("div", { className: "engineering-task__header", children: [el("span", { text: "AUBURN · 1926" }), el("span", { className: "engineering-task__lamp", text: t("ENSAYO") })] });
+  const protocol = el("div", { className: "engineering-task__protocol", children: [
+    el("span", { className: "engineering-task__protocol-code", text: `PROTOCOLO / ${kind.toUpperCase()}` }),
+    el("span", { className: "engineering-task__protocol-steps", text: "PREPARAR  ·  AJUSTAR  ·  VALIDAR" }),
+  ] });
   const instructions = el("p", { className: "engineering-task__instructions" });
   const board = el("div", { className: "engineering-task__board" });
   const status = el("p", { className: "engineering-task__status", attrs: { role: "status", "aria-live": "polite" } });
   const progress = el("progress", { className: "engineering-task__progress", attrs: { max: "100", value: "0", "aria-label": t("Progreso del ensayo") } });
-  root.append(header, instructions, board, progress, status, el("small", { className: "engineering-task__note", text: t("Lecturas y controles ficticios para esta simulación educativa.") }));
+  root.append(header, protocol, instructions, board, progress, status, el("small", { className: "engineering-task__note", text: t("Lecturas y controles ficticios para esta simulación educativa.") }));
   host.append(root);
 
   function listen<E extends Event>(node: EventTarget, type: string, listener: (event: E) => void) {

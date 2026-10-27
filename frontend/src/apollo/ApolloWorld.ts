@@ -60,9 +60,11 @@ export class ApolloWorld {
   private crewRoot = new THREE.Group();
   private rocket = new THREE.Group();
   private van = new THREE.Group();
+  private vehicleRigs: { root: THREE.Group; wheels: THREE.Group[]; wheelRadius: number; previousZ: number; phase: number; headlamp: THREE.MeshStandardMaterial; taillamp: THREE.MeshStandardMaterial }[] = [];
   private arms: THREE.Group[] = [];
   private crew: THREE.Group[] = [];
   private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null; run: THREE.AnimationAction | null; jump: THREE.AnimationAction | null }[] = [];
+  private technicians: { root: THREE.Group; leftArm: THREE.Group; rightArm: THREE.Group; leftLeg: THREE.Group; rightLeg: THREE.Group; head: THREE.Group; baseX: number; baseZ: number; radius: number; phase: number; speed: number; role: string }[] = [];
   private mixers: THREE.AnimationMixer[] = [];
   private colliders: Collider[] = [];
   private sun = new THREE.DirectionalLight(0xfff0d3, 3.2);
@@ -151,7 +153,9 @@ export class ApolloWorld {
     this.buildVehicles();
     this.buildClouds();
     this.buildServiceDetails();
-    for (const child of [...this.scene.children]) if (child instanceof THREE.Group) this.mergeAuthored(child);
+    // Dynamic rigs keep their hierarchy for animation; authored static groups are
+    // still merged into material batches for the active-play draw-call budget.
+    for (const child of [...this.scene.children]) if (child instanceof THREE.Group && !child.userData.dynamicVehicle && !child.userData.dynamicTechnician) this.mergeAuthored(child);
     this.flushStatic();
     this.scene.add(this.playerRoot, this.crewRoot);
     this.playerRoot.position.copy(this.player);
@@ -574,7 +578,10 @@ export class ApolloWorld {
     const kind: CarKind = crew ? 'van' : 'sedan';
     const decal = crew ? new THREE.TextureLoader().load('/icon-512.png') : undefined;
     const group = buildCar(CAR_SPECS[kind], { kind, paint: crew ? 0xd9d6bd : Math.abs(x)>88?0xb8b8a2:0x546e73, decal, periodStyle:true }, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness));
-    group.position.set(x, 0, z); this.scene.add(group); return group;
+    group.position.set(x, 0, z); this.scene.add(group);
+    const rig = group.userData.vehicleRig as { wheels: THREE.Group[]; wheelRadius: number; headlamp: THREE.MeshStandardMaterial; taillamp: THREE.MeshStandardMaterial };
+    this.vehicleRigs.push({ root: group, wheels: rig.wheels, wheelRadius: rig.wheelRadius, previousZ: z, phase: this.vehicleRigs.length * 1.73, headlamp: rig.headlamp, taillamp: rig.taillamp });
+    return group;
   }
   private buildVehicles(): void {
     this.van = this.vehicle(-17, 75, true);
@@ -756,7 +763,7 @@ export class ApolloWorld {
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
       // high-poly clone. They remain silhouettes appropriate to support operations.
       for(const [id,dx,dz]of[['complex',-3,-2],['documentation',-3,-1],['communications',2.5,1.4],['observation',3,0]] as const){
-        const plot=SITE_PLOTS.find(p=>p.id===id)!;this.addTechnician(plot.target.x+dx,plot.target.z+dz);
+        const plot=SITE_PLOTS.find(p=>p.id===id)!;this.addTechnician(plot.target.x+dx,plot.target.z+dz,id);
       }
       this.flushStatic();
     } catch (error) {
@@ -767,29 +774,27 @@ export class ApolloWorld {
       this.crewRoot.visible = false;
     }
   }
-  private addTechnician(x: number, z: number): void {
+  private addTechnician(x: number, z: number, role = 'support'): void {
     this.colliders.push({x,z,w:.29,d:.22});
-    const shirt=this.material('technician-shirt',0xd9d4bd,.96,0),pants=this.material('technician-pants',0x42585f,.94,0),skin=this.material('skin',0xb98e67,.85,0),shoe=this.material('worker-shoe',0x303a35,.8,.05);
-    const torso=new THREE.Mesh(new THREE.CylinderGeometry(.25,.22,.6,8),shirt);torso.position.set(x,1.19,z);torso.scale.z=.65;this.addStatic(torso);
-    this.box(.42,.08,.28,this.material('worker-belt',0x4b4d3e),x,.91,z);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.15,12,10),skin);head.scale.set(1,1.2,.93);head.position.set(x,1.69,z);this.addStatic(head);
-    this.cylinder(.074,.074,.13,skin,x,1.48,z);
-    // Period work cap, brim and face cues preserve a human silhouette at station range.
-    const cap=new THREE.Mesh(new THREE.SphereGeometry(.16,12,6,0,Math.PI*2,0,Math.PI*.51),shirt);cap.position.set(x,1.77,z);this.addStatic(cap);
-    this.box(.27,.025,.15,shirt,x,1.77,z+.13);
-    for(const dx of [-.052,.052])this.box(.022,.016,.009,shoe,x+dx,1.71,z+.137);
-    this.box(.13,.1,.012,shirt,x-.11,1.27,z+.168);this.box(.07,.028,.013,this.material('worker-badge',0x718b8d),x-.11,1.29,z+.18);
-    for(const dx of [-.115,.115]) {
-      const thigh=new THREE.Mesh(new THREE.CylinderGeometry(.095,.084,.42,8),pants);thigh.position.set(x+dx,.69,z);this.addStatic(thigh);
-      const shin=new THREE.Mesh(new THREE.CylinderGeometry(.083,.069,.43,8),pants);shin.position.set(x+dx,.29,z);this.addStatic(shin);
-      this.box(.16,.12,.29,shoe,x+dx,.07,z+.055);
-    }
-    // Articulated upper arm/forearm segments instead of a box-person stand-in.
-    for(const side of [-1,1]) {
-      this.beam(new THREE.Vector3(x+side*.24,1.37,z),new THREE.Vector3(x+side*.32,1.09,z+.025),.12,shirt);
-      this.beam(new THREE.Vector3(x+side*.32,1.09,z+.025),new THREE.Vector3(x+side*.29,.96,z+.21),.09,skin);
-      const hand=new THREE.Mesh(new THREE.SphereGeometry(.06,8,6),skin);hand.position.set(x+side*.29,.95,z+.21);hand.scale.y=1.3;this.addStatic(hand);
-    }
+    const group = new THREE.Group(); group.name = `dynamic-technician-${role}`; group.position.set(x, 0, z); group.userData.dynamicTechnician = true;
+    const shirtColor = role === 'communications' ? 0x728b8e : role === 'documentation' ? 0xb6a46e : role === 'observation' ? 0x768b68 : 0xd9d4bd;
+    const shirt=this.material(`technician-shirt-${role}`,shirtColor,.92,0),pants=this.material('technician-pants',0x42585f,.94,0),skin=this.material('skin',0xb98e67,.85,0),shoe=this.material('worker-shoe',0x303a35,.8,.05),badge=this.material(`worker-badge-${role}`,role==='communications'?0xc08d45:0x718b8d,.55,.2);
+    const addBox=(w:number,h:number,d:number,mat:THREE.Material,px:number,py:number,pz:number,parent:THREE.Group=group)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(px,py,pz);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
+    const addCylinder=(rt:number,rb:number,h:number,mat:THREE.Material,px:number,py:number,pz:number,parent:THREE.Group=group)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,10),mat);mesh.position.set(px,py,pz);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
+    const addSphere=(r:number,mat:THREE.Material,px:number,py:number,pz:number,parent:THREE.Group=group)=>{const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,12,9),mat);mesh.position.set(px,py,pz);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
+    const beam=(a:THREE.Vector3,b:THREE.Vector3,width:number,mat:THREE.Material,parent:THREE.Group)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(width,width*.9,a.distanceTo(b),8),mat);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(UP,b.clone().sub(a).normalize());mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
+    addCylinder(.25,.22,.6,shirt,0,1.19,0).scale.z=.65;
+    addBox(.42,.08,.28,this.material('worker-belt',0x4b4d3e),0,.91,0);
+    const head=new THREE.Group();head.position.set(0,1.69,0);group.add(head);addSphere(.15,skin,0,0,0,head).scale.set(1,1.2,.93);addCylinder(.074,.074,.13,skin,0,-.21,0,head);
+    const cap=addSphere(.16,shirt,0,1.77-1.69,0,head);cap.scale.set(1,0.65,1);addBox(.27,.025,.15,shirt,0,.08,.13,head);
+    for(const dx of [-.052,.052])addBox(.022,.016,.009,shoe,dx,.02,.137,head);
+    addBox(.13,.1,.012,shirt,-.11,1.27,0);addBox(.07,.028,.013,badge,-.11,1.29,.18);
+    const legs=[-1,1].map(side=>{const hip=new THREE.Group();hip.position.set(side*.115,.9,0);group.add(hip);addCylinder(.095,.084,.42,pants,0,-.21,0,hip);const shin=new THREE.Group();shin.position.set(0,-.42,0);hip.add(shin);addCylinder(.083,.069,.43,pants,0,-.215,0,shin);addBox(.16,.12,.29,shoe,0,-.46,.055,shin);return hip;});
+    const arms=[-1,1].map(side=>{const shoulder=new THREE.Group();shoulder.position.set(side*.24,1.37,0);group.add(shoulder);beam(new THREE.Vector3(0,0,0),new THREE.Vector3(side*.08,-.28,.025),.06,shirt,shoulder);const elbow=new THREE.Group();elbow.position.set(side*.08,-.28,.025);shoulder.add(elbow);beam(new THREE.Vector3(0,0,0),new THREE.Vector3(-side*.03,-.15,.21),.045,skin,elbow);addSphere(.06,skin,-side*.03,-.16,.21,elbow);return shoulder;});
+    if(role==='documentation'){const board=addBox(.23,.32,.025,badge,.28,.98,.22);board.rotation.x=-.22;}
+    if(role==='communications'){addCylinder(.018,.018,.22,badge,.22,1.44,.03);addSphere(.045,badge,.22,1.58,.03);}
+    group.userData.role = role; this.scene.add(group);
+    this.technicians.push({root:group,leftArm:arms[0]!,rightArm:arms[1]!,leftLeg:legs[0]!,rightLeg:legs[1]!,head,baseX:x,baseZ:z,radius:role==='observation'?.42:.28,phase:role==='communications'?.8:role==='documentation'?2.2:role==='observation'?3.4:1.1,speed:role==='documentation'?.55:.7,role});
   }
   private addFallbackSuit(root: THREE.Group): void {
     const suit = this.material('fallback-suit', 0xd9d8c6);
@@ -888,6 +893,38 @@ export class ApolloWorld {
     this.playerRoot.rotation.y = Math.atan2(dx, dz);
     return true;
   }
+  /** Small, frame-independent life pass for support hardware and field staff. */
+  private updateActors(dt: number): void {
+    for (const rig of this.vehicleRigs) {
+      const deltaZ = rig.root.position.z - rig.previousZ;
+      if (Math.abs(deltaZ) > 0.00001) {
+        for (const wheel of rig.wheels) wheel.rotation.x += deltaZ / Math.max(rig.wheelRadius, 0.01);
+      }
+      rig.previousZ = rig.root.position.z;
+      const isCrewVan = rig.root === this.van;
+      const pulse = isCrewVan && this.mode === 'crew' ? .72 + Math.sin(this.clock * 8) * .18 : .22;
+      rig.headlamp.emissiveIntensity = pulse;
+      rig.taillamp.emissiveIntensity = isCrewVan && this.mode === 'crew' ? .42 + Math.max(0, Math.sin(this.clock * 5)) * .28 : .18;
+    }
+    for (const technician of this.technicians) {
+      const phase = this.clock * technician.speed + technician.phase;
+      const nextX = technician.baseX + Math.cos(phase) * technician.radius;
+      const nextZ = technician.baseZ + Math.sin(phase) * technician.radius * .52;
+      const deltaX = nextX - technician.root.position.x;
+      const deltaZ = nextZ - technician.root.position.z;
+      technician.root.position.set(nextX, Math.abs(Math.sin(phase * 2)) * .012, nextZ);
+      if (Math.hypot(deltaX, deltaZ) > .0001) technician.root.rotation.y = Math.atan2(deltaX, deltaZ);
+      const stride = Math.sin(phase * 2) * .22;
+      technician.leftLeg.rotation.x = stride;
+      technician.rightLeg.rotation.x = -stride;
+      technician.leftArm.rotation.x = -stride * .72;
+      technician.rightArm.rotation.x = stride * .72;
+      technician.leftArm.rotation.z = -.05 + Math.sin(phase * .5) * .02;
+      technician.rightArm.rotation.z = .05 - Math.sin(phase * .5) * .02;
+      technician.head.rotation.y += (Math.sin(phase * .31) * .12 - technician.head.rotation.y) * (1 - Math.exp(-4 * dt));
+      technician.head.rotation.x += (Math.sin(phase * .22) * .025 - technician.head.rotation.x) * (1 - Math.exp(-3 * dt));
+    }
+  }
   private applyDeadzone(value: number, deadzone = 0.14): number {
     const magnitude = Math.abs(value);
     return magnitude <= deadzone ? 0 : Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
@@ -934,6 +971,7 @@ export class ApolloWorld {
     });
     this.pollGamepad(dt);
     const moving = this.move(dt);
+    this.updateActors(dt);
     if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
       this.jump(); this.keys.delete(' ');
       const jump = this.people[0]?.jump;
@@ -1067,7 +1105,7 @@ export class ApolloWorld {
   diagnostics(): Record<string, unknown> {
     const info = this.renderer.info;
     const times = [...this.frameDurations].sort((a, b) => a - b);
-    return { engine: 'Three.js', player: this.player.toArray(), yaw: this.yaw, quality: this.quality, drawCalls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.renderer.getPixelRatio(), shadowMap: this.renderer.shadowMap.enabled ? this.sun.shadow.mapSize.x : 0, shadowLights: this.renderer.shadowMap.enabled ? 1 : 0, samples: times.length, meanFrameMs: times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0, p95FrameMs: times[Math.floor(times.length * 0.95)] ?? 0, rocketHeightMeters: 110.6, colliders: this.colliders.length, launchY: this.rocket.position.y, crew: this.crew.length, loadedModel: { ...this.loadedModel, playerBounds: new THREE.Box3().setFromObject(this.playerRoot).getSize(new THREE.Vector3()).toArray(), modelScale: this.playerRoot.children[0]?.scale.toArray() }, assetErrors: [...this.assetErrors], originalProps:true, softSmoke:true, stationIndicators:0 };
+    return { engine: 'Three.js', player: this.player.toArray(), yaw: this.yaw, quality: this.quality, drawCalls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.renderer.getPixelRatio(), shadowMap: this.renderer.shadowMap.enabled ? this.sun.shadow.mapSize.x : 0, shadowLights: this.renderer.shadowMap.enabled ? 1 : 0, samples: times.length, meanFrameMs: times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0, p95FrameMs: times[Math.floor(times.length * 0.95)] ?? 0, rocketHeightMeters: 110.6, colliders: this.colliders.length, launchY: this.rocket.position.y, crew: this.crew.length, technicians: this.technicians.length, animatedVehicles: this.vehicleRigs.length, loadedModel: { ...this.loadedModel, playerBounds: new THREE.Box3().setFromObject(this.playerRoot).getSize(new THREE.Vector3()).toArray(), modelScale: this.playerRoot.children[0]?.scale.toArray() }, assetErrors: [...this.assetErrors], originalProps:true, softSmoke:true, stationIndicators:0 };
   }
   private onKeyDown = (event: KeyboardEvent): void => {
     if ((event.target as HTMLElement)?.closest('input,textarea,select,button')) return;

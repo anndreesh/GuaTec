@@ -101,7 +101,9 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
   root.setAttribute('aria-label', copy[kind]);
   const top = node('header', 'ap-inst-header');
   top.append(node('span', 'ap-inst-serial', copy.station), node('span', 'ap-inst-badge', `AP11 / ${kind === 'survey' ? 'OPT-01' : kind === 'records' ? 'DOC-02' : kind === 'signal' ? 'RF-03' : 'CAM-04'}`));
-  root.append(top, node('h2', 'ap-inst-title', copy[kind]), node('p', 'ap-inst-instructions', copy[`${kind}Help`]));
+  const protocol = node('div', 'ap-inst-protocol');
+  protocol.append(node('span', 'ap-inst-protocol-code', `PROTOCOLO / ${kind.toUpperCase()}`), node('span', 'ap-inst-protocol-steps', 'OBSERVAR  ·  AJUSTAR  ·  REGISTRAR'));
+  root.append(top, protocol, node('h2', 'ap-inst-title', copy[kind]), node('p', 'ap-inst-instructions', copy[`${kind}Help`]));
   const stage = node('div', 'ap-inst-stage'); root.append(stage);
   const feedback = node('p', 'ap-inst-feedback'); feedback.setAttribute('aria-live', 'polite'); root.append(feedback);
   const footer = node('footer', 'ap-inst-footer');
