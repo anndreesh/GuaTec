@@ -1,4 +1,4 @@
-import type { Language } from '@/core/i18n';
+import { getLanguage, type Language } from '@/core/language';
 import { STAND_TRANSLATIONS } from './ApolloStandLocale';
 
 /** Spanish is the authored source. Exact source strings keep content and persistent IDs
@@ -263,7 +263,7 @@ const rows: readonly (readonly [string, string, string])[] = [
 
 export const APOLLO_TRANSLATIONS = new Map([...rows,...STAND_TRANSLATIONS].map(([source,en,fr]) => [source, { en, fr }]));
 export function apolloLanguage(): Language {
-  try { const value=localStorage.getItem('mm.language'); return value==='en'||value==='fr' ? value : 'es'; } catch { return 'es'; }
+  return getLanguage();
 }
 
 /** Only translation, never DOM insertion. Unknown names and units remain unchanged. */

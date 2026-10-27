@@ -1,6 +1,5 @@
-export type Language = "es" | "en" | "fr";
-
-const STORAGE_KEY = "mm.language";
+import { getLanguage, type Language } from './language';
+export { getLanguage, setLanguage, type Language } from './language';
 
 const translations: Record<string, string> = {
   "Simulador educativo de exploración marciana: gestiona recursos, toma decisiones y recolecta ciencia real.":
@@ -1482,24 +1481,8 @@ Object.assign(spanishFromEnglish, {
   "The data technician is preparing the outdoor recorders.": "La técnica de datos prepara los registradores exteriores.",
 });
 
-let currentLanguage: Language =
-  (["es", "en", "fr"] as Language[]).includes(localStorage.getItem(STORAGE_KEY) as Language)
-    ? (localStorage.getItem(STORAGE_KEY) as Language)
-    : "es";
-document.documentElement.lang = currentLanguage;
-
-export function getLanguage(): Language {
-  return currentLanguage;
-}
-
-export function setLanguage(language: Language): void {
-  currentLanguage = language;
-  localStorage.setItem(STORAGE_KEY, language);
-  document.documentElement.lang = language;
-  window.dispatchEvent(new CustomEvent("languagechange", { detail: language }));
-}
-
 export function t(text: string): string {
+  const currentLanguage = getLanguage();
   const exact = currentLanguage === "en"
     ? translations[text] ?? englishExtra[text]
     : currentLanguage === "fr"
@@ -1520,7 +1503,7 @@ export function t(text: string): string {
 }
 
 export function languageLabel(): string {
-  return currentLanguage.toUpperCase();
+  return getLanguage().toUpperCase();
 }
 
 export function languageName(language: Language): string {
