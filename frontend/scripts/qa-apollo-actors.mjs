@@ -27,6 +27,7 @@ try{
  const instrumentAfter=await page.evaluate(()=>world.movingStandParts.map(p=>p.node.rotation[p.axis]));const weather=instrumentBefore.findIndex(p=>p.activity==='weather');assert.notEqual(instrumentAfter[weather],instrumentBefore[weather].angle);checks.push('Weather rotor survives static batching at its world placement and advances independently.');
  assert.ok(after.every((t,i)=>t.x===before[i].x&&t.z===before[i].z&&t.collider));
  assert.ok(after.some((t,i)=>Math.abs(t.arm-before[i].arm)>.001));checks.push('Four working technicians animate with feet and colliders planted.');
+ await page.evaluate(()=>world.setStationStatus([],'observation'));await page.waitForTimeout(250);const tracking=await page.evaluate(()=>world.movingStandParts.filter(p=>p.activity==='tracking').map(p=>p.node.rotation.z));assert.ok(tracking.every(angle=>angle!==0));checks.push('Tracking reels turn at the observation checkpoint.');
  await page.evaluate(()=>{const t=world.technicians[0];world.setStandFocus({x:t.baseX,z:t.baseZ})});await page.waitForTimeout(1000);
  await page.screenshot({path:resolve(out,'technicians-motion-a.png')});await page.waitForTimeout(700);await page.screenshot({path:resolve(out,'technicians-motion-b.png')});
  const exploration=await page.evaluate(()=>world.diagnostics());
@@ -39,6 +40,13 @@ try{
  checks.push('Crew transport wheel travel matches road distance; parked lights remain independent.');
  await page.screenshot({path:resolve(out,'crew-transport.png')});
  const metrics=await page.evaluate(()=>world.diagnostics());
+ const rates=await page.evaluate(()=>{
+   world.setCinematic(null,0);world.setSuspended(false);world.setStationStatus([],'observation');
+   const result=[];for(const frames of[30,120]){for(const p of world.movingStandParts)p.node.rotation[p.axis]=0;for(let i=0;i<frames;i++)world.update(1/frames);result.push(world.movingStandParts.map(p=>p.node.rotation[p.axis]));}return result;
+ });assert.ok(rates[0].every((angle,i)=>Math.abs(angle-rates[1][i])<1e-9));checks.push('Mechanism rotation agrees at 30 and 120 simulation steps per second.');
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{world.setCinematic(null,0);world.player.set(-70,0,179);world.setSuspended(false);window.animate=true});await page.waitForTimeout(700);await page.screenshot({path:resolve(out,'technicians-mobile.png')});
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.waitForFunction(()=>window.ready);await page.evaluate(()=>world.setStationStatus([],'observation'));await page.waitForTimeout(100);
+ const reducedBefore=await page.evaluate(()=>({parts:world.movingStandParts.map(p=>p.node.rotation[p.axis]),arms:world.technicians.map(t=>t.leftArm.rotation.toArray())}));await page.waitForTimeout(400);
+ const reducedAfter=await page.evaluate(()=>({parts:world.movingStandParts.map(p=>p.node.rotation[p.axis]),arms:world.technicians.map(t=>t.leftArm.rotation.toArray())}));assert.deepEqual(reducedAfter,reducedBefore);checks.push('Reduced motion keeps weather, tracking and idle gestures stable.');
  assert.deepEqual(errors,[]);await writeFile(resolve(out,'report.json'),JSON.stringify({checks,exploration,metrics,errors},null,2));console.log(`PASS: ${checks.length} actor checks. Exploration ${exploration.drawCalls} calls / ${exploration.triangles} triangles; crew ${metrics.drawCalls} calls / ${metrics.triangles} triangles.`);
 }catch(error){await page.screenshot({path:resolve(out,'failure.png')});throw error}finally{await browser.close()}

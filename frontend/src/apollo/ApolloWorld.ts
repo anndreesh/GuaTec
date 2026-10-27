@@ -819,6 +819,20 @@ export class ApolloWorld {
       addBox(.041,.009,.012,shoe,side*.052,.047,.136,head);
       const collar=addBox(.09,.055,.025,shirt,side*.055,1.45,.12);collar.rotation.z=side*.4;
     }
+    if(role==='documentation'){
+      for(const side of[-1,1]){
+        const frame=new THREE.Mesh(new THREE.TorusGeometry(.035,.004,4,16),shoe);
+        frame.position.set(side*.052,.02,.145);head.add(frame);
+        addBox(.008,.008,.11,shoe,side*.10,.02,.09,head);
+      }
+      addBox(.04,.006,.008,shoe,0,.02,.148,head);
+    }
+    if(role==='communications'){
+      const band=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-.16,.01,0),new THREE.Vector3(-.17,.16,0),new THREE.Vector3(0,.20,-.02),new THREE.Vector3(.17,.16,0),new THREE.Vector3(.16,.01,0)]),16,.014,5,false),shoe);head.add(band);
+      for(const side of[-1,1])addSphere(.054,shoe,side*.16,.01,0,head).scale.set(.65,1,1);
+      const mic=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(.16,0,0),new THREE.Vector3(.16,-.07,.10),new THREE.Vector3(.045,-.08,.17)]),8,.008,5,false),shoe);head.add(mic);
+      addSphere(.018,shoe,.045,-.08,.17,head);
+    }
     addBox(.005,.36,.015,this.material('worker-belt',0x4b4d3e),0,1.17,.168);
     for (let button=0;button<3;button++)addSphere(.008,badge,.02,1.08+button*.10,.177);
     const legs=[-1,1].map(side=>{const hip=new THREE.Group();hip.position.set(side*.115,.9,0);group.add(hip);addCylinder(.095,.084,.42,pants,0,-.21,0,hip);const shin=new THREE.Group();shin.position.set(0,-.42,0);hip.add(shin);addCylinder(.083,.069,.43,pants,0,-.215,0,shin);addBox(.16,.12,.29,shoe,0,-.46,.055,shin);return hip;});
@@ -949,8 +963,8 @@ export class ApolloWorld {
       technician.rightLeg.rotation.x = 0;
       technician.leftArm.rotation.x = -.14 + Math.sin(phase * 1.3) * .055 * motion;
       technician.rightArm.rotation.x = (technician.role === 'communications' ? -.62 : -.24) + Math.sin(phase * .8) * .07 * motion;
-      technician.leftArm.rotation.z = -.05 + Math.sin(phase * .5) * .02;
-      technician.rightArm.rotation.z = .05 - Math.sin(phase * .5) * .02;
+      technician.leftArm.rotation.z = -.05 + Math.sin(phase * .5) * .02 * motion;
+      technician.rightArm.rotation.z = .05 - Math.sin(phase * .5) * .02 * motion;
       const dx = this.player.x - technician.baseX, dz = this.player.z - technician.baseZ;
       const nearby = dx * dx + dz * dz < 36;
       const look = nearby ? clamp(Math.atan2(dx, dz), -.55, .55) : Math.sin(phase * .31) * .12 * motion;
