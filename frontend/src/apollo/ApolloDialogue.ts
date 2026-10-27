@@ -65,7 +65,10 @@ export class ApolloDialogue {
     content.append(header,text);this.host.append(avatar,content);this.host.classList.add('ap-radio-visible');
   }
   refreshLanguage() {
-    if (this.active) this.render(this.active);
+    if (this.active) {
+      this.render(this.active);this.remaining=Math.max(this.remaining,this.active.duration);
+      this.voice?.speak(apolloText(this.active.text),this.active.character);
+    }
   }
   clear() {
     this.queue=[];this.active=null;this.remaining=0;this.voice?.stop();

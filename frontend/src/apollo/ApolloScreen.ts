@@ -583,7 +583,11 @@ export class ApolloScreen implements Screen {
     if(!this.root.classList.contains('ap-ready')){const loading=this.root.querySelector('.ap-loading');if(loading)loading.textContent=apolloText('PREPARANDO OPERACIONES · APOLLO 11');return;}
     this.world.refreshLanguage();
     this.dialogue?.refreshLanguage();
-    if (this.movie) {const caption=this.movieOverlay?.querySelector<HTMLElement>('.ap-cinema-caption');if(caption)caption.dataset.signature='';this.movieVoiceKey='';this.renderMovie();return;}
+    if (this.movie) {
+      const caption=this.movieOverlay?.querySelector<HTMLElement>('.ap-cinema-caption');if(caption)caption.dataset.signature='';
+      const skip=this.movieOverlay?.querySelector<HTMLElement>('.ap-skip');if(skip)skip.textContent=apolloText('Omitir introducción');
+      this.movieVoiceKey='';this.renderMovie();return;
+    }
     this.renderObjective(); this.updateNavigation();
     const kind=this.modalKind;
     const bonusId=this.bonusKey;

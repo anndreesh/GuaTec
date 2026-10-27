@@ -46,6 +46,10 @@
   letter-spacing: normal;
 }
 
+.ap-start-error-detail{margin:0 0 22px;color:#b9ccca;font-size:12px;letter-spacing:normal}
+.ap-start-error-detail summary{cursor:pointer;padding:8px 0}
+.ap-start-error-detail pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#081a22;font:11px/1.6 ui-monospace,monospace}
+
 .ap-start-error-actions .ap-button {
   min-width: 170px;
 }
