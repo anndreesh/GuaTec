@@ -5,6 +5,7 @@ export class ApolloAudio {
   private ambience: GainNode | null = null;
   private roar: GainNode | null = null;
   private ui: GainNode | null = null;
+  private worldBus: GainNode | null = null;
   private sources: AudioScheduledSourceNode[] = [];
   muted = false;
   async start() {
@@ -12,23 +13,24 @@ export class ApolloAudio {
     const c = this.ctx = new AudioContext();
     this.master = c.createGain(); this.master.gain.value = .38; this.master.connect(c.destination);
     this.ui = c.createGain(); this.ui.gain.value = .22; this.ui.connect(this.master);
+    this.worldBus = c.createGain(); this.worldBus.gain.value = 1; this.worldBus.connect(this.master);
     const buffer = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
     const data = buffer.getChannelData(0); let low = 0;
     for (let i = 0; i < data.length; i++) { low = (low + (Math.random() * 2 - 1) * .02) / 1.02; data[i] = low * 3; }
     const noise = c.createBufferSource(); noise.buffer = buffer; noise.loop = true;
     const filter = c.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 550;
     this.ambience = c.createGain(); this.ambience.gain.value = .25;
-    noise.connect(filter).connect(this.ambience).connect(this.master); noise.start(); this.sources.push(noise);
+    noise.connect(filter).connect(this.ambience).connect(this.worldBus); noise.start(); this.sources.push(noise);
     // Quiet original harmonic bed, deliberately sparse under radio dialogue.
     [130.81, 196, 261.63].forEach((frequency, i) => {
       const oscillator = c.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.value = frequency;
       const gain = c.createGain(); gain.gain.value = .012 / (i + 1);
-      oscillator.connect(gain).connect(this.master!); oscillator.start(); this.sources.push(oscillator);
+      oscillator.connect(gain).connect(this.worldBus!); oscillator.start(); this.sources.push(oscillator);
     });
     const engine = c.createBufferSource(); engine.buffer = buffer; engine.loop = true;
     const bass = c.createBiquadFilter(); bass.type = 'lowpass'; bass.frequency.value = 180;
     this.roar = c.createGain(); this.roar.gain.value = 0;
-    engine.connect(bass).connect(this.roar).connect(this.master); engine.start(); this.sources.push(engine);
+    engine.connect(bass).connect(this.roar).connect(this.worldBus); engine.start(); this.sources.push(engine);
     await this.resume(c);
   }
   launch(elapsed: number, distance: number) {
@@ -73,16 +75,17 @@ export class ApolloAudio {
     try { await context.resume(); }
     catch (error) { if (context.state !== 'closed') throw error; }
   }
-  pause(paused: boolean) {
+  pause(paused: boolean, keepInterfaceAudio = false) {
     const context=this.ctx;
     if(!context || context.state==='closed') return;
+    this.worldBus?.gain.setTargetAtTime(paused ? 0 : 1,context.currentTime,.08);
     // A screen can unmount while the browser is still processing this transition.
     // Always consume the transition promise; intentional teardown is not a game error.
-    void (paused ? context.suspend() : context.resume()).catch(()=>{});
+    void (paused && !keepInterfaceAudio ? context.suspend() : context.resume()).catch(()=>{});
   }
   dispose() {
     this.sources.forEach(s => { try { s.stop(); } catch {} });this.sources=[];
-    const context=this.ctx;this.ctx=null;this.ui=null;
+    const context=this.ctx;this.ctx=null;this.ui=null;this.worldBus=null;
     if(context && context.state!=='closed')void context.close().catch(()=>{});
   }
 }

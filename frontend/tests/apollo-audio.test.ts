@@ -34,3 +34,9 @@ test('pause does not request a resume after the context is already closed',()=>{
   const {audio,context}=install();context.state='closed';audio.pause(false);
   assert.equal(context.resumes,0);audio.dispose();
 });
+test('stand mode keeps interface audio running while the world bus is ducked',async()=>{
+  const {audio,context}=install(),levels:number[]=[];
+  (audio as unknown as {worldBus:unknown}).worldBus={gain:{setTargetAtTime:(value:number)=>levels.push(value)}};
+  audio.pause(true,true);assert.equal(context.resumes,1);assert.deepEqual(levels,[0]);
+  audio.pause(false);assert.deepEqual(levels,[0,1]);audio.dispose();await settle();
+});
