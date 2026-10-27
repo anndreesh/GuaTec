@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": "https://gua-tec.vercel.app/api"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://gua-tec.vercel.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
