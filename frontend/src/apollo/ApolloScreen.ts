@@ -430,6 +430,7 @@ export class ApolloScreen implements Screen {
     if(!this.world || !this.started || this.modal)return;
     this.modalKind='pause';
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
+    this.root.querySelector<HTMLElement>('.ap-modal')?.classList.add('ap-pause-overlay');
     box.classList.add('ap-pause-dialog');
     box.append(el('div','ap-pause-status','MISSION CONTROL · APOLLO 11 · KENNEDY SPACE CENTER'),el('p','ap-pause-intro','La misión está detenida. Revisa el estado operativo y retoma el recorrido cuando estés listo.'));
     const grid=el('div','ap-pause-grid');

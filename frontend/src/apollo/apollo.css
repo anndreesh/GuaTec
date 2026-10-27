@@ -108,3 +108,21 @@ body.apollo-active .language-menu{display:none}
 
 @media(max-width:760px){.ap-pause-dialog{display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto auto auto auto auto}.ap-pause-dialog>.ap-pause-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-row:5}.ap-pause-dialog>.ap-pause-map-title{grid-row:6}.ap-pause-dialog>.ap-pause-map{grid-row:7;height:220px}}
 @media(max-width:520px){.ap-pause-dialog{padding:26px 18px 20px}.ap-pause-dialog>.ap-pause-grid{grid-template-columns:1fr;gap:8px}.ap-pause-control{min-height:58px;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;text-align:left}.ap-pause-control::before{top:5px;left:auto;right:9px}.ap-pause-control strong{font-size:10px}.ap-pause-dialog>.ap-pause-map{height:160px}}
+
+/* Compact drop-down pause panel: controls stay secondary, the map is the main view. */
+.ap-pause-overlay{align-items:flex-start;padding:18px 24px 28px;overflow:auto}
+.ap-pause-overlay .ap-pause-dialog{width:min(1040px,100%);max-height:calc(100dvh - 36px);margin:0 auto;overflow:auto;padding:24px 30px 26px;animation:ap-pause-drop .28s cubic-bezier(.2,.8,.2,1) both}
+.ap-pause-overlay .ap-pause-dialog h1{font-size:clamp(25px,3vw,34px);margin:6px 0 5px}
+.ap-pause-overlay .ap-pause-intro{margin-bottom:14px!important;font-size:11px!important}
+.ap-pause-overlay .ap-pause-grid{gap:8px;margin-bottom:18px}
+.ap-pause-overlay .ap-pause-control{min-height:48px;height:48px;flex-direction:row;justify-content:flex-start;gap:8px;padding:7px 9px;text-align:left;border-radius:2px;box-shadow:inset 0 1px #ffffff0c,0 5px 12px #020b0e55}
+.ap-pause-overlay .ap-pause-control::before{content:none}
+.ap-pause-overlay .ap-pause-control::after{height:1px}
+.ap-pause-overlay .ap-pause-icon{width:24px;height:24px;font-size:14px;box-shadow:none}
+.ap-pause-overlay .ap-pause-control strong{font-size:9px;letter-spacing:.02em;line-height:1.15}
+.ap-pause-overlay .ap-pause-map-title{font-size:9px;margin-bottom:7px}
+.ap-pause-overlay .ap-pause-map{height:360px}
+@keyframes ap-pause-drop{from{opacity:0;transform:translateY(-14px) scaleY(.98);transform-origin:top center}to{opacity:1;transform:translateY(0) scaleY(1)}}
+@media(max-width:760px){.ap-pause-overlay{padding:12px}.ap-pause-overlay .ap-pause-dialog{padding:20px 18px 20px}.ap-pause-overlay .ap-pause-map{height:240px}}
+@media(max-width:520px){.ap-pause-overlay .ap-pause-grid{grid-template-columns:1fr;gap:6px}.ap-pause-overlay .ap-pause-control{height:42px;min-height:42px}.ap-pause-overlay .ap-pause-map{height:220px}}
+@media(prefers-reduced-motion:reduce){.ap-pause-overlay .ap-pause-dialog{animation:none}}
