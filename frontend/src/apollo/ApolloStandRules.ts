@@ -18,6 +18,14 @@ export const CREW_CARDS = [
 ] as const;
 
 export type StandDraft = { version: 1; kind: string; slots?: (number | null)[]; controls?: number[]; scanned?: boolean[] };
+
+/** A tabletop imprinter is an educational prop, not a historical launch-access system. */
+export function validateImprintStroke(travel:number,seconds:number):'accepted'|'incomplete'|'fast'|'slow'{
+  if(!Number.isFinite(travel)||!Number.isFinite(seconds)||travel<.9||travel>1.01||seconds<=0)return'incomplete';
+  if(seconds<.35)return'fast';
+  if(seconds>2.4)return'slow';
+  return'accepted';
+}
 export function restoreStandDraft(kind: string, value: unknown): StandDraft {
   const clean: StandDraft = { version: 1, kind };
   if (!value || typeof value !== 'object') return clean;
@@ -33,11 +41,17 @@ export function restoreStandDraft(kind: string, value: unknown): StandDraft {
   }
   const ranges = kind === 'telemetry' ? [100,100,100] : kind === 'weather' ? [359,100] : [];
   if (ranges.length && Array.isArray(saved.controls) && saved.controls.length === ranges.length && saved.controls.every(Number.isFinite)) clean.controls = saved.controls.map((v,i) => Math.max(0,Math.min(ranges[i]!,v)));
-  if (kind === 'beacons' && Array.isArray(saved.scanned) && saved.scanned.length === 3 && saved.scanned.every(v => typeof v === 'boolean')) {
+  if (['beacons','crew-manifest'].includes(kind) && Array.isArray(saved.scanned) && saved.scanned.length === 3 && saved.scanned.every(v => typeof v === 'boolean')) {
     clean.scanned = [...saved.scanned];
     // A recovered draft is never an automatic completion event. Reacquire the final
-    // beacon if the player left during the confirmation delay.
+    // record if the player left during the confirmation delay.
     if (clean.scanned.every(Boolean)) clean.scanned[2] = false;
+  }
+  // Preserve correctly matched credentials from the earlier matching-board activity.
+  // Wrong placements never become a validated credential in the new imprinter.
+  if(kind==='crew-manifest'&&!clean.scanned&&clean.slots){
+    clean.scanned=clean.slots.map((value,i)=>value===[1,2,0][i]);
+    if(clean.scanned.every(Boolean))clean.scanned[2]=false;
   }
   return clean;
 }

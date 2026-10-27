@@ -1,7 +1,8 @@
 import type { ApolloBonusCheckpoint } from './ApolloState';
 import { apolloText } from './ApolloLocale';
-import { FUSE_RATINGS, FUSE_SOCKETS, TELEMETRY_REFERENCE, CABLE_CHANNELS, CABLE_TARGET_ORDER, FLIGHT_CARDS, CREW_CARDS, slotsCorrect, moveIntoSlot, readingsAligned, weatherAligned, advanceScan, restoreStandDraft, type StandDraft } from './ApolloStandRules';
+import { FUSE_RATINGS, FUSE_SOCKETS, TELEMETRY_REFERENCE, CABLE_CHANNELS, CABLE_TARGET_ORDER, FLIGHT_CARDS, slotsCorrect, moveIntoSlot, readingsAligned, weatherAligned, advanceScan, restoreStandDraft, type StandDraft } from './ApolloStandRules';
 import './ApolloStands.css';
+import {mountCredentialImprinter} from './ApolloCredentialImprinter';
 
 export interface BonusMissionHandle { dispose(): void; snapshot(): StandDraft }
 interface BonusMissionOptions { onComplete(): void; onCancel(): void; onFeedback?: (kind: 'success' | 'error') => void; draft?: unknown; onDraft?: (draft:StandDraft)=>void }
@@ -13,7 +14,7 @@ const descriptions: Record<ApolloBonusCheckpoint['kind'], { code: string; title:
   'flight-plan': { code: 'OPS / 02', title: 'Mesa de secuencias', verb: 'Ordena los documentos en la línea de tiempo.', note: 'Preparación → tripulación a bordo → encendido → despegue.' },
   telemetry: { code: 'DATA / 03', title: 'Consola de telemetría', verb: 'Ajusta los tres sintonizadores hasta superponer las señales.', note: 'La traza punteada es la referencia; la traza continua es tu lectura.' },
   cables: { code: 'LINK / 04', title: 'Panel de conexiones', verb: 'Lleva cada cable al terminal con la misma letra.', note: 'Las letras identifican los canales además del color.' },
-  'crew-manifest': { code: 'CREW / 05', title: 'Registro de tripulación', verb: 'Asocia cada credencial con su función en la misión.', note: 'Armstrong: comandante. Collins: módulo de mando. Aldrin: módulo lunar.' },
+  'crew-manifest': { code: 'CREW / 05', title: 'Registro de tripulación', verb: 'Imprime las tres credenciales pasando el rodillo sobre cada ficha.', note: 'Impresor de práctica: las credenciales y el registro son una adaptación educativa.' },
   weather: { code: 'WX / 06', title: 'Parte de observación', verb: 'Alinea la veleta y ajusta la placa de nubosidad.', note: 'Referencia del ejercicio: rumbo 225° y placa al 35 %. No son mediciones históricas.' },
   beacons: { code: 'SAFE / 07', title: 'Barrido del perímetro', verb: 'Mueve el visor sobre cada baliza y mantén el encuadre.', note: 'Inspecciona B1, B2 y B3. También puedes mover el visor con las flechas.' },
 };
@@ -65,7 +66,9 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     let drag: { item: number; id: number; x: number; y: number; moved: boolean } | null = null, ghost: HTMLElement | null = null, suppressClick = false;
     const chips = items.map((label, index) => {
       const chip = node('button', 'ap-placement-piece'); chip.type = 'button'; chip.dataset.item = String(index);
-      chip.append(node('span', 'ap-piece-index', String(index + 1).padStart(2, '0')), node('strong', '', label)); chip.setAttribute('aria-label', apolloText(label));
+      chip.append(node('span', 'ap-piece-index', String(index + 1).padStart(2, '0')));
+      if(cls==='ap-fuse-board'){const fuse=node('span','ap-fuse-body');fuse.setAttribute('aria-hidden','true');chip.append(fuse);}
+      chip.append(node('strong','',label));chip.setAttribute('aria-label',apolloText(label));
       chip.style.setProperty('--channel-color', ['#d07d56', '#77a7b8', '#d4b65b', '#9c9ac3'][index % 4]!); tray.append(chip); return chip;
     });
     const destinations = labels.map((label, index) => {
@@ -125,13 +128,19 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     leverBox.append(node('span', '', 'INTERRUPTOR GENERAL / 0 → 1'), lever, node('span', 'ap-breaker-state', 'OFF / ON')); workspace.append(leverBox);
   }
 
-  if (bonus.kind === 'flight-plan' || bonus.kind === 'crew-manifest') {
-    const flight = bonus.kind === 'flight-plan';
-    const items = flight ? [FLIGHT_CARDS[2].title, FLIGHT_CARDS[0].title, FLIGHT_CARDS[3].title, FLIGHT_CARDS[1].title] : [CREW_CARDS[2].name, CREW_CARDS[0].name, CREW_CARDS[1].name];
-    const labels = flight ? ['01 / PREPARACIÓN', '02 / EMBARQUE', '03 / MOTORES', '04 / SALIDA'] : CREW_CARDS.map(card => card.role);
-    const reference = flight ? [1, 3, 0, 2] : [1, 2, 0];
-    const deck = placement(items, labels, flight ? 'ap-timeline-board' : 'ap-manifest-board', slots => update(slots.filter(v => v !== null).length / labels.length * .85, slots.filter(v => v !== null).length + ' / ' + labels.length + ' DOCUMENTOS'));
-    action(flight ? 'Sellar plan de vuelo' : 'Cotejar manifiesto', () => slotsCorrect(deck.get(), reference) ? finish(flight ? 'Cronología validada · registro archivado.' : 'Tripulación identificada · manifiesto cotejado.') : fail('Hay documentos pendientes o fuera de lugar. Revisa las placas de destino.'));
+  if (bonus.kind === 'flight-plan') {
+    const items=[FLIGHT_CARDS[2].title,FLIGHT_CARDS[0].title,FLIGHT_CARDS[3].title,FLIGHT_CARDS[1].title];
+    const labels=['01 / PREPARACIÓN','02 / EMBARQUE','03 / MOTORES','04 / SALIDA'];
+    const deck=placement(items,labels,'ap-timeline-board',slots=>update(slots.filter(v=>v!==null).length/4*.85,slots.filter(v=>v!==null).length+' / 4 DOCUMENTOS'));
+    action('Sellar plan de vuelo',()=>slotsCorrect(deck.get(),[1,3,0,2])?finish('Cronología validada · registro archivado.'):fail('Hay documentos pendientes o fuera de lugar. Revisa las placas de destino.'));
+  }
+
+  if(bonus.kind==='crew-manifest'){
+    const imprinter=mountCredentialImprinter(workspace,{draft,signal:abort.signal,onDraft:()=>draftChanged(),onRead:count=>{
+      update(count/3,count+' / 3 CREDENCIALES');
+      if(count)feedback.textContent=apolloText('Credencial impresa · función registrada en el manifiesto.');
+    },onReject:fail,onComplete:()=>finish('Tripulación identificada · manifiesto cotejado.')});
+    snapshot=imprinter.snapshot;
   }
 
   if (bonus.kind === 'cables') {

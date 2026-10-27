@@ -60,6 +60,12 @@ const range = async (name,value) => {
  await page.mouse.click(r.x+8+(r.width-16)*value/max,r.y+r.height/2);
 };
 const finish = async () => {await page.waitForFunction(()=>window.completed===1,{timeout:5000});};
+const imprint=async(travel=1)=>{
+ const handle=page.locator('.ap-imprinter-roller'),a=await handle.boundingBox(),span=await handle.evaluate(el=>el.parentElement.clientWidth-98);
+ await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
+ for(let n=1;n<=15;n++){await page.mouse.move(a.x+a.width/2+span*travel*n/15,a.y+a.height/2);await page.waitForTimeout(50);}
+ await page.mouse.up();
+};
 try {
  await page.goto(new URL('/apollo-stand-acceptance',url).href);await page.waitForFunction(()=>window.ready,{timeout:60000});
  assert.deepEqual(await page.evaluate(()=>world.assetErrors),[]);
@@ -77,7 +83,18 @@ try {
  await assign([1,3,0,2]);await range('Palanca de alimentación',100);await finish();checks.push('Fuses: wrong circuit rejected; pointer placement and power lever succeed.');
  await open('flight-plan');await page.getByRole('button',{name:'Sellar plan de vuelo'}).click();assert.equal(await page.evaluate(()=>window.completed),0);
  await assign([1,3,0,2],true);await page.getByRole('button',{name:'Sellar plan de vuelo'}).click();await finish();checks.push('Flight plan: missing pieces rejected; full keyboard ordering succeeds.');
- await open('crew-manifest');await assign([1,2,0]);await page.getByRole('button',{name:'Cotejar manifiesto'}).click();await finish();checks.push('Crew: three credentials matched to roles by pointer.');
+ await open('crew-manifest');await imprint(.4);assert.equal(await page.locator('[data-recorded=true]').count(),0);
+ await imprint();assert.equal(await page.locator('[data-recorded=true]').count(),1);
+ await page.locator('.ap-imprinter-roller').focus();await page.keyboard.down('Space');await page.waitForTimeout(1000);await page.keyboard.up('Space');assert.equal(await page.locator('[data-recorded=true]').count(),2);
+ const credentials=await page.evaluate(()=>handle.snapshot());await open('crew-manifest',credentials);assert.equal(await page.locator('[data-recorded=true]').count(),2);
+ await page.setViewportSize({width:390,height:844});await page.locator('.ap-imprinter-track').scrollIntoViewIfNeeded();
+ const reader=await page.locator('.ap-imprinter-roller').boundingBox(),travel=await page.locator('.ap-imprinter-track').evaluate(el=>el.clientWidth-98),readerCdp=await page.context().newCDPSession(page);
+ await readerCdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:reader.x+reader.width/2,y:reader.y+reader.height/2}]});
+ await readerCdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:reader.x+reader.width/2+travel*.4,y:reader.y+reader.height/2}]});await readerCdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});assert.equal(await page.locator('[data-recorded=true]').count(),2);
+ await readerCdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:reader.x+reader.width/2,y:reader.y+reader.height/2}]});
+ for(let n=1;n<=12;n++){await readerCdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:reader.x+reader.width/2+travel*n/12,y:reader.y+reader.height/2}]});await page.waitForTimeout(65);}
+ await readerCdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await readerCdp.detach();await finish();await page.setViewportSize({width:1440,height:900});
+ checks.push('Crew: incomplete stroke rejected; mouse, Space hold, native touch and restored credentials verified.');
  await open('cables');await assign([2,0,3,1]);assert.equal(await page.locator('.ap-patch-wires path').count(),4);await page.screenshot({path:resolve(out,'cables-connected.png')});
  await page.getByRole('button',{name:'Probar continuidad'}).click();await finish();checks.push('Cables: four visible curves and continuity verification succeed.');
  await open('telemetry');await page.getByRole('button',{name:'Fijar enlace'}).click();assert.equal(await page.evaluate(()=>window.completed),0);
@@ -92,7 +109,7 @@ try {
  assert.equal(await page.locator('[data-filled=true]').count(),2);assert.equal(await page.evaluate(()=>window.completed),0);checks.push('Partial draft: two connectors restore without earning clearance.');
  for(const [width,height]of[[768,1024],[390,844]]){
    await page.setViewportSize({width,height});
-   for(const kind of ['cables','telemetry','weather','flight-plan']){
+   for(const kind of ['cables','telemetry','weather','flight-plan','crew-manifest']){
      await open(kind);assert.equal(await page.locator('.ap-dialog').evaluate(el=>el.scrollWidth>el.clientWidth),false,kind+' responsive overflow');
      await page.screenshot({path:resolve(out,width+'-'+kind+'.png')});
    }

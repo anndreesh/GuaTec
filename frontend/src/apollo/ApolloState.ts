@@ -56,7 +56,7 @@ export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
   },
   {
     id: 'crew-manifest', title: 'Manifiesto de tripulación',
-    objective: 'Asocia las credenciales de Armstrong, Collins y Aldrin con sus funciones en el Apollo 11.',
+    objective: 'Registra las credenciales de Armstrong, Collins y Aldrin con el rodillo del impresor de práctica.',
     target: { x: -25, z: 188 }, kind: 'crew-manifest', requires: ['umbilical-check'], afterCheckpoint: 'communications',
   },
   {

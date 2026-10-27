@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { slotsCorrect, moveIntoSlot, FUSE_RATINGS, FUSE_SOCKETS, readingsAligned, weatherAligned, headingError, advanceScan, restoreStandDraft } from '../src/apollo/ApolloStandRules';
+import { slotsCorrect, moveIntoSlot, FUSE_RATINGS, FUSE_SOCKETS, readingsAligned, weatherAligned, headingError, advanceScan, restoreStandDraft, validateImprintStroke } from '../src/apollo/ApolloStandRules';
 
 test('placement preserves uniqueness, swaps occupied sockets and rejects invalid slots', () => {
   let slots: (number | null)[] = [null, null, null, null];
@@ -12,6 +12,21 @@ test('placement preserves uniqueness, swaps occupied sockets and rejects invalid
   assert.equal(slotsCorrect(slots, [1, 2, 0, 3]), false);
   assert.equal(slotsCorrect([10, 20, 5, 15], FUSE_SOCKETS), true);
   assert.equal(slotsCorrect(FUSE_RATINGS, FUSE_SOCKETS), false);
+});
+
+test('credential imprinting requires a complete steady stroke instead of a click',()=>{
+  assert.equal(validateImprintStroke(1,.9),'accepted');assert.equal(validateImprintStroke(.92,1.3),'accepted');
+  assert.equal(validateImprintStroke(.45,.8),'incomplete');assert.equal(validateImprintStroke(-1,.8),'incomplete');
+  assert.equal(validateImprintStroke(1,.1),'fast');assert.equal(validateImprintStroke(1,3),'slow');
+  assert.equal(validateImprintStroke(NaN,1),'incomplete');assert.equal(validateImprintStroke(1,Infinity),'incomplete');
+});
+
+test('old credential placements retain valid matches without granting an automatic completion',()=>{
+  assert.deepEqual(restoreStandDraft('crew-manifest',{version:1,kind:'crew-manifest',slots:[1,2,null]}).scanned,[true,true,false]);
+  assert.deepEqual(restoreStandDraft('crew-manifest',{version:1,kind:'crew-manifest',slots:[2,1,0]}).scanned,[false,false,true]);
+  assert.deepEqual(restoreStandDraft('crew-manifest',{version:1,kind:'crew-manifest',slots:[1,2,0]}).scanned,[true,true,false]);
+  assert.deepEqual(restoreStandDraft('crew-manifest',{version:1,kind:'crew-manifest',scanned:[true,false,true]}).scanned,[true,false,true]);
+  assert.deepEqual(restoreStandDraft('crew-manifest',{version:1,kind:'crew-manifest',scanned:[true,true,true]}).scanned,[true,true,false]);
 });
 test('signal lock needs all finite readings and weather wraps around north', () => {
   assert.equal(readingsAligned([62, 74, 58]), true);

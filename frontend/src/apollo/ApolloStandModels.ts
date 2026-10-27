@@ -242,13 +242,18 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
       box(.065,1.01,.065,steel,x,1.68,-.66);sheet(5,.48,.31,x,2.13,-.61);
     }
   } else if (kind === 'records' || kind === 'crew-manifest') {
-    for(let i=0;i<(kind==='records'?2:3);i++)clipboard(-.82+i*.72,1.19+i*.006,.12,kind==='records'?9:5,-.08+i*.06);
+    if(kind==='records')for(let i=0;i<2;i++)clipboard(-.82+i*.72,1.19+i*.006,.12,9,-.08+i*.06);
     if(kind==='records'){
       beveled(.83,.65,.61,paint,-1.13,.70,-.28);
       for(const y of[.49,.76]){box(.77,.22,.045,cream,-1.13,y,.36);box(.24,.025,.055,steel,-1.13,y,.40);}
     }else{
       for(let i=0;i<3;i++){const x=-.9+i*.77;box(.6,.045,.19,dark,x,1.35,-.48);sheet(5,.44,.57,x,1.65,-.56);}
       box(2.55,.045,.045,steel,0,1.98,-.62);
+      clipboard(-.9,1.19,.22,5,0);
+      box(1.12,.075,.68,dark,.49,1.20,.17);sheet(5,.70,.45,.49,1.245,.17,-Math.PI/2);
+      for(const z of[-.11,.45])box(1.06,.035,.035,steel,.49,1.26,z);
+      cyl(.07,.64,steel,.16,1.33,.17,Math.PI/2);
+      for(const z of[-.20,.54])cyl(.10,.12,dark,.16,1.35,z,Math.PI/2);
     }
     // Filing sorter, binder rings, stamp and a gooseneck lamp.
     for (let i = 0; i < 3; i++) { box(.64, .035, .66, dark, -1.1, 1.28 + i * .16, -.4); box(.55, .025, .56, paper, -1.1, 1.31 + i * .16, -.4); }

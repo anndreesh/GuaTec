@@ -37,6 +37,7 @@ test('dynamic navigation, connectors and progress preserve values in all languag
     ['E · Banco de alimentación', 'E · Power distribution bench', 'E · Banc d’alimentation'],
     ['✓ REGISTRO VALIDADO', '✓ RECORD VERIFIED', '✓ REGISTRE VALIDÉ'],
     ['3 / 4 CONECTORES', '3 / 4 CONNECTORS', '3 / 4 CONNECTEURS'],
+    ['2 / 3 CREDENCIALES', '2 / 3 CREDENTIALS', '2 / 3 BADGES'],
     ['20 A / PORTAFUSIBLE', '20 A / FUSE SOCKET', '20 A / PORTE-FUSIBLE'],
     ['C / CANAL 3', 'C / CHANNEL 3', 'C / CANAL 3'],
     ['42 m · Plan de vuelo', '42 m · Flight plan', '42 m · Plan de vol'],

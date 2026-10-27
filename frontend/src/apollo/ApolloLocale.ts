@@ -285,8 +285,8 @@ export function apolloText(source: string, language: Language = apolloLanguage()
     'STAND BLOQUEADO · COMPLETA ':['STATION LOCKED · COMPLETE ','POSTE VERROUILLÉ · TERMINEZ '],
   };
   for(const [prefix,translated]of Object.entries(prefixes))if(source.startsWith(prefix))return translated[language==='en'?0:1]+apolloText(source.slice(prefix.length),language);
-  const progress=source.match(/^(\d+) \/ (\d+) (FUSIBLES|DOCUMENTOS|CONECTORES|BALIZAS REGISTRADAS)$/);
-  if(progress){const units:Record<string,[string,string]>={FUSIBLES:['FUSES','FUSIBLES'],DOCUMENTOS:['DOCUMENTS','DOCUMENTS'],CONECTORES:['CONNECTORS','CONNECTEURS'],'BALIZAS REGISTRADAS':['BEACONS RECORDED','BALISES ENREGISTRÉES']};return `${progress[1]} / ${progress[2]} ${units[progress[3]!]![language==='en'?0:1]}`;}
+  const progress=source.match(/^(\d+) \/ (\d+) (FUSIBLES|DOCUMENTOS|CONECTORES|CREDENCIALES|BALIZAS REGISTRADAS)$/);
+  if(progress){const units:Record<string,[string,string]>={FUSIBLES:['FUSES','FUSIBLES'],DOCUMENTOS:['DOCUMENTS','DOCUMENTS'],CONECTORES:['CONNECTORS','CONNECTEURS'],CREDENCIALES:['CREDENTIALS','BADGES'],'BALIZAS REGISTRADAS':['BEACONS RECORDED','BALISES ENREGISTRÉES']};return `${progress[1]} / ${progress[2]} ${units[progress[3]!]![language==='en'?0:1]}`;}
   const port=source.match(/^(\d+ A) \/ PORTAFUSIBLE$/);if(port)return `${port[1]} / ${language==='en'?'FUSE SOCKET':'PORTE-FUSIBLE'}`;
   const cable=source.match(/^([A-D]) \/ CANAL (\d+)$/);if(cable)return `${cable[1]} / ${language==='en'?'CHANNEL':'CANAL'} ${cable[2]}`;
   const terminal=source.match(/^BORNE ([A-D])$/);if(terminal)return `${language==='en'?'TERMINAL':'BORNE'} ${terminal[1]}`;
