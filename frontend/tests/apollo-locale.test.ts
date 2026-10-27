@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { APOLLO_TRANSLATIONS, APOLLO_TRANSLATION_ROWS, apolloText } from '@/apollo/ApolloLocale';
 import { CHECKPOINTS, BONUS_CHECKPOINTS, DIALOGUES } from '@/apollo/ApolloState';
 import { FLIGHT_CARDS, CREW_CARDS } from '@/apollo/ApolloStandRules';
+import {STAND_HANDOFFS} from '@/apollo/ApolloStandHandoffs';
 
 test('Apollo locale catalog has complete ES/EN/FR rows', () => {
   assert.ok(APOLLO_TRANSLATIONS.size > 150, 'Apollo copy catalog should cover the full mission surface');
@@ -20,6 +21,7 @@ test('every authored objective, action, stand and dialogue has English and Frenc
     ...DIALOGUES.map(line => line.text),
     ...FLIGHT_CARDS.flatMap(card => [card.title, card.detail]),
     ...CREW_CARDS.map(card => card.role),
+    ...Object.values(STAND_HANDOFFS).flatMap(handoff=>[handoff.purpose,handoff.reply]),
   ];
   for (const source of sources) assert.ok(APOLLO_TRANSLATIONS.has(source), `Missing authored mission copy: ${source}`);
 });

@@ -18,6 +18,7 @@ import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts 
 import { mountBonusMission, type BonusMissionHandle } from './ApolloBonusMissions';
 import { restoreStandDraft, type StandDraft } from './ApolloStandRules';
 import {SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
+import {STAND_HANDOFFS} from './ApolloStandHandoffs';
 
 const SLUG = MISSION_SLUGS.mission1;
 const el = <K extends keyof HTMLElementTagNameMap>(tag:K, cls='', text='') => {
@@ -324,7 +325,10 @@ export class ApolloScreen implements Screen {
     },onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{
       this.bonusMission?.dispose(); this.bonusMission=null;
       this.bonusKey='';delete this.standDrafts[id];
-      if(this.state.completeBonus(id)) { void this.save(); this.renderObjective(); this.closeModal(); this.notify(`STAND COMPLETADO · ${bonus.title}`); }
+      if(this.state.completeBonus(id)) {
+        void this.save();this.renderObjective();this.closeModal();this.notify(`STAND COMPLETADO · ${bonus.title}`);
+        const handoff=STAND_HANDOFFS[id];if(handoff)this.dialogue.say('Daniel Carter',handoff.reply,9);
+      }
     },onCancel:()=>this.closeModal()});
   }
   private showStation() {

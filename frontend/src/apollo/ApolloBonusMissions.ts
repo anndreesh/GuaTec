@@ -3,6 +3,7 @@ import { apolloText } from './ApolloLocale';
 import { FUSE_RATINGS, FUSE_SOCKETS, TELEMETRY_REFERENCE, CABLE_CHANNELS, CABLE_TARGET_ORDER, FLIGHT_CARDS, slotsCorrect, moveIntoSlot, readingsAligned, weatherAligned, advanceScan, restoreStandDraft, type StandDraft } from './ApolloStandRules';
 import './ApolloStands.css';
 import {mountCredentialImprinter} from './ApolloCredentialImprinter';
+import {STAND_HANDOFFS} from './ApolloStandHandoffs';
 
 export interface BonusMissionHandle { dispose(): void; snapshot(): StandDraft }
 interface BonusMissionOptions { onComplete(): void; onCancel(): void; onFeedback?: (kind: 'success' | 'error') => void; draft?: unknown; onDraft?: (draft:StandDraft)=>void }
@@ -35,6 +36,8 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
   const spec = descriptions[bonus.kind], stage = node('section', 'ap-stand ap-stand--' + bonus.kind), rail = node('aside', 'ap-stand-brief');
   host.classList.add('ap-stand-dialog'); host.parentElement?.classList.add('ap-stand-overlay');
   rail.append(node('span', 'ap-stand-code', spec.code), node('h2', '', spec.title), node('p', '', spec.verb), node('small', 'ap-stand-note', spec.note));
+  const purpose=STAND_HANDOFFS[bonus.id];
+  if(purpose){const context=node('details','ap-stand-purpose');context.append(node('summary','','Vínculo con la misión'),node('p','',purpose.purpose));rail.append(context);}
   const progress = node('div', 'ap-stand-progress'); progress.setAttribute('role', 'progressbar'); progress.setAttribute('aria-label', apolloText('Verificación del stand')); progress.setAttribute('aria-valuemin', '0'); progress.setAttribute('aria-valuemax', '100');
   const progressBar = node('span'); progress.append(progressBar);
   const counter = node('output', 'ap-stand-counter', 'EN ESPERA');

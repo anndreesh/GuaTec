@@ -80,6 +80,7 @@ export const STAND_TRANSLATIONS: readonly (readonly [string,string,string])[] = 
   ['Stand pendiente de autorización','Station awaiting clearance','Poste en attente d’autorisation'],
   ['STAND OBLIGATORIO · OPERACIÓN DE APOYO','REQUIRED STATION · GROUND SUPPORT','POSTE OBLIGATOIRE · SOUTIEN AU SOL'],
   ['Continuar operaciones','Resume operations','Reprendre les opérations'],
+  ['Vínculo con la misión','Connection to the mission','Lien avec la mission'],
   ['Imprime las tres credenciales pasando el rodillo sobre cada ficha.','Print all three credentials by sliding the roller across each card.','Imprimez les trois badges en passant le rouleau sur chaque fiche.'],
   ['Impresor de práctica: las credenciales y el registro son una adaptación educativa.','Practice imprinter: the credentials and log are an educational adaptation.','Imprimante d’exercice : les badges et le registre sont une adaptation pédagogique.'],
   ['Registra las credenciales de Armstrong, Collins y Aldrin con el rodillo del impresor de práctica.','Record Armstrong, Collins and Aldrin’s credentials with the practice imprinter roller.','Enregistrez les badges d’Armstrong, Collins et Aldrin avec le rouleau de l’imprimante d’exercice.'],
