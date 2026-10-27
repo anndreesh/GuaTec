@@ -36,8 +36,8 @@ export function mountFieldTask(kind: FieldMinigameKind, host: HTMLElement, callb
   const lamp = el("span", { className: "field-task__lamp", text: t("common.working") });
   const header = el("div", { className: "field-task__header", children: [el("strong", { text: fieldTaskLabel(kind) }), lamp] });
   const protocol = el("div", { className: "field-task__protocol", children: [
-    el("span", { className: "field-task__protocol-code", text: `FICHA / ${kind.toUpperCase()}` }),
-    el("span", { className: "field-task__protocol-steps", text: "OBSERVAR  ·  OPERAR  ·  REGISTRAR" }),
+    el("span", { className: "field-task__protocol-code", text: `${t("common.procedure")} / ${["assembly","mass","calibration","signal"].indexOf(kind)+1}` }),
+    el("span", { className: "field-task__protocol-steps", text: t("common.steps") }),
   ] });
   const board = el("div", { className: "field-task__board" });
   const progress = el("progress", { className: "field-task__progress", attrs: { max: "1", value: "0", "aria-label": t("common.progress") } });

@@ -21,8 +21,8 @@ export function mountEngineeringTask(kind: EngineeringTaskKind, host: HTMLElemen
   const root = el("section", { className: `engineering-task engineering-task--${kind}`, attrs: { "aria-label": t("Banco de ingeniería experimental") } });
   const header = el("div", { className: "engineering-task__header", children: [el("span", { text: "AUBURN · 1926" }), el("span", { className: "engineering-task__lamp", text: t("ENSAYO") })] });
   const protocol = el("div", { className: "engineering-task__protocol", children: [
-    el("span", { className: "engineering-task__protocol-code", text: `PROTOCOLO / ${kind.toUpperCase()}` }),
-    el("span", { className: "engineering-task__protocol-steps", text: "PREPARAR  ·  AJUSTAR  ·  VALIDAR" }),
+    el("span", { className: "engineering-task__protocol-code", text: `${t("PROTOCOLO")} / ${["circuits","antenna","propulsion","diagnosis","launch"].indexOf(kind)+1}` }),
+    el("span", { className: "engineering-task__protocol-steps", text: t("PREPARAR  ·  AJUSTAR  ·  VALIDAR") }),
   ] });
   const instructions = el("p", { className: "engineering-task__instructions" });
   const board = el("div", { className: "engineering-task__board" });

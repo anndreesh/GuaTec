@@ -1,6 +1,8 @@
 import { getLanguage } from "../core/i18n";
 // Local copy keeps the tasks independent of the legacy mission translation catalog.
 const copy: Record<string, [string, string]> = {
+  "PROTOCOLO": ["PROCEDURE", "PROCÉDURE"],
+  "PREPARAR  ·  AJUSTAR  ·  VALIDAR": ["PREPARE  ·  ADJUST  ·  VALIDATE", "PRÉPARER  ·  RÉGLER  ·  VALIDER"],
   "Banco de ingeniería experimental": ["Experimental engineering bench", "Banc d’ingénierie expérimentale"],
   "ENSAYO": ["TEST", "ESSAI"], "VALIDADO": ["VALIDATED", "VALIDÉ"],
   "Progreso del ensayo": ["Test progress", "Progression de l’essai"],

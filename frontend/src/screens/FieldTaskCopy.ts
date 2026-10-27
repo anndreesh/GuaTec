@@ -3,6 +3,8 @@ import type { FieldTaskId } from "../state/Mission01FieldTasks";
 
 /** Stable keys shared by field stations, task controls and the saved report. */
 const copy: Record<string, readonly [string, string, string]> = {
+  "common.procedure": ["FICHA", "WORKSHEET", "FICHE"],
+  "common.steps": ["OBSERVAR  ·  OPERAR  ·  REGISTRAR", "OBSERVE  ·  OPERATE  ·  RECORD", "OBSERVER  ·  MANIPULER  ·  CONSIGNER"],
   "task.assembly": ["Montaje del bastidor", "Frame assembly", "Assemblage du châssis"],
   "task.mass": ["Balance de masa", "Mass balance", "Équilibrage de la masse"],
   "task.calibration": ["Calibración de instrumentos", "Instrument calibration", "Étalonnage des instruments"],
