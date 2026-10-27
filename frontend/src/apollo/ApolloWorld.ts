@@ -449,11 +449,6 @@ export class ApolloWorld {
     this.beam(new THREE.Vector3(0, 8, 0), new THREE.Vector3(0, 12, 0), 0.1, steel, g);
     this.scene.add(g);
     this.colliders.push({ x: 82, z: 236, w: 3.8, d: 3.8 });
-    for (const [x, z] of [[-58, 217], [-52, 216], [71, 259], [7, 372], [-13, 136]]) {
-      const wood = this.material('crate', 0x94734f, 0.95);
-      this.box(1.1, 0.8, 0.75, wood, x, 0.4, z);
-      for (const dx of [-0.43, 0.43]) this.box(0.12, 0.85, 0.78, this.material('crate-trim', 0x544c3e), x + dx, 0.43, z);
-    }
     // Tracking tripod at the spectator area is a distinct authored piece.
     for (let i = 0; i < 6; i++) this.colliders.push(buildBench(this.furniture, -22 + i * 9, 381, 0, 3.2, i % 2 === 0));
   }
