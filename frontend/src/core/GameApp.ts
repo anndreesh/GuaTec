@@ -7,29 +7,7 @@ import { getLanguage, languageName, setLanguage, t, type Language } from "@/core
 import type { UserDTO } from "@/types";
 import type { Screen } from "@/screens/Screen";
 
-const MENU_BACKGROUNDS = [
-  "/images/rocket-liftoff.jpeg",
-  "/images/launch-pad-sunset.jpeg",
-  "/images/magnetosphere.jpeg",
-  "/images/earthrise-moon.jpg",
-  "/images/astronaut-spacewalk.webp",
-  "/images/tomato-seeds-experiment.avif",
-  "/images/sls-rocket-pad.jpeg",
-  "/images/shuttle-launch.jpeg",
-  "/images/jeremy-thomas-E0AHdsENmDg-unsplash.jpg",
-  "/images/jorge-gardner-tCtnz_NkYG4-unsplash.jpg",
-  "/images/josh-methven-qz6IXJ7dIDM-unsplash.jpg",
-  "/images/nasa-7Cz6bWjdlDs-unsplash.jpg",
-  "/images/nasa-GkpYlUpUOIY-unsplash.jpg",
-  "/images/nasa-JZz2UYtHo1s-unsplash.jpg",
-  "/images/nasa-Q1p7bh3SHj8-unsplash.jpg",
-  "/images/nasa-dCgbRAQmTQA-unsplash.jpg",
-  "/images/nasa-yZygONrUBe8-unsplash.jpg",
-  "/images/sheeyam-bJgiy4lBFgU-unsplash.jpg",
-  "/images/shot-by-cerqueira-0o_GEzyargo-unsplash.jpg",
-  "/images/spacex--p-KCm6xB9I-unsplash.jpg",
-  "/images/spacex-tKs_2sBoqAg-unsplash.jpg",
-] as const;
+import MENU_BACKGROUNDS from "virtual:menu-backgrounds";
 
 /**
  * Root application controller: owns the ambient Babylon(-or-fallback)
@@ -196,10 +174,10 @@ export class GameApp {
     let previous:string|null=null;
     try{previous=sessionStorage.getItem("mm.menuBackground");}catch{/* Background rotation is optional. */}
     const available = MENU_BACKGROUNDS.filter((path) => path !== previous);
-    const selected = available[Math.floor(Math.random() * available.length)] ?? MENU_BACKGROUNDS[0];
+    const selected = available[Math.floor(Math.random() * available.length)] ?? MENU_BACKGROUNDS[0] ?? "";
     try{sessionStorage.setItem("mm.menuBackground", selected);}catch{/* Use this background for the current page. */}
     if (this.menuBackdrop) {
-      this.menuBackdrop.style.backgroundImage = `url("${selected}")`;
+      this.menuBackdrop.style.backgroundImage = selected ? `url(${JSON.stringify(selected)})` : "";
     }
     return selected;
   }

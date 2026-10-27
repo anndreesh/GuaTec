@@ -1,6 +1,38 @@
-import { resolve } from "node:path";
-import { rm } from "node:fs/promises";
-import { defineConfig } from "vite";
+import { resolve, relative, sep } from "node:path";
+import { rm, readdir } from "node:fs/promises";
+import { defineConfig, type Plugin } from "vite";
+
+/** Public assets remain direct URLs; only their names enter the JS bundle. */
+function menuBackgrounds(): Plugin {
+  const id = "virtual:menu-backgrounds", resolvedId = "\0" + id;
+  const directory = resolve(__dirname, "public/images");
+  async function images(folder: string): Promise<string[]> {
+    const entries = await readdir(folder, { withFileTypes: true });
+    const paths = await Promise.all(entries.map(async entry => {
+      const path = resolve(folder, entry.name);
+      if (entry.isDirectory()) return images(path);
+      if (!entry.isFile() || !/\.(avif|webp|png|jpe?g|gif|svg)$/i.test(entry.name)) return [];
+      return ["/images/" + relative(directory, path).split(sep).map(encodeURIComponent).join("/")];
+    }));
+    return paths.flat().sort();
+  }
+  return {
+    name: "discover-menu-backgrounds",
+    resolveId(source) { if (source === id) return resolvedId; },
+    async load(source) { if (source === resolvedId) return `export default ${JSON.stringify(await images(directory))};`; },
+    configureServer(server) {
+      const refresh = (path: string) => {
+        if (!path.startsWith(directory + sep) || !/\.(avif|webp|png|jpe?g|gif|svg)$/i.test(path)) return;
+        const module = server.moduleGraph.getModuleById(resolvedId);
+        if (module) server.moduleGraph.invalidateModule(module);
+        server.ws.send({ type: "full-reload" });
+      };
+      server.watcher.add(directory);
+      server.watcher.on("add", refresh); server.watcher.on("unlink", refresh);
+      server.httpServer?.once("close", () => { server.watcher.off("add", refresh); server.watcher.off("unlink", refresh); });
+    },
+  };
+}
 
 const sourceOnlyModels = [
   "arboles.glb",
@@ -15,7 +47,7 @@ const sourceOnlyModels = [
 // set VITE_API_BASE_URL and serve the built assets behind the same
 // reverse proxy as the Flask API (see docker-compose.yml).
 export default defineConfig(({ command }) => ({
-  plugins: command === "build" ? [{
+  plugins: [menuBackgrounds(), ...(command === "build" ? [{
     name: "exclude-source-only-models",
     apply: "build",
     async closeBundle() {
@@ -23,7 +55,7 @@ export default defineConfig(({ command }) => ({
         rm(resolve(__dirname, "dist/assets/models", file), { force: true }),
       ));
     },
-  }] : [],
+  } satisfies Plugin] : [])],
   resolve: {
     alias: {
       "@": "/src",
