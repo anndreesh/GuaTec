@@ -90,7 +90,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
   const copy: Record<keyof Copy, string> = COPY[options.language] ?? COPY.es;
   const surveyTargets = options.variant === 'orientation' ? [SURVEY_TARGETS[1]] : [...SURVEY_TARGETS];
   let draft = restoreInstrumentDraft(kind, options.draft), disposed = false, completed = false, raf = 0;
-  let clock = 0, lastFrame = performance.now(), lock = 0, locked = false, pulseStarted: number | null = null, pulseClock = 0;
+  let clock = 0, lastFrame = performance.now(), lock = 0, locked = false, pulseStarted: number | null = null;
   let selectedCard = '', selectedSlot = 0, lastDraft = '';
   let pulseDemo = -1, audio: AudioContext | null = null, tone: OscillatorNode | null = null, gain: GainNode | null = null;
   if (options.variant === 'orientation') draft.captures=[];
@@ -189,11 +189,14 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
       const beginPulse = () => {
         if (disposed || completed || pulseStarted !== null) return;
         if (!locked || !signalAligned(draft.values)) { say(copy.pulseLost, true); return; }
-        pulseDemo=-1; pulseStarted = clock; pulseClock = 0; key.classList.add('ap-inst-key-down'); ensureTone(true); say(copy.transmitting);
+        pulseDemo=-1;pulseStarted=performance.now();key.classList.add('ap-inst-key-down');ensureTone(true);say(copy.transmitting);
       };
       const endPulse = () => {
         if (pulseStarted === null) return;
-        const duration = pulseClock; pulseStarted = null; stopTone(); key.classList.remove('ap-inst-key-down');
+        // Human input uses wall time. Capped animation deltas at 8 fps used to turn
+        // a correct 0.8-second hold into an invalid short pulse.
+        const duration=(performance.now()-pulseStarted)/1000;pulseStarted=null;stopTone();key.classList.remove('ap-inst-key-down');
+        if(document.hidden||!locked||!signalAligned(draft.values)){draft.pulses=[];persist();say(copy.pulseLost,true);return;}
         if (!pulseCorrect(duration, draft.pulses.length)) { draft.pulses = []; say(copy.pulseWrong, true); }
         else { draft.pulses.push(duration); say(draft.pulses.length < 3 ? copy.readyPulse : copy.received); }
         [...pulseRow.children].forEach((n, i) => n.classList.toggle('ap-inst-pulse-done', i < draft.pulses.length)); persist();
@@ -201,6 +204,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
       };
       listen(key, 'pointerdown', (e: Event) => { const event = e as PointerEvent; event.preventDefault(); key.setPointerCapture(event.pointerId); beginPulse(); });
       listen(key, 'pointerup', endPulse); listen(key, 'pointercancel', () => { pulseStarted = null; stopTone(); key.classList.remove('ap-inst-key-down'); });
+      listen(key,'lostpointercapture',()=>{pulseStarted=null;stopTone();key.classList.remove('ap-inst-key-down');});
       listen(root, 'keydown', (e: Event) => { const event = e as KeyboardEvent; if (event.code !== 'Space' || (event.target as HTMLElement)?.matches('input') || ((event.target as HTMLElement)?.tagName === 'BUTTON' && event.target !== key)) return; event.preventDefault(); if (!event.repeat) beginPulse(); });
       listen(root, 'keyup', (e: Event) => { if ((e as KeyboardEvent).code === 'Space') { (e as KeyboardEvent).preventDefault(); endPulse(); } });
       listen(window, 'blur', () => { pulseStarted = null; pulseDemo=-1; stopTone(); key.classList.remove('ap-inst-key-down'); });
@@ -320,8 +324,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
         if (locked && !previousLock) say(copy.readyPulse);
         if (!aligned && draft.pulses.length) { draft.pulses = []; persist(); [...stage.querySelectorAll('.ap-inst-pulse')].forEach(n => n.classList.remove('ap-inst-pulse-done')); }
         if (pulseStarted !== null) {
-          if (!aligned || document.hidden) { pulseStarted = null; pulseClock = 0; stopTone(); stage.querySelector('.ap-inst-telegraph')?.classList.remove('ap-inst-key-down'); say(copy.pulseLost, true); }
-          else pulseClock += dt;
+          if (!aligned || document.hidden) { pulseStarted = null; stopTone(); stage.querySelector('.ap-inst-telegraph')?.classList.remove('ap-inst-key-down'); say(copy.pulseLost, true); }
         }
         if (pulseDemo >= 0) {
           pulseDemo += dt; const t = pulseDemo;
@@ -333,7 +336,7 @@ export function mountInstrument(host: HTMLElement, kind: InstrumentKind, options
     }
     raf = requestAnimationFrame(frame);
   }
-  listen(document, 'visibilitychange', () => { lastFrame = performance.now(); if (document.hidden) { stopTone(); pulseStarted = null; pulseClock=0; pulseDemo=-1; stage.querySelector('.ap-inst-telegraph')?.classList.remove('ap-inst-key-down'); } });
+  listen(document, 'visibilitychange', () => { lastFrame = performance.now(); if (document.hidden) { stopTone(); pulseStarted = null; pulseDemo=-1; stage.querySelector('.ap-inst-telegraph')?.classList.remove('ap-inst-key-down'); } });
   persist(); raf = requestAnimationFrame(frame);
   return { dispose, snapshot };
 }
