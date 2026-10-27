@@ -5,6 +5,16 @@ import type { ApolloBonusKind } from './ApolloState';
 export type StandModelKind = ApolloBonusKind | 'orientation' | 'survey' | 'records' | 'radio' | 'crew' | 'tracking';
 export type StandMaterialFactory = (name: string, color: number, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial;
 
+/** Ground-plane proxies are kept separate from the visual mesh batches. */
+export function standCollisionProxies(kind: StandModelKind, x: number, z: number): {x:number;z:number;w:number;d:number}[] {
+  const colliders=[{x,z,w:1.8,d:.95},...[-2.12,2.12].map(dx=>({x:x+dx,z:z-1.2,w:.09,d:.09}))];
+  if(kind==='telemetry')colliders.push({x:x+2.02,z:z-.35,w:.4,d:.4});
+  if(kind==='weather')colliders.push({x:x+2.35,z:z-.72,w:.12,d:.12},{x:x-2.35,z:z-.55,w:.28,d:.28});
+  if(kind==='beacons')for(const dx of[-2.25,0,2.25])colliders.push({x:x+dx,z:z-1.6,w:.2,d:.2});
+  if(kind==='survey'||kind==='tracking')colliders.push({x:x-2.13,z:z-.05,w:.4,d:.5});
+  return colliders;
+}
+
 /** One shared instrument atlas. Printed labels, meter scales, paper and phosphor displays
  * share a texture instead of allocating a canvas for each dial or console. */
 export function createStandAtlas(): THREE.CanvasTexture {
@@ -153,11 +163,12 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     box(.18, .05, .13, dark, .99, 1.20, .47); cyl(.04, .14, copper, .99, 1.29, .47);
   } else {
     // Optical head with lens hood, film magazine, handwheels and a braced tripod.
-    box(.75, .5, .65, paint, -.45, 1.83, -.05); cyl(.20, .6, dark, -.45, 1.83, -.52, Math.PI / 2);
-    cyl(.18, .05, steel, -.45, 1.83, -.84, Math.PI / 2); cyl(.14, .06, dark, -.45, 1.83, -.88, Math.PI / 2);
-    cyl(.22, .15, dark, -.45, 2.22, .10, Math.PI / 2); cyl(.12, .08, steel, .02, 1.7, -.05, 0, Math.PI / 2);
-    cyl(.06, .62, steel, -.45, 1.25, -.05);
-    for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3; tube([[-.45, 1.25, -.05], [-.45 + Math.cos(a) * .6, .2, -.05 + Math.sin(a) * .6]], .035, steel); }
+    const cx=-2.13;
+    box(.75, .5, .65, paint, cx, 1.83, -.05); cyl(.20, .6, dark, cx, 1.83, -.52, Math.PI / 2);
+    cyl(.18, .05, steel, cx, 1.83, -.84, Math.PI / 2); cyl(.14, .06, dark, cx, 1.83, -.88, Math.PI / 2);
+    cyl(.22, .15, dark, cx, 2.22, .10, Math.PI / 2); cyl(.12, .08, steel, cx+.47, 1.7, -.05, 0, Math.PI / 2);
+    cyl(.06, .62, steel, cx, 1.25, -.05);
+    for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3; tube([[cx, 1.25, -.05], [cx + Math.cos(a) * .6, .2, -.05 + Math.sin(a) * .6]], .035, steel); }
     clipboard(.87, 1.18, .25, 8);
   }
   // Cable drops and louvred service panel join the desk to the grounded work area.

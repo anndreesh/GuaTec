@@ -8,7 +8,7 @@ import { buildBench, type Kit, type StationKind } from './ApolloFurniture';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
 import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
-import { buildStandModel, createStandAtlas, type StandModelKind } from './ApolloStandModels';
+import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind } from './ApolloStandModels';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
 type Mode = 'intro' | 'crew' | 'launch' | null;
@@ -171,8 +171,8 @@ export class ApolloWorld {
   refreshLanguage(): void {
     this.renderer.domElement.setAttribute('aria-label', apolloText('Centro Espacial Kennedy en 1969. Escenario 3D de Apollo 11.'));
     for (const sign of this.localizedSigns) {
-      for (const plane of sign.planes) {
-        const material = plane.material as THREE.MeshBasicMaterial;
+      const materials = new Set(sign.planes.map(plane=>plane.material as THREE.MeshBasicMaterial));
+      for (const material of materials) {
         const previous = material.map;
         material.map = this.textTexture(`${apolloText(sign.title)}\n${apolloText(sign.subtitle)}`, '#f2e8cb', true);
         material.needsUpdate = true;
@@ -212,6 +212,15 @@ export class ApolloWorld {
     const batch = this.staticBuffers.get(material) ?? [];
     batch.push(g); this.staticBuffers.set(material, batch);
     mesh.geometry.dispose();
+  }
+  private addStaticModel(root: THREE.Group): void {
+    root.updateMatrixWorld(true);
+    root.traverse(node=>{
+      if(!(node instanceof THREE.Mesh)||Array.isArray(node.material))return;
+      const geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
+      const batch=this.staticBuffers.get(node.material)??[];batch.push(geometry);this.staticBuffers.set(node.material,batch);
+      node.geometry.dispose();
+    });
   }
   private mergeAuthored(group: THREE.Group): void {
     group.updateMatrixWorld(true);
@@ -476,8 +485,8 @@ export class ApolloWorld {
     BONUS_CHECKPOINTS.forEach((bonus, index) => {
       const { x, z } = bonus.target;
       const model = buildStandModel(bonus.kind, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, index);
-      model.position.set(x, 0, z); this.scene.add(model);
-      this.colliders.push({ x, z: z - .10, w: 1.85, d: .95 });
+      model.position.set(x, 0, z); this.addStaticModel(model);
+      this.colliders.push(...standCollisionProxies(bonus.kind,x,z));
       const accent = new THREE.Mesh(new THREE.SphereGeometry(.10, 10, 6), new THREE.MeshBasicMaterial({ color: 0xc99550 }));
       accent.position.set(x + 1.82, 2.31, z - 1.10); this.scene.add(accent);
       this.bonusAccents.push({ mesh: accent, phase: index * 1.8, id: bonus.id });
@@ -487,10 +496,10 @@ export class ApolloWorld {
     const atlas = this.standAtlas ??= createStandAtlas();
     const kinds: Record<string, StandModelKind> = { map: 'orientation', camera: z > 300 ? 'tracking' : 'survey', desk: 'records', radio: 'radio', crew: 'crew' };
     const model = buildStandModel(kinds[type] ?? 'records', (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, 0);
-    model.position.set(x, 0, z); this.scene.add(model);
-    this.colliders.push({ x, z, w: 1.85, d: .95 });
+    model.position.set(x, 0, z); this.addStaticModel(model);
+    this.colliders.push(...standCollisionProxies(kinds[type] ?? 'records',x,z));
     // Keep the existing authored mission names visible above the shared instrument kit.
-    this.sign(title, subtitle, x + .1, 3.22, z - 1.25, 0, 4.5);
+    this.sign(title, subtitle, x + .1, 3.48, z - 1.25, 0, 4.5);
   }
   private fence(from: number, to: number, z: number): void {
     const metal = this.material('fence', 0x717b79, 0.8, 0.5);
@@ -510,7 +519,7 @@ export class ApolloWorld {
     const front = this.textPlane(`${apolloText(title)}\n${apolloText(sub)}`, w - .12, 1.13, '#f2e8cb', true);
     front.position.z = .046;
     group.add(front);
-    const rear = this.textPlane(`${apolloText(title)}\n${apolloText(sub)}`, w - .12, 1.13, '#f2e8cb', true);
+    const rear = front.clone();
     rear.position.z = -.046;
     rear.rotation.y = Math.PI;
     group.add(rear);
