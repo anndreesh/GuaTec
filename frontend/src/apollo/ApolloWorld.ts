@@ -129,7 +129,8 @@ export class ApolloWorld {
     this.flushStatic();
     this.scene.add(this.playerRoot, this.crewRoot);
     this.playerRoot.position.copy(this.player);
-    this.camera.position.set(this.player.x, 3.8, this.player.z + 8); this.camera.lookAt(this.player.x, 1.4, this.player.z);
+    // Keep the astronaut readable as a third-person hero from the first frame.
+    this.camera.position.set(this.player.x, 3.35, this.player.z + 5.8); this.camera.lookAt(this.player.x, 1.35, this.player.z);
     this.buildMarker();
     const smokeMaterial = new THREE.MeshBasicMaterial({ map:createSmokeTexture(), color:0xe8e3d6, transparent:true, opacity:.72, depthWrite:false, side:THREE.DoubleSide });
     this.smoke = new THREE.InstancedMesh(new THREE.PlaneGeometry(2,2), smokeMaterial, this.smokeCount);
@@ -857,11 +858,12 @@ export class ApolloWorld {
       this.inspectionPosition.set(this.inspectionTarget==='vab'?-1000:this.inspectionTarget==='tower'?-17:0,this.inspectionTarget==='vab'?81:65,this.inspectionTarget==='vab'?-100:0);
       this.camera.lookAt(this.inspectionPosition);this.camera.fov=this.inspectionTarget==='vab'?18:35;this.camera.updateProjectionMatrix();
     } else {
-      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * 8, this.player.y + 3.7 + this.pitch, this.player.z + Math.cos(this.yaw) * 8);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 8.5, this.player.y + 1.45 + this.pitch * 2, this.player.z - Math.cos(this.yaw) * 8.5);
+      const followDistance = 5.8;
+      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * followDistance, this.player.y + 3.35 + this.pitch, this.player.z + Math.cos(this.yaw) * followDistance);
+      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 2, this.player.z - Math.cos(this.yaw) * 6.3);
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
-      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 70; this.camera.updateProjectionMatrix();
+      this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
     }
     this.renderer.render(this.scene, this.camera);
   }
