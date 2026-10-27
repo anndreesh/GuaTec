@@ -16,6 +16,7 @@ migrations/versions/__pycache__/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/artifacts/
 *.tsbuildinfo
 .vercel/
 
