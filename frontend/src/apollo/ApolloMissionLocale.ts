@@ -1,5 +1,7 @@
 /** Mission-wide copy audited alongside the state, world signage and error surfaces. */
 export const MISSION_TRANSLATIONS: readonly (readonly [string, string, string])[] = [
+  ['Sin conexión · no hay registro guardado disponible','Offline · no saved record is available','Hors ligne · aucune sauvegarde disponible'],
+  ['No se pudo guardar · conserva esta sesión e intenta de nuevo','Could not save · keep this session open and try again','Sauvegarde impossible · gardez cette session ouverte et réessayez'],
   ['No se pudo activar el modo 3D', '3D mode could not start', 'Le mode 3D n’a pas pu démarrer'],
   ['Este navegador no pudo activar WebGL 2, que es necesario para mostrar la Misión 01. Tu progreso no se ha perdido.', 'This browser could not start WebGL 2, which Mission 01 requires. Your progress is safe.', 'Ce navigateur n’a pas pu activer WebGL 2, nécessaire à la mission 01. Votre progression est conservée.'],
   ['Activa la aceleración gráfica en la configuración del navegador.', 'Enable hardware acceleration in your browser settings.', 'Activez l’accélération matérielle dans les paramètres du navigateur.'],

@@ -17,7 +17,8 @@
     "qa:app-locales": "node scripts/qa-app-locales.mjs",
     "qa:app-storage": "node scripts/qa-app-storage.mjs",
     "qa:legal-locales": "node scripts/qa-legal-locales.mjs",
-    "qa:apollo-report": "node scripts/qa-apollo-report.mjs"
+    "qa:apollo-report": "node scripts/qa-apollo-report.mjs",
+    "qa:apollo-saving": "node scripts/qa-apollo-saving.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^7.35.1",

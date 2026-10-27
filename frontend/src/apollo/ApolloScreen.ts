@@ -170,7 +170,7 @@ export class ApolloScreen implements Screen {
         saved=preferLocal ? local!.state : remoteValid?remoteState:undefined;
         drafts=preferLocal?local?.drafts:envelope.apollo11Drafts;
         standDrafts=preferLocal?local?.standDrafts:envelope.apollo11StandDrafts;
-      } catch { saved=local?.state; drafts=local?.drafts;standDrafts=local?.standDrafts; this.saveStatus='Sin conexión · guardado en este dispositivo'; }
+      } catch { saved=local?.state; drafts=local?.drafts;standDrafts=local?.standDrafts; this.saveStatus=local?.state?'Sin conexión · guardado en este dispositivo':'Sin conexión · no hay registro guardado disponible'; }
     }
     if(this.disposed) return;
     this.state=new ApolloState(saved);
@@ -620,11 +620,12 @@ export class ApolloScreen implements Screen {
     const snapshot=this.state.toJSON(),savedAt=Date.now();
     const drafts=JSON.parse(JSON.stringify(this.fieldDrafts)) as FieldDrafts;
     const standDrafts=JSON.parse(JSON.stringify(this.standDrafts)) as Record<string,StandDraft>;
-    try {localStorage.setItem(this.localKey,JSON.stringify({state:snapshot,savedAt,drafts,standDrafts}));this.saveStatus='Guardado local · sincronizando…';} catch {this.saveStatus='Almacenamiento local no disponible · sincronizando…';}
+    let savedLocally=false;
+    try {localStorage.setItem(this.localKey,JSON.stringify({state:snapshot,savedAt,drafts,standDrafts}));savedLocally=true;this.saveStatus='Guardado local · sincronizando…';} catch {this.saveStatus='Almacenamiento local no disponible · sincronizando…';}
     const wire={tick:Math.floor(this.state.elapsed),resources:{fuel:100,pressure:100,stability:100,telemetry:100},resolvedDecisionIds:[],log:[],apollo11:snapshot,apollo11SavedAt:savedAt,apollo11Drafts:drafts,apollo11StandDrafts:standDrafts} as unknown as MissionSaveState;
     this.saveQueue=this.saveQueue.catch(()=>{}).then(async()=>{
       try {await progressApi.autosave(SLUG,wire,snapshot.done?100:(snapshot.completed.length+snapshot.bonusCompleted.length)/15*100);this.saveStatus='Registro guardado y sincronizado';}
-      catch {this.saveStatus='Guardado local · sin conexión al servidor';}
+      catch {this.saveStatus=savedLocally?'Guardado local · sin conexión al servidor':'No se pudo guardar · conserva esta sesión e intenta de nuevo';}
       if(!this.disposed)this.renderObjective();
     });
     return this.saveQueue;
