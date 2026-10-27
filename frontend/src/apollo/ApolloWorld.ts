@@ -97,7 +97,7 @@ export class ApolloWorld {
       cyl: (rt, rb, h, material, x, y, z, rx = 0, rz = 0) => { const mesh = this.cylinder(rt, rb, h, material, x, y, z); mesh.rotation.x = rx; mesh.rotation.z = rz; },
       ball: (r, material, x, y, z, squash = 1, dome = false) => { const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 12, dome ? 6 : 10, 0, Math.PI * 2, dome ? 0 : 0, dome ? Math.PI / 2 : Math.PI), material); mesh.position.set(x, y, z); mesh.scale.y = squash; mesh.castShadow = true; this.staticBuffers.set(material, [...(this.staticBuffers.get(material) ?? []), mesh.geometry.clone().applyMatrix4(mesh.matrix)]); },
       tube: (a, b, width, material) => this.beam(a, b, width, material),
-      sheet: (w, d, tex, x, y, z, tilt = 0) => { const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); mesh.rotation.x = -Math.PI / 2 + tilt; mesh.position.set(x, y, z); this.scene.add(mesh); },
+      sheet: (w, d, tex, x, y, z, tilt = 0) => { const mesh = new THREE.Mesh(this.planeGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })); mesh.rotation.x = -Math.PI / 2 + tilt; mesh.position.set(x, y, z); this.scene.add(mesh); },
     };
     const conservativeRenderer = useConservativeRenderer();
     this.renderer = new THREE.WebGLRenderer({
@@ -187,6 +187,17 @@ export class ApolloWorld {
     if (!this.materials.has(name)) this.materials.set(name, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
     return this.materials.get(name)!;
   }
+  /** Immutable planes may share buffers only at identical dimensions. Keeping the
+   * authored size preserves bounding spheres and frustum culling for long signs. */
+  private planeGeometry(width: number, height: number): THREE.BufferGeometry {
+    const key = `plane:${width}:${height}`;
+    let geometry = this.geometries.get(key);
+    if (!geometry) {
+      geometry = new THREE.PlaneGeometry(width, height);
+      this.geometries.set(key, geometry);
+    }
+    return geometry;
+  }
   private box(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, parent?: THREE.Group, rotation = 0): THREE.Mesh {
     const geometry = new THREE.BoxGeometry(w, h, d);
     const mesh = new THREE.Mesh(geometry, material);
@@ -273,7 +284,7 @@ export class ApolloWorld {
     return tex;
   }
   private groundPlane(w: number, d: number, x: number, z: number, mat: THREE.Material, y = 0): void {
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    const plane = new THREE.Mesh(this.planeGeometry(w, d), mat);
     plane.rotation.x = -Math.PI / 2; plane.position.set(x, y, z); plane.receiveShadow = true;
     this.scene.add(plane);
   }
@@ -429,7 +440,7 @@ export class ApolloWorld {
     x.fillStyle = '#25334f'; x.fillRect(0, 0, 77, 54);
     x.fillStyle = '#fff'; for (let r = 0; r < 5; r++) for (let k = 0; k < 6; k++) x.fillRect(6 + k * 12, 5 + r * 10, 3, 3);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.32), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    return new THREE.Mesh(this.planeGeometry(2.5, 1.32), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
   }
   private buildBuildings(): void {
     const wall = this.material('building', 0xc2c2b7, 0.87);
@@ -538,7 +549,7 @@ export class ApolloWorld {
   }
   private textPlane(text: string, w: number, h: number, color: string, background: boolean): THREE.Mesh {
     const tex = this.textTexture(text, color, background);
-    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.FrontSide }));
+    return new THREE.Mesh(this.planeGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: !background, side: THREE.FrontSide }));
   }
   private textTexture(text: string, color: string, background: boolean): THREE.CanvasTexture {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
@@ -638,7 +649,7 @@ export class ApolloWorld {
       const width = 460 + random() * 260;
       const height = 100 + random() * 55;
       for (let layer = 0; layer < 2; layer++) {
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), materials[(i + layer) % materials.length]);
+        const mesh = new THREE.Mesh(this.planeGeometry(1, 1), materials[(i + layer) % materials.length]);
         mesh.position.set((random() - 0.5) * width * 0.24, (layer - 1) * 18, (layer - 1) * 16);
         mesh.rotation.y = (random() - 0.5) * 0.12;
         mesh.scale.set(width * (1 - layer * 0.11), height * (1 - layer * 0.08), 1);
@@ -1007,7 +1018,7 @@ export class ApolloWorld {
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp); window.removeEventListener('blur', this.onBlur);
     this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown); this.renderer.domElement.removeEventListener('pointermove', this.onPointerMove); this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp); this.renderer.domElement.removeEventListener('pointercancel', this.onPointerUp);
     this.mixers.forEach(m => m.stopAllAction());
-    this.disposeObject(this.scene); this.sun.shadow.map?.dispose();
+    this.disposeObject(this.scene); this.geometries.clear(); this.sun.shadow.map?.dispose();
     this.environmentTarget?.dispose();
     this.renderer.dispose(); this.renderer.domElement.remove();
   }
