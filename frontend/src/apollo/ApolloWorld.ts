@@ -31,7 +31,8 @@ export class ApolloWorld {
   readonly ready: Promise<void>;
   readonly assetErrors: string[] = [];
   yaw = 0;
-  private pitch = 0.28;
+  // Vertical orbit offset: dragging upward raises the view toward the sky.
+  private pitch = 0.22;
   private zoomed = false;
   private keys = new Set<string>();
   private suspended = false;
@@ -48,7 +49,7 @@ export class ApolloWorld {
   private van = new THREE.Group();
   private arms: THREE.Group[] = [];
   private crew: THREE.Group[] = [];
-  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null }[] = [];
+  private people: { root: THREE.Group; mixer: THREE.AnimationMixer; walk: THREE.AnimationAction | null; idle: THREE.AnimationAction | null; run: THREE.AnimationAction | null; jump: THREE.AnimationAction | null }[] = [];
   private mixers: THREE.AnimationMixer[] = [];
   private colliders: Collider[] = [];
   private sun = new THREE.DirectionalLight(0xfff0d3, 3.2);
@@ -643,10 +644,15 @@ export class ApolloWorld {
         const mixer = new THREE.AnimationMixer(model);
         const walking = gltf.animations.find(c => /walk/i.test(c.name));
         const idling = gltf.animations.find(c => /idle/i.test(c.name));
+        const running = gltf.animations.find(c => /run/i.test(c.name));
+        const jumping = gltf.animations.find(c => /jump|fall|airborne/i.test(c.name));
         const walk = walking ? mixer.clipAction(walking).setEffectiveWeight(i ? 1 : 0).play() : null;
         const idle = idling ? mixer.clipAction(idling).setEffectiveWeight(i ? 0 : 1).play() : null;
+        const run = running ? mixer.clipAction(running).setEffectiveWeight(0).play() : null;
+        const jump = jumping ? mixer.clipAction(jumping).setEffectiveWeight(0) : null;
+        if (jump) { jump.setLoop(THREE.LoopOnce, 1); jump.clampWhenFinished = true; }
         if (walk) walk.time = i * 0.35;
-        this.people.push({ root: holder, mixer, walk, idle }); this.mixers.push(mixer);
+        this.people.push({ root: holder, mixer, walk, idle, run, jump }); this.mixers.push(mixer);
       }
       this.crewRoot.visible = false;
       // Ambient technical staff use a cheap authored period-uniform rig, not a fifth
@@ -752,19 +758,30 @@ export class ApolloWorld {
     const moving = this.move(dt);
     if (!this.suspended && !this.mode && this.keys.has(' ') && this.grounded) {
       this.verticalVelocity = 6.4; this.grounded = false; this.keys.delete(' ');
+      const jump = this.people[0]?.jump;
+      jump?.reset().setEffectiveWeight(1).play();
     }
     if (!this.grounded) {
       this.verticalVelocity -= 18 * dt;
       this.player.y = Math.max(0, this.player.y + this.verticalVelocity * dt);
-      if (this.player.y === 0) { this.verticalVelocity = 0; this.grounded = true; }
+      if (this.player.y === 0) {
+        this.verticalVelocity = 0; this.grounded = true;
+        this.people[0]?.jump?.stop().setEffectiveWeight(0);
+      }
     }
     this.playerRoot.position.copy(this.player);
     // The observation site is genuinely 5.6 km away: keep humid distance haze
     // subtle enough for the long lens instead of hiding the rocket in dense fog.
     if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.density = this.player.z > 5000 || this.mode === 'launch' ? 0.00004 : 0.00038;
     for (let i = 0; i < this.people.length; i++) {
-      const p = this.people[i]; const walking = i === 0 ? moving : this.mode === 'crew';
-      p.walk?.setEffectiveWeight(walking ? 1 : 0); p.idle?.setEffectiveWeight(walking ? 0 : 1);
+      const p = this.people[i];
+      const airborne = i === 0 && !this.grounded;
+      const walking = i === 0 ? moving : this.mode === 'crew';
+      const running = i === 0 && walking && this.keys.has('shift');
+      p.walk?.setEffectiveWeight(!airborne && walking && !running ? 1 : 0);
+      p.run?.setEffectiveWeight(!airborne && running ? 1 : 0);
+      p.idle?.setEffectiveWeight(!airborne && !walking ? 1 : 0);
+      if (!p.jump || !airborne) p.jump?.setEffectiveWeight(0);
       if (i === 0 || this.mode === 'crew') p.mixer.update(dt);
     }
     if (this.target.visible) { this.target.children[1].rotation.y += dt; this.target.children[1].position.y = 3.8 + Math.sin(this.clock * 2) * 0.22; }
@@ -777,8 +794,8 @@ export class ApolloWorld {
       this.camera.lookAt(this.inspectionPosition);this.camera.fov=this.inspectionTarget==='vab'?18:35;this.camera.updateProjectionMatrix();
     } else {
       const followDistance = 5.8;
-      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * followDistance, this.player.y + 3.35 + this.pitch, this.player.z + Math.cos(this.yaw) * followDistance);
-      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 2, this.player.z - Math.cos(this.yaw) * 6.3);
+      this.cameraGoal.set(this.player.x + Math.sin(this.yaw) * followDistance, this.player.y + 3.35 + this.pitch * 0.9, this.player.z + Math.cos(this.yaw) * followDistance);
+      this.cameraLook.set(this.player.x - Math.sin(this.yaw) * 6.3, this.player.y + 1.4 + this.pitch * 3, this.player.z - Math.cos(this.yaw) * 6.3);
       this.camera.position.lerp(this.cameraGoal, 1 - Math.exp(-dt * 7)); this.camera.lookAt(this.cameraLook);
       if (this.player.z > 5000) { this.camera.position.set(this.player.x, 5, this.player.z); this.camera.lookAt(0, 64, 0); }
       this.camera.fov = this.player.z > 5000 ? 3.4 : this.zoomed ? 22 : 62; this.camera.updateProjectionMatrix();
@@ -867,7 +884,9 @@ export class ApolloWorld {
   private onPointerMove = (event: PointerEvent): void => {
     if (!this.lastPointer || this.suspended || this.mode) return;
     this.yaw -= (event.clientX - this.lastPointer.x) * 0.004;
-    this.pitch = clamp(this.pitch + (event.clientY - this.lastPointer.y) * 0.003, -0.2, 1);
+    // Screen-up drag should look up. The wider range makes it possible to
+    // follow the full Saturn V stack without allowing an upside-down view.
+    this.pitch = clamp(this.pitch - (event.clientY - this.lastPointer.y) * 0.004, -0.65, 1.8);
     this.lastPointer = { x: event.clientX, y: event.clientY };
   };
   private onPointerUp = (): void => { this.lastPointer = null; };
