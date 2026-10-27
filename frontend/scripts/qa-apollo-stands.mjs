@@ -101,7 +101,15 @@ try {
  for(const [name,value]of[['S-IVB',62],['Enlace',74],['Plataforma',58]])await range(name,value);
  await page.getByRole('button',{name:'Fijar enlace'}).click();await finish();checks.push('Telemetry: misalignment rejected; all three tuners verified.');
  await open('weather');await range('Rumbo de veleta',225);await range('Obturador de nubosidad',35);await page.getByRole('button',{name:'Sellar parte de observación'}).click();await finish();checks.push('Weather: vane and cloud plate matched.');
+ await page.evaluate(()=>{const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(x,y,r,...args){if(r===35)window.reticle=[x,y];return arc.call(this,x,y,r,...args)}});
  await open('beacons');const r=await page.locator('.ap-perimeter canvas').boundingBox();
+ await page.locator('.ap-perimeter canvas').focus();await page.keyboard.down('ArrowRight');await page.waitForTimeout(100);
+ // Headless tabs do not consistently emit window focus events; exercise the
+ // lifecycle event explicitly while the arrow is held, before releasing it.
+ await page.evaluate(()=>window.dispatchEvent(new Event('blur')));const reticle=await page.evaluate(()=>window.reticle);await page.waitForTimeout(300);assert.deepEqual(await page.evaluate(()=>window.reticle),reticle);
+ await page.keyboard.up('ArrowRight');await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await page.mouse.move(r.x+r.width*.22,r.y+r.height*.3);await page.waitForTimeout(550);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForTimeout(1400);assert.equal(await page.evaluate(()=>handle.snapshot().scanned[0]),false);
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));checks.push('Perimeter lifecycle: explicit blur clears held arrows and cannot finish an interrupted dwell.');
  for(const [x,y]of[[.22,.3],[.73,.65],[.48,.24]]){await page.mouse.move(r.x+r.width*x,r.y+r.height*y,{steps:8});await page.waitForTimeout(1450);}
  await finish();checks.push('Perimeter: three continuous dwell scans succeed.');
  await open('cables');await drag(2,0);await drag(0,1);const draft=await page.evaluate(()=>handle.snapshot());

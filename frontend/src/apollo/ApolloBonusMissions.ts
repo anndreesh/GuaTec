@@ -214,12 +214,16 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
     snapshot=()=>({version:1,kind:bonus.kind,scanned:[...recorded]});
     update(recorded.filter(Boolean).length/3,recorded.filter(Boolean).length+' / 3 BALIZAS REGISTRADAS');
     let aim = { x: .5, y: .7 };
+    let active=true;
+    const suspendScan=()=>{active=false;keys.clear();lock.fill(0);};
+    listen(window,'blur',suspendScan);listen(window,'focus',()=>{active=!document.hidden;});
+    listen(document,'visibilitychange',()=>{if(document.hidden)suspendScan();else active=true;});
     const pointer = (event: PointerEvent) => { const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return; aim = { x: Math.max(0, Math.min(1, (event.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (event.clientY - r.top) / r.height)) }; };
     listen<PointerEvent>(canvas, 'pointerdown', e => { canvas.focus(); canvas.setPointerCapture(e.pointerId); pointer(e); }); listen<PointerEvent>(canvas, 'pointermove', pointer);
     listen<KeyboardEvent>(canvas, 'keydown', e => { if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); } }); listen<KeyboardEvent>(canvas, 'keyup', e => keys.delete(e.key)); listen(canvas, 'blur', () => keys.clear());
     view.append(canvas); workspace.append(view);
     animate((dt, time) => {
-      if (complete) return;
+      if (complete || !active) return;
       aim.x = Math.max(0, Math.min(1, aim.x + (Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft'))) * dt * .35)); aim.y = Math.max(0, Math.min(1, aim.y + (Number(keys.has('ArrowDown')) - Number(keys.has('ArrowUp'))) * dt * .6));
       const c = canvas.getContext('2d')!; c.fillStyle = '#122a28'; c.fillRect(0, 0, 800, 400); c.strokeStyle = '#2c4940'; c.lineWidth = 1;
       for (let x = 0; x < 800; x += 50) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 400); c.stroke(); } for (let y = 0; y < 400; y += 50) { c.beginPath(); c.moveTo(0, y); c.lineTo(800, y); c.stroke(); }
