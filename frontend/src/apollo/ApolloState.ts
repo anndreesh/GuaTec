@@ -26,6 +26,8 @@ export interface ApolloBonusCheckpoint {
   readonly objective: string;
   readonly target: { readonly x: number; readonly z: number };
   readonly kind: ApolloBonusKind;
+  /** Earlier stands that must be complete before this one can be registered. */
+  readonly requires?: readonly string[];
 }
 
 /** Mandatory field stands: they extend the historical route with hands-on operations. */
@@ -36,34 +38,34 @@ export const BONUS_CHECKPOINTS: readonly ApolloBonusCheckpoint[] = [
     target: { x: -48, z: 190 }, kind: 'sequence',
   },
   {
-    id: 'telemetry-rack', title: 'Rack de telemetría',
-    objective: 'Ajusta tres lecturas analógicas para estabilizar el enlace de datos de la plataforma.',
-    target: { x: 40, z: 290 }, kind: 'telemetry',
+    id: 'flight-record', title: 'Plan de vuelo',
+    objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
+    target: { x: 42, z: 180 }, kind: 'flight-plan', requires: ['power-bus'],
   },
   {
-    id: 'pad-safety', title: 'Perímetro de seguridad',
-    objective: 'Confirma los tres balizadores del perímetro antes de abrir la ruta de servicio.',
-    target: { x: 44, z: 365 }, kind: 'beacons',
+    id: 'telemetry-rack', title: 'Rack de telemetría',
+    objective: 'Ajusta tres lecturas analógicas para estabilizar el enlace de datos de la plataforma.',
+    target: { x: 40, z: 290 }, kind: 'telemetry', requires: ['flight-record'],
   },
   {
     id: 'umbilical-check', title: 'Conexiones umbilicales',
     objective: 'Une los cuatro nodos de servicio en el orden correcto para confirmar la continuidad del conjunto.',
-    target: { x: -45, z: 285 }, kind: 'cables',
-  },
-  {
-    id: 'weather-window', title: 'Ventana meteorológica',
-    objective: 'Ajusta viento, humedad y nubosidad para emitir el parte de condiciones de lanzamiento.',
-    target: { x: 95, z: 315 }, kind: 'weather',
-  },
-  {
-    id: 'flight-record', title: 'Plan de vuelo',
-    objective: 'Ordena cuatro tarjetas de operación para reconstruir la secuencia de salida del Apollo 11.',
-    target: { x: 42, z: 180 }, kind: 'flight-plan',
+    target: { x: -45, z: 285 }, kind: 'cables', requires: ['telemetry-rack'],
   },
   {
     id: 'crew-manifest', title: 'Manifiesto de tripulación',
     objective: 'Verifica que cada astronauta esté asociado con su asiento y distintivo antes del traslado a la plataforma.',
-    target: { x: 18, z: 170 }, kind: 'crew-manifest',
+    target: { x: 18, z: 170 }, kind: 'crew-manifest', requires: ['umbilical-check'],
+  },
+  {
+    id: 'weather-window', title: 'Ventana meteorológica',
+    objective: 'Ajusta viento, humedad y nubosidad para emitir el parte de condiciones de lanzamiento.',
+    target: { x: 95, z: 315 }, kind: 'weather', requires: ['crew-manifest'],
+  },
+  {
+    id: 'pad-safety', title: 'Perímetro de seguridad',
+    objective: 'Confirma los tres balizadores del perímetro antes de abrir la ruta de servicio.',
+    target: { x: 44, z: 365 }, kind: 'beacons', requires: ['weather-window'],
   },
 ];
 
@@ -289,7 +291,8 @@ export class ApolloState {
   }
 
   completeBonus(id: string): boolean {
-    if (!BONUS_CHECKPOINTS.some(bonus => bonus.id === id) || this.bonusCompleted.includes(id)) return false;
+    const bonus = BONUS_CHECKPOINTS.find(entry => entry.id === id);
+    if (!bonus || this.bonusCompleted.includes(id) || bonus.requires?.some(required => !this.bonusCompleted.includes(required))) return false;
     this.bonusCompleted.push(id);
     return true;
   }

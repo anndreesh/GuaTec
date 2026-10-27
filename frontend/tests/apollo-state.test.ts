@@ -3,8 +3,13 @@ import assert from 'node:assert/strict';
 import { ApolloState, BONUS_CHECKPOINTS, CHECKPOINTS, DIALOGUES } from '../src/apollo/ApolloState';
 
 function completeCheckpoint(state: ApolloState): void {
+  const completeStand = (id: string): void => {
+    const stand = BONUS_CHECKPOINTS.find(entry => entry.id === id)!;
+    for (const required of stand.requires ?? []) completeStand(required);
+    if (!state.bonusCompleted.includes(id)) assert.equal(state.completeBonus(id), true, `stand ${id}`);
+  };
   for (const action of state.current.actions) {
-    for (const required of action.requiresBonus ?? []) assert.equal(state.completeBonus(required), true);
+    for (const required of action.requiresBonus ?? []) completeStand(required);
     assert.equal(state.act(action.id), true);
   }
 }
@@ -109,6 +114,7 @@ test('dependent documentation, communication and authorization actions require t
   assert.equal(state.act('log'), true);
   assert.equal(state.act('report'), true);
   assert.equal(state.act('identify'), false);
+  assert.equal(state.completeBonus('telemetry-rack'), true);
   assert.equal(state.completeBonus('umbilical-check'), true);
   assert.equal(state.act('identify'), true);
   assert.equal(state.current.id, 'communications');
@@ -116,13 +122,12 @@ test('dependent documentation, communication and authorization actions require t
   assert.equal(state.act('antenna'), true);
   assert.equal(state.act('ready'), false);
   assert.equal(state.act('signal'), true);
-  assert.equal(state.completeBonus('telemetry-rack'), true);
   assert.equal(state.act('ready'), true);
   completeCheckpoint(state);
   assert.equal(state.current.id, 'observation');
-  assert.equal(state.act('authorize'), false);
+  assert.equal(state.act('authorize'), false, 'authorize before camera/audio');
   assert.equal(state.act('audio'), true);
-  assert.equal(state.act('authorize'), false);
+  assert.equal(state.act('authorize'), false, 'authorize before camera');
   assert.equal(state.act('camera'), true);
   assert.equal(state.completeBonus('weather-window'), true);
   assert.equal(state.completeBonus('pad-safety'), true);
@@ -140,6 +145,7 @@ test('restoring checks without prerequisites cannot grant an earned checkpoint',
   assert.deepEqual(new ApolloState(state.toJSON()).checks, ['log', 'report']);
   state.act('identify');
   assert.equal(new ApolloState({ ...state.toJSON(), checks: ['ready'] }).checkpoint, 0);
+  state.completeBonus('telemetry-rack');
   state.completeBonus('umbilical-check');
   assert.equal(state.act('identify'), true);
   completeCheckpoint(state); completeCheckpoint(state);
@@ -156,7 +162,7 @@ test('checkpoint and dialogue data are internally consistent', () => {
     assert.ok(Number.isFinite(checkpoint.target.x) && Number.isFinite(checkpoint.target.z));
     assert.ok(DIALOGUES.some(dialogue => dialogue.checkpoint === index && dialogue.trigger === 'enter'));
   });
-  assert.deepEqual(BONUS_CHECKPOINTS.map(bonus => bonus.id), ['power-bus', 'telemetry-rack', 'pad-safety', 'umbilical-check', 'weather-window', 'flight-record', 'crew-manifest']);
+  assert.deepEqual(BONUS_CHECKPOINTS.map(bonus => bonus.id), ['power-bus', 'flight-record', 'telemetry-rack', 'umbilical-check', 'crew-manifest', 'weather-window', 'pad-safety']);
   for (const dialogue of DIALOGUES) {
     assert.ok(dialogue.checkpoint >= 0 && dialogue.checkpoint < 8);
     assert.ok(dialogue.duration >= 1 && dialogue.text.length > 20);

@@ -10,10 +10,15 @@ test('mandatory stands complete independently and persist alongside the historic
   assert.equal(state.checkpoint, 0);
   assert.deepEqual(state.bonusCompleted, [BONUS_CHECKPOINTS[0]!.id]);
   assert.equal(state.completeBonus(BONUS_CHECKPOINTS[0]!.id), false);
+  assert.equal(state.completeBonus('telemetry-rack'), false);
+  assert.equal(state.completeBonus('flight-record'), true);
+  assert.equal(state.completeBonus('telemetry-rack'), true);
 });
 
 test('bonus progress survives saves and rejects unknown bonus ids', () => {
   const state = new ApolloState();
+  state.completeBonus('power-bus');
+  state.completeBonus('flight-record');
   state.completeBonus('telemetry-rack');
   const save = state.toJSON();
   assert.deepEqual(new ApolloState(JSON.parse(JSON.stringify(save))).toJSON(), save);

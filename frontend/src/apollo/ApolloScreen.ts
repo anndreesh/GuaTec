@@ -236,7 +236,9 @@ export class ApolloScreen implements Screen {
     const missing=BONUS_CHECKPOINTS.filter(bonus=>blocked?.requiresBonus?.includes(bonus.id)&&!this.state.bonusCompleted.includes(bonus.id));
     if(missing?.length) this.hud.append(el('small','ap-bonus-gate',`REQUERIDO PARA AVANZAR · ${missing.map(bonus=>bonus.title).join(' · ')}`));
     const bonusStatus=el('small','ap-bonus-status',`STANDS OBLIGATORIOS · ${this.state.bonusCompleted.length} / ${BONUS_CHECKPOINTS.length} COMPLETADOS`);
-    this.hud.append(checklist,bonusStatus,el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
+    const nextBonus=BONUS_CHECKPOINTS.find(bonus=>!this.state.bonusCompleted.includes(bonus.id));
+    const nextStand=nextBonus ? el('small','ap-bonus-next',`SIGUIENTE STAND · ${nextBonus.title}`) : null;
+    this.hud.append(checklist,bonusStatus,...(nextStand?[nextStand]:[]),el('small','ap-save',this.saveStatus || 'Guardado automático al completar cada etapa'));
     this.world?.setTarget(this.state.done?null:cp.target);
     this.world?.setBonusStatus(this.state.bonusCompleted);
     this.world?.setStationStatus(this.state.completed,cp.id);
@@ -285,6 +287,8 @@ export class ApolloScreen implements Screen {
   private openBonusMission(id:string) {
     const bonus=BONUS_CHECKPOINTS.find(entry=>entry.id===id);
     if(!bonus || this.state.bonusCompleted.includes(id)) return;
+    const missing=BONUS_CHECKPOINTS.filter(entry=>bonus.requires?.includes(entry.id)&&!this.state.bonusCompleted.includes(entry.id));
+    if(missing?.length) { this.notify(`STAND BLOQUEADO · COMPLETA ${missing[0]!.title}`); return; }
     this.modalKind='bonus';
     const box=this.openModal('STAND OBLIGATORIO · OPERACIÓN DE APOYO',bonus.title);
     this.bonusMission=mountBonusMission(box,bonus,{onFeedback:kind=>this.audio.bonusFeedback(kind),onComplete:()=>{

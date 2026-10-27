@@ -138,68 +138,74 @@ export function mountBonusMission(host: HTMLElement, bonus: ApolloBonusCheckpoin
 
   if (bonus.kind === 'cables') {
     const target = [0, 2, 1, 3];
-    let progress = 0;
     const nodes = node('div', 'ap-bonus-cable-nodes');
-    const readout = node('div', 'ap-bonus-readout', 'CONTINUIDAD · 0 / 4 NODOS');
-    target.forEach((_, index) => {
-      const terminal = node('button', 'ap-bonus-cable-node', `N-${index + 1}`); terminal.type = 'button';
-      terminal.setAttribute('aria-label', `Nodo de servicio ${index + 1}`);
-      listen(terminal, 'click', () => {
-        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
-        if (index !== target[progress]) { progress = 0; nodes.querySelectorAll('.ap-bonus-cable-node--active').forEach(item => item.classList.remove('ap-bonus-cable-node--active')); readout.textContent = 'CONTINUIDAD · RUTA ABIERTA'; fail('Conexión inválida · el relé aisló el circuito.'); return; }
-        progress += 1; terminal.classList.add('ap-bonus-cable-node--active'); readout.textContent = `CONTINUIDAD · ${progress} / 4 NODOS`;
-        if (progress === target.length) finish('Continuidad confirmada · umbilical listo.');
+    const readout = node('div', 'ap-bonus-readout', 'CONTINUIDAD · ARRASTRA LOS NODOS A LA RUTA');
+    const order = [0, 1, 2, 3];
+    let dragged = -1;
+    const render = () => {
+      nodes.replaceChildren();
+      order.forEach((value, slot) => {
+        const terminal = node('button', 'ap-bonus-cable-node', `N-${value + 1}`); terminal.type = 'button'; terminal.draggable = true;
+        terminal.setAttribute('aria-label', `Nodo de servicio ${value + 1}, posición ${slot + 1}`);
+        listen(terminal, 'dragstart', () => { dragged = slot; terminal.classList.add('ap-bonus-dragging'); });
+        listen(terminal, 'dragend', () => terminal.classList.remove('ap-bonus-dragging'));
+        listen(terminal, 'dragover', event => event.preventDefault());
+        listen(terminal, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `CONTINUIDAD · ${order.map(value => `N-${value + 1}`).join(' · ')}`; });
+        nodes.append(terminal);
       });
-      nodes.append(terminal);
-    });
-    stage.append(readout, nodes, node('small', 'ap-bonus-hint', 'Sigue la ruta marcada por el pulso: N-1 · N-3 · N-2 · N-4.'));
+    };
+    const confirm = node('button', 'ap-bonus-action', 'Verificar conexiones'); confirm.type = 'button';
+    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Continuidad confirmada · umbilical listo.') : fail('Ruta incorrecta · reordena los nodos hasta cerrar el circuito.'));
+    render(); stage.append(readout, nodes, confirm, node('small', 'ap-bonus-hint', 'Arrastra los nodos para formar la ruta: N-1 · N-3 · N-2 · N-4.'));
   }
 
   if (bonus.kind === 'flight-plan') {
     const target = [2, 0, 3, 1];
-    let progress = 0;
     const cards = node('div', 'ap-bonus-flight-cards');
-    const readout = node('div', 'ap-bonus-readout', 'SECUENCIA DE SALIDA · 0 / 4 TARJETAS');
+    const readout = node('div', 'ap-bonus-readout', 'SECUENCIA DE SALIDA · ARRASTRA LAS TARJETAS');
     const labels = ['T−10 · autorización', 'T−05 · brazos', 'T−00 · ignición', 'T+01 · ascenso'];
-    target.forEach((_, index) => {
-      const card = node('button', 'ap-bonus-flight-card', labels[index]!); card.type = 'button';
-      card.setAttribute('aria-label', labels[index]!);
-      listen(card, 'click', () => {
-        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
-        if (index !== target[progress]) { progress = 0; cards.querySelectorAll('.ap-bonus-flight-card--active').forEach(item => item.classList.remove('ap-bonus-flight-card--active')); readout.textContent = 'SECUENCIA DE SALIDA · REVISAR'; fail('Orden incorrecto · las tarjetas regresaron a la bandeja.'); return; }
-        progress += 1; card.classList.add('ap-bonus-flight-card--active'); readout.textContent = `SECUENCIA DE SALIDA · ${progress} / 4 TARJETAS`;
-        if (progress === target.length) finish('Plan verificado · secuencia de salida archivada.');
+    const order = [0, 1, 2, 3];
+    let dragged = -1;
+    const render = () => {
+      cards.replaceChildren();
+      order.forEach((value, slot) => {
+        const card = node('button', 'ap-bonus-flight-card', labels[value]!); card.type = 'button'; card.draggable = true;
+        card.setAttribute('aria-label', `${labels[value]}, posición ${slot + 1}`);
+        listen(card, 'dragstart', () => { dragged = slot; card.classList.add('ap-bonus-dragging'); });
+        listen(card, 'dragend', () => card.classList.remove('ap-bonus-dragging'));
+        listen(card, 'dragover', event => event.preventDefault());
+        listen(card, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `SECUENCIA · ${order.map(value => labels[value]!.split(' · ')[0]).join(' → ')}`; });
+        cards.append(card);
       });
-      cards.append(card);
-    });
-    stage.append(readout, cards, node('small', 'ap-bonus-hint', 'Reconstruye la secuencia: T−00 · T−10 · T+01 · T−05.'));
+    };
+    const confirm = node('button', 'ap-bonus-action', 'Verificar secuencia'); confirm.type = 'button';
+    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Plan verificado · secuencia de salida archivada.') : fail('Orden incorrecto · reordena las tarjetas antes de confirmar.'));
+    render(); stage.append(readout, cards, confirm, node('small', 'ap-bonus-hint', 'Arrastra para reconstruir: T−00 · T−10 · T+01 · T−05.'));
   }
 
   if (bonus.kind === 'crew-manifest') {
     const target = [2, 0, 1];
-    let progress = 0;
     const readout = node('div', 'ap-bonus-readout', 'MANIFIESTO · 0 / 3 ASIGNACIONES');
     const cards = node('div', 'ap-bonus-crew-cards');
     const labels = ['ARMSTRONG · COMANDANTE', 'COLLINS · PILOTO CM', 'ALDRIN · PILOTO LM'];
     const seats = ['ASIENTO A', 'ASIENTO B', 'ASIENTO C'];
-    target.forEach((_expected, index) => {
-      const card = node('button', 'ap-bonus-crew-card', `${labels[index]}\n${seats[index]}`); card.type = 'button';
-      card.setAttribute('aria-label', `${labels[index]}, ${seats[index]}`);
-      listen(card, 'click', () => {
-        if (disposed || stage.classList.contains('ap-bonus-stage--complete')) return;
-        if (index !== target[progress]) {
-          progress = 0;
-          cards.querySelectorAll('.ap-bonus-crew-card--active').forEach(item => item.classList.remove('ap-bonus-crew-card--active'));
-          readout.textContent = 'MANIFIESTO · REVISAR ASIGNACIONES';
-          fail('Asignación incorrecta · el manifiesto volvió a la bandeja.');
-          return;
-        }
-        progress += 1; card.classList.add('ap-bonus-crew-card--active'); readout.textContent = `MANIFIESTO · ${progress} / 3 ASIGNACIONES`;
-        if (progress === target.length) finish('Manifiesto verificado · traslado autorizado.');
+    const order = [0, 1, 2];
+    let dragged = -1;
+    const render = () => {
+      cards.replaceChildren();
+      order.forEach((value, slot) => {
+        const card = node('button', 'ap-bonus-crew-card', `${labels[value]}\n${seats[slot]}`); card.type = 'button'; card.draggable = true;
+        card.setAttribute('aria-label', `${labels[value]}, ${seats[slot]}`);
+        listen(card, 'dragstart', () => { dragged = slot; card.classList.add('ap-bonus-dragging'); });
+        listen(card, 'dragend', () => card.classList.remove('ap-bonus-dragging'));
+        listen(card, 'dragover', event => event.preventDefault());
+        listen(card, 'drop', event => { event.preventDefault(); if (dragged < 0 || dragged === slot) return; const [moved] = order.splice(dragged, 1); order.splice(slot, 0, moved!); dragged = -1; render(); readout.textContent = `MANIFIESTO · ${order.map(value => labels[value]!.split(' · ')[0]).join(' → ')}`; });
+        cards.append(card);
       });
-      cards.append(card);
-    });
-    stage.append(readout, cards, node('small', 'ap-bonus-hint', 'Asocia cada distintivo con su asiento en el orden del manifiesto: Aldrin · Armstrong · Collins.'));
+    };
+    const confirm = node('button', 'ap-bonus-action', 'Verificar manifiesto'); confirm.type = 'button';
+    listen(confirm, 'click', () => order.every((value, index) => value === target[index]) ? finish('Manifiesto verificado · traslado autorizado.') : fail('Asignación incorrecta · reordena las tarjetas antes de confirmar.'));
+    render(); stage.append(readout, cards, confirm, node('small', 'ap-bonus-hint', 'Arrastra los distintivos para sentar a la tripulación: Aldrin · Armstrong · Collins.'));
   }
 
   const cancel = node('button', 'ap-button ap-bonus-cancel', 'Volver a operaciones'); cancel.type = 'button';
