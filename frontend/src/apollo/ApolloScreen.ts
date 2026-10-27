@@ -404,6 +404,8 @@ export class ApolloScreen implements Screen {
     if(!this.world || !this.started || this.modal)return;
     this.modalKind='pause';
     const box=this.openModal('OPERACIONES EN PAUSA','Un momento antes de la historia');
+    box.classList.add('ap-pause-dialog');
+    box.append(el('div','ap-pause-status','MISSION CONTROL · APOLLO 11 · KENNEDY SPACE CENTER'),el('p','ap-pause-intro','La misión está detenida. Revisa el estado operativo y retoma el recorrido cuando estés listo.'));
     const grid=el('div','ap-pause-grid');
     const mute=this.pauseControl(this.audio.muted?'🔇':'🔊',this.audio.muted?'Activar audio':'Silenciar audio',()=>{this.audio.toggle();this.voice.setVolume(this.audio.muted?0:.82);this.openPause();});
     const restart=this.pauseControl('↻','Reiniciar misión',()=>this.confirmReset());
@@ -445,16 +447,15 @@ export class ApolloScreen implements Screen {
     const c=canvas.getContext('2d');if(!c)return;
     const w=canvas.width,h=canvas.height, sx=w/400,sz=h/470;
     const p=(x:number,z:number)=>[(x+200)*sx,(z+40)*sz] as const;
-    c.fillStyle='#101e23';c.fillRect(0,0,w,h);
+    c.fillStyle='#b9ad8d';c.fillRect(0,0,w,h);
     c.strokeStyle='#25373a';c.lineWidth=1;
     for(let x=0;x<w;x+=w/10){c.beginPath();c.moveTo(x,0);c.lineTo(x,h);c.stroke();}
     for(let y=0;y<h;y+=h/10){c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();}
-    c.fillStyle='#173847';c.fillRect(w*.88,0,w*.12,h);
     c.strokeStyle='#6b7773';c.lineWidth=Math.max(3,w*.018);c.beginPath();
-    // Same asphalt segments and building footprints as ApolloWorld.buildGround().
+    // Same soil, service roads and building footprints as ApolloWorld.buildGround().
     const road=(x1:number,z1:number,x2:number,z2:number)=>{const [a,b]=p(x1,z1),[d,e]=p(x2,z2);c.beginPath();c.moveTo(a,b);c.lineTo(d,e);c.stroke();};
-    road(0,-40,0,430);c.lineWidth=Math.max(2,w*.012);
-    road(-90,145,90,145);road(-82.5,250,82.5,250);road(-90,210,10,210);road(-65,365,65,365);
+    road(0,40,0,500);c.lineWidth=Math.max(2,w*.012);
+    road(-95,150,95,150);road(-110,235,110,235);road(-75,355,75,355);
     c.fillStyle='#667978';
     for(const [x,z,bw,bd] of [[-125,200,26,21],[116,250,22,17],[-118,338,28,19],[120,130,24,17]]){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);}
     const [rx,rz]=p(0,0);c.fillStyle='#b55c4a30';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#c37463';c.lineWidth=1;c.stroke();

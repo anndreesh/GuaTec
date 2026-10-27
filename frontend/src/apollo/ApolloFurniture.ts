@@ -35,18 +35,21 @@ function canvasTexture(width: number, height: number, draw: (c: CanvasRenderingC
   return texture;
 }
 
-/** A hand-inked map of the coast, roads and launch complex (labels are universal symbols, not words). */
+/** A hand-inked map of the soil, service roads and launch complex. */
 function mapTexture(): THREE.CanvasTexture {
   return canvasTexture(512, 232, c => {
-    c.fillStyle = '#e8dcc0'; c.fillRect(0, 0, 512, 232);
-    c.fillStyle = '#a9b883'; c.beginPath(); c.moveTo(0, 20); c.bezierCurveTo(140, 0, 260, 60, 330, 40); c.bezierCurveTo(400, 25, 450, 90, 512, 80); c.lineTo(512, 232); c.lineTo(0, 232); c.fill();
-    c.fillStyle = '#c9d6cf'; c.beginPath(); c.moveTo(512, 80); c.bezierCurveTo(450, 90, 400, 25, 330, 40); c.bezierCurveTo(400, 0, 470, 0, 512, 0); c.fill();
-    c.strokeStyle = '#7d8a6c'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = '#c4b895'; c.fillRect(0, 0, 512, 232);
+    c.fillStyle = '#b5a984';
+    for (let i = 0; i < 28; i++) c.fillRect((i * 83) % 512, (i * 47) % 232, 38, 1);
     c.strokeStyle = 'rgba(90,70,40,0.35)'; c.lineWidth = 1;
     for (let x = 0; x <= 512; x += 32) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 232); c.stroke(); }
     for (let y = 0; y <= 232; y += 29) { c.beginPath(); c.moveTo(0, y); c.lineTo(512, y); c.stroke(); }
-    c.strokeStyle = '#4a4036'; c.lineWidth = 4; c.beginPath(); c.moveTo(40, 190); c.lineTo(250, 150); c.lineTo(360, 100); c.lineTo(470, 90); c.stroke();
-    c.lineWidth = 2; c.beginPath(); c.moveTo(250, 150); c.lineTo(250, 40); c.stroke();
+    c.strokeStyle = '#4a4036'; c.lineWidth = 7;
+    c.beginPath(); c.moveTo(256, 20); c.lineTo(256, 228); c.stroke();
+    c.lineWidth = 5;
+    for (const [y, half] of [[82, 122], [124, 142], [183, 96]] as const) {
+      c.beginPath(); c.moveTo(256 - half, y); c.lineTo(256 + half, y); c.stroke();
+    }
     c.fillStyle = '#b3282d'; c.beginPath(); c.arc(360, 100, 9, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#2d2a26'; c.fillRect(244, 34, 14, 12); c.fillRect(120, 168, 16, 12);
     c.save(); c.translate(458, 188); c.fillStyle = '#2d2a26'; c.beginPath(); c.moveTo(0, -24); c.lineTo(8, 8); c.lineTo(0, 2); c.lineTo(-8, 8); c.closePath(); c.fill(); c.font = '700 14px sans-serif'; c.textAlign = 'center'; c.fillText('N', 0, 26); c.restore();

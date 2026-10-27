@@ -5,18 +5,30 @@
 
 body.apollo-cinematic .language-menu{visibility:hidden}
 body.apollo-active .language-menu{display:none}
-.ap-pause-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 14px}
-.ap-pause-control{display:flex;align-items:center;gap:12px;min-height:76px;padding:14px;background:#162e35;border-color:#718b8755}
-.ap-pause-control:hover{background:#294850;border-color:#e7c18b}
-.ap-pause-icon{display:grid;place-items:center;width:32px;height:32px;color:#f1c77f;font-size:24px}
-.ap-pause-control strong{font-size:12px;font-weight:550}
-.ap-language-options{display:flex;gap:6px;grid-column:1 / -1;padding:4px 0}
-.ap-language-option{min-width:54px;padding:9px 12px;text-align:center}
-.ap-language-option[aria-pressed="true"]{border-color:#e7c18b;color:#f1c77f;background:#2b4a4d}
-.ap-pause-map-title{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d7c59f;margin:4px 0}
-.ap-pause-map{display:block;width:100%;height:220px;object-fit:cover;background:#101e23;border:1px solid #718b8755}
+.ap-pause-dialog{position:relative;width:min(760px,100%);padding:34px 36px 30px;background:linear-gradient(145deg,#142a31f5,#09171df7 72%);border:1px solid #d5b77855;border-top:3px solid #e2bd78;box-shadow:0 34px 100px #02080dcc, inset 0 0 0 1px #91a8a51f;overflow:hidden}
+.ap-pause-dialog::before{content:"";position:absolute;inset:12px;pointer-events:none;border:1px solid #91a8a512;background:repeating-linear-gradient(0deg,transparent 0 23px,#d8c28d06 23px 24px),linear-gradient(90deg,transparent 0 72%,#d9b87908 72% 72.2%,transparent 72.2%)}
+.ap-pause-dialog::after{content:"";position:absolute;top:0;right:0;width:180px;height:180px;pointer-events:none;background:radial-gradient(circle at 100% 0,#d2ae6630,transparent 68%)}
+.ap-pause-dialog>*{position:relative;z-index:1}
+.ap-pause-dialog .ap-kicker{display:flex;align-items:center;gap:10px;color:#e6c27e;font-size:10px;letter-spacing:.2em}
+.ap-pause-dialog .ap-kicker::before{content:"";display:block;width:28px;height:1px;background:#e6c27e;box-shadow:0 4px #e6c27e55}
+.ap-pause-dialog h1{max-width:520px;margin:10px 0 8px;color:#f2eee1;font-size:clamp(28px,4vw,44px);letter-spacing:-.04em}
+.ap-pause-status{margin:4px 0 4px;color:#b8c4b8;font-size:10px;letter-spacing:.16em}
+.ap-pause-intro{max-width:52ch;margin:0 0 24px!important;color:#9eafb0!important;font-size:12px!important;line-height:1.65!important}
+.ap-pause-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 26px}
+.ap-pause-control{position:relative;display:flex;align-items:center;gap:15px;min-height:82px;padding:15px 16px;background:linear-gradient(135deg,#1d3940e8,#10242bd9);border:1px solid #8197933d;border-radius:2px;box-shadow:inset 0 1px #ffffff0b,0 8px 18px #020b0e55;overflow:hidden}
+.ap-pause-control::after{content:"";position:absolute;left:0;bottom:0;width:34%;height:2px;background:#d6b875;transform:scaleX(.35);transform-origin:left;transition:transform .2s ease}
+.ap-pause-control:hover,.ap-pause-control:focus-visible{background:linear-gradient(135deg,#294b51,#173239);border-color:#d9b978;box-shadow:inset 0 1px #fff2,0 10px 24px #020b0e88;transform:translateY(-1px)}
+.ap-pause-control:hover::after,.ap-pause-control:focus-visible::after{transform:scaleX(1)}
+.ap-pause-icon{display:grid;place-items:center;width:38px;height:38px;flex:none;color:#f1c77f;font-size:24px;border:1px solid #d7b97655;border-radius:50%;background:#0c1c22;box-shadow:0 0 0 4px #d7b9760c}
+.ap-pause-control strong{color:#edf0e5;font-size:12px;font-weight:600;letter-spacing:.04em}
+.ap-language-options{display:flex;gap:7px;grid-column:1 / -1;padding:2px 0 0}
+.ap-language-option{min-width:58px;padding:10px 12px;text-align:center;background:#10252b}
+.ap-language-option[aria-pressed="true"]{border-color:#e7c18b;color:#f1c77f;background:#2b4a4d;box-shadow:0 0 16px #d7b97620}
+.ap-pause-map-title{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#d7c59f;margin:0 0 10px}
+.ap-pause-map-title::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,#d7c59f66,transparent)}
+.ap-pause-map{display:block;width:100%;height:230px;object-fit:cover;background:#17252a;border:1px solid #d7b97645;box-shadow:inset 0 0 24px #02080d88,0 12px 24px #02080d55}
 @media(max-width:520px){.ap-mark{flex:0 0 65px}.ap-mark b{font-size:15px;letter-spacing:.12em}.ap-mark b span{display:block}.ap-controls{margin-right:72px;flex-shrink:0}.ap-controls .ap-button{font-size:9px;padding:7px;min-width:38px}.ap-objective>small:first-child{display:block;font-size:8px}.ap-progress{float:none;display:block;margin-top:5px;font-size:10px}}
-@media(max-width:520px){.ap-pause-control{min-height:68px;padding:10px;gap:7px}.ap-pause-control strong{font-size:10px}.ap-pause-icon{width:26px;font-size:20px}.ap-pause-map{height:170px}}
+@media(max-width:520px){.ap-pause-dialog{padding:26px 18px 20px}.ap-pause-dialog h1{font-size:30px}.ap-pause-status{font-size:8px;letter-spacing:.12em}.ap-pause-intro{margin-bottom:18px!important}.ap-pause-grid{gap:8px;margin-bottom:20px}.ap-pause-control{min-height:68px;padding:10px;gap:8px}.ap-pause-control strong{font-size:10px}.ap-pause-icon{width:28px;height:28px;font-size:19px}.ap-pause-map{height:170px}}
 
 /* Lift the checkpoint panel while preserving its existing dimensions. */
 .ap-objective{top:4px}

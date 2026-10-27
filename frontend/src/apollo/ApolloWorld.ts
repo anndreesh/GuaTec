@@ -3,7 +3,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { loadProp, type PropOptions } from './ApolloProps';
 import { buildCar, CAR_SPECS, type CarKind } from './ApolloVehicles';
 import { buildBench, buildTable, type Kit, type StationKind } from './ApolloFurniture';
 import { apolloText } from './ApolloLocale';
@@ -73,7 +72,6 @@ export class ApolloWorld {
   private inspectionTarget:'rocket'|'tower'|'vab'|null=null;
   private inspectionPosition=new THREE.Vector3();
   private smokeBillboard=new THREE.Quaternion();
-  private lateProps = new THREE.Group();
   private nasaTexture: THREE.Texture | null = null;
   private cloudSprites = new THREE.Group();
   private localizedSigns: { title: string; subtitle: string; planes: THREE.Mesh[]; width: number }[] = [];
@@ -123,7 +121,7 @@ export class ApolloWorld {
     this.buildVehicles();
     this.buildClouds();
     this.buildServiceDetails();
-    for (const child of [...this.scene.children]) if (child instanceof THREE.Group && child!==this.lateProps) this.mergeAuthored(child);
+    for (const child of [...this.scene.children]) if (child instanceof THREE.Group) this.mergeAuthored(child);
     this.flushStatic();
     this.scene.add(this.playerRoot, this.crewRoot);
     this.playerRoot.position.copy(this.player);
@@ -146,7 +144,7 @@ export class ApolloWorld {
     this.renderer.domElement.addEventListener('pointermove', this.onPointerMove);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
     this.renderer.domElement.addEventListener('pointercancel', this.onPointerUp);
-    this.ready = Promise.all([this.loadAstronauts(), this.loadProps()]).then(() => undefined);
+    this.ready = this.loadAstronauts();
   }
 
   /** Refresh only language-dependent canvas textures; geometry and player state stay intact. */
@@ -161,21 +159,6 @@ export class ApolloWorld {
         previous?.dispose();
       }
     }
-  }
-
-  private async loadProps(): Promise<void> {
-    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    this.lateProps.name = 'Apollo late-loaded GLB props'; this.scene.add(this.lateProps);
-    const load = async (label: string, url: string, options: PropOptions, x: number, z: number, ry: number, collider?: Collider) => {
-      try {
-        if (this.quality === 'low' && /shuttle|bacardi/i.test(label)) return;
-        const prop = await loadProp(loader, url, options); prop.group.position.set(x, 0, z); prop.group.rotation.y = ry; this.lateProps.add(prop.group);
-        if (collider) this.colliders.push(collider);
-      } catch (error) { this.assetErrors.push(`${label}: ${String(error)}`); }
-    };
-    await Promise.all([
-      load('space_shuttle_nasa', '/assets/models/space_shuttle_nasa_optimized.glb', { fit: { axis: 'z', size: 33 } }, 120, 150, Math.PI / 2, { x: 120, z: 150, w: 17, d: 8 }),
-    ]);
   }
 
   private material(name: string, color: number, roughness = 0.8, metalness = 0): THREE.MeshStandardMaterial {
@@ -454,7 +437,7 @@ export class ApolloWorld {
     this.station(-70, 165, 'RECONOCIMIENTO', '02 · OBSERVACIÓN DEL COMPLEJO', 'camera');
     this.station(-100, 220, 'DOCUMENTACIÓN', '03 · REGISTRO DE COMUNICACIONES', 'desk');
     this.station(70, 235, 'COMUNICACIONES', '04 · ESTACIÓN DE APOYO', 'radio');
-    this.station(0, 150, 'LA TRIPULACIÓN', '05 · RECREACIÓN HISTÓRICA', 'crew');
+    this.station(-24, 170, 'LA TRIPULACIÓN', '05 · RECREACIÓN HISTÓRICA', 'crew');
     this.station(0, 355, 'OBSERVACIÓN', '06 · CÁMARA DE SEGUIMIENTO', 'camera');
     const steel = this.material('galvanized', 0xa4aaa5, 0.58, 0.7);
     // Deep-space style parabolic dish, original geometry; visual educational approximation.
@@ -477,7 +460,7 @@ export class ApolloWorld {
     const steel = this.material('station-steel', 0x63746f, 0.6, 0.4);
     const cream = this.material('station-cream', 0xc6c4ad, 0.8);
     this.box(7, 0.12, 5, this.material('station-concrete', 0xb7b3a0), x, 0.05, z);
-    const ids:Record<string,StationKind>={'-35,130':'map','-70,165':'camera','-100,220':'desk','70,235':'radio','0,150':'crew','0,355':'camera'};
+    const ids:Record<string,StationKind>={'-35,130':'map','-70,165':'camera','-100,220':'desk','70,235':'radio','-24,170':'crew','0,355':'camera'};
     this.colliders.push(...buildTable(this.furniture, (ids[`${x},${z}`] ?? type) as StationKind, x, z));
     this.sign(title, subtitle, x + 0.5, 2.5, z - 2, 0, 5.5);
     this.colliders.push({ x, z, w: type === 'camera' ? 0.65 : 1.5, d: type === 'camera' ? 0.65 : 0.85 });
@@ -557,7 +540,7 @@ export class ApolloWorld {
     const grit=this.material('service-gravel',0x9d967e,.98,0);
     const curb=this.material('curb',0xb9b69d,.92,.08);
     const metal=this.material('utility-pipe',0x6d7d76,.65,.5);
-    for(const [x,z] of [[-35,130],[-70,165],[-100,220],[70,235],[0,150],[0,355]]) {
+    for(const [x,z] of [[-35,130],[-70,165],[-100,220],[70,235],[-24,170],[0,355]]) {
       this.groundPlane(10,8,x,z,grit,-.015);
       for(const dx of [-5.1,5.1])this.box(.16,.15,8.3,curb,x+dx,.07,z);
       this.box(10.3,.15,.16,curb,x,.07,z-4.1);

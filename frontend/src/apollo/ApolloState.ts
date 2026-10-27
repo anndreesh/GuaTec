@@ -61,7 +61,7 @@ export const CHECKPOINTS: readonly ApolloCheckpoint[] = [
   {
     id: 'crew', title: 'La tripulación del Apollo 11',
     objective: 'Observa la recreación retrospectiva del traslado de Armstrong, Collins y Aldrin.',
-    target: { x: 0, z: 150 }, requirements: ['communications'],
+    target: { x: -24, z: 170 }, requirements: ['communications'],
     actions: [
       { id: 'crew-film', label: 'Observar el traslado', description: 'Recreación retrospectiva de la mañana del 16 de julio: tres representaciones estilizadas se dirigen hacia el vehículo de traslado y la plataforma. La elipsis a negro representa su embarque.' },
     ],
