@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
 import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
 import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind } from './ApolloStandModels';
-import {SITE_PLOTS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
+import {SITE_BUILDINGS,SITE_PLOTS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
 import {standIndicatorPosition,standUsesPower} from './ApolloStandDesigns';
 
 export type ApolloQuality = 'low' | 'medium' | 'high';
@@ -460,7 +460,7 @@ export class ApolloWorld {
     this.box(160, 2, 136, roof, 0, 161, 0, distantVab);
     vabLod.addLevel(vab, 0); vabLod.addLevel(distantVab, 2300); vabLod.position.set(-1000, 0, -100); this.scene.add(vabLod);
     // Support buildings form solid closed shells: no doors/interiors are traversable.
-    for (const [x, z, w, d, h] of [[-125, 200, 26, 21, 6], [116, 250, 22, 17, 5], [-118, 338, 28, 19, 6], [120, 130, 24, 17, 5]]) {
+    for (const {x,z,width:w,depth:d,height:h} of SITE_BUILDINGS) {
       this.box(w, h, d, wall, x, h / 2, z);
       this.box(w + 1, 0.35, d + 1, roof, x, h, z);
       this.colliders.push({ x, z, w: w / 2 + 0.7, d: d / 2 + 0.7 });
@@ -613,7 +613,7 @@ export class ApolloWorld {
       }
     }
     // Low drainage aprons and pipe work give the service buildings a functional edge.
-    for(const [x,z,depth]of[[-125,200,21],[116,250,17],[-118,338,19],[120,130,17]]) {
+    for(const {x,z,width,depth,height}of SITE_BUILDINGS) {
       this.box(25,.12,3,grit,x,.015,z+12);
       for(let i=0;i<4;i++)this.box(.08,.09,2.8,metal,x-11+i*.4,.13,z+12);
       this.box(4,.55,.75,metal,x+8,.3,z-10);
@@ -628,6 +628,23 @@ export class ApolloWorld {
         this.box(2.5,1.2,.06,glass,x-8+i*5,2.93,z+depth/2+.19);
         this.box(2.6,.065,.075,ivory,x-8+i*5,2.93,z+depth/2+.23);
         this.box(.065,1.25,.075,ivory,x-8+i*5,2.93,z+depth/2+.23);
+      }
+      // The side elevations form the backdrop to the engineering/radio yards.
+      // Clerestory glazing, joints, rain pipes and low louvers give these visible
+      // walls a human scale while remaining inside the existing solid footprint.
+      const joint=this.material('roof',0x5f6e6d,.7,.3);
+      for(const side of[-1,1]){
+        const face=x+side*(width/2+.08);
+        for(const offset of[-.32,-.08,.16,.40]){
+          const wz=z+depth*offset;
+          this.box(.06,1.15,2.1,glass,face,3.15,wz);
+          for(const wy of[2.55,3.75])this.box(.10,.07,2.25,ivory,face+side*.04,wy,wz);
+          this.box(.10,1.2,.055,ivory,face+side*.04,3.15,wz);
+        }
+        for(const offset of[-.43,.04])this.box(.025,height-.3,.035,joint,face-side*.045,height/2,z+depth*offset);
+        this.cylinder(.045,.045,height-.2,metal,face+.03*side,height/2,z-depth/2+.3);
+        this.box(.07,1.05,1.45,joint,face,.94,z+depth*.03);
+        for(let slat=0;slat<6;slat++)this.box(.10,.035,1.32,metal,face+side*.045,.57+slat*.15,z+depth*.03);
       }
     }
   }

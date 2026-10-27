@@ -2,6 +2,13 @@ import {BONUS_CHECKPOINTS, CHECKPOINTS} from './ApolloState';
 import type {StandModelKind} from './ApolloStandDesigns';
 export type SitePoint={x:number;z:number};
 export type SiteRect=SitePoint&{width:number;depth:number};
+/** One footprint contract for map, closed shells, facade details and collisions. */
+export const SITE_BUILDINGS:readonly (SiteRect&{height:number})[]=[
+  {x:-125,z:200,width:26,depth:21,height:6},
+  {x:116,z:250,width:22,depth:17,height:5},
+  {x:-118,z:338,width:28,depth:19,height:6},
+  {x:120,z:130,width:24,depth:17,height:5},
+];
 
 /** Map and world consume the same roads; the access road ends before the pedestrian yard. */
 export const SITE_ROADS:readonly {from:SitePoint;to:SitePoint;width:number;shoulder:number}[]=[

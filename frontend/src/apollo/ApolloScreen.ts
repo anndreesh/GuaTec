@@ -17,7 +17,7 @@ import { mountInstrument, type InstrumentHandle, type InstrumentKind } from './A
 import { FIELD_INSTRUMENTS, fieldDraftKey, restoreFieldDrafts, type FieldDrafts } from './ApolloFieldProgress';
 import { mountBonusMission, type BonusMissionHandle } from './ApolloBonusMissions';
 import { restoreStandDraft, type StandDraft } from './ApolloStandRules';
-import {SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
+import {SITE_BUILDINGS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
 import {STAND_HANDOFFS} from './ApolloStandHandoffs';
 
 const SLUG = MISSION_SLUGS.mission1;
@@ -542,7 +542,7 @@ export class ApolloScreen implements Screen {
     c.strokeStyle='#7d9482';c.lineWidth=Math.max(1,w*.003);c.lineCap='round';
     for(const points of SITE_WALKWAYS){c.beginPath();points.forEach((point,i)=>{const[x,z]=p(point.x,point.z);if(i)c.lineTo(x,z);else c.moveTo(x,z)});c.stroke();}
     c.fillStyle='#28474b';c.strokeStyle='#78a39a';c.lineWidth=2;
-    for(const [x,z,bw,bd] of [[-125,200,26,21],[116,250,22,17],[-118,338,28,19],[120,130,24,17]]){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);c.strokeRect(a,b,bw*sx,bd*sz);}
+    for(const {x,z,width:bw,depth:bd} of SITE_BUILDINGS){const [a,b]=p(x-bw/2,z-bd/2);c.fillRect(a,b,bw*sx,bd*sz);c.strokeRect(a,b,bw*sx,bd*sz);}
     const [rx,rz]=p(0,0);c.fillStyle='#9b4f4b33';c.beginPath();c.ellipse(rx,rz,90*sx,90*sz,0,0,Math.PI*2);c.fill();c.strokeStyle='#d47c6e';c.setLineDash([7,5]);c.lineWidth=2;c.stroke();c.setLineDash([]);
     c.font=`600 ${Math.max(10,w/40)}px sans-serif`;c.fillStyle='#f0e7c9';c.fillText(apolloText('N ↑'),12,24);c.fillText(apolloText('39A · RESTRINGIDO'),rx+12,rz+5);
     c.fillStyle='#b8d1c6';c.fillText(apolloText('↖ VAB · 1 km'),12,Math.max(42,h*.18));
