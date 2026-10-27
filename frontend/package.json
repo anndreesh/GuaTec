@@ -12,7 +12,8 @@
     "qa:apollo": "node scripts/qa-apollo-stands.mjs",
     "qa:apollo-locales": "node scripts/qa-apollo-locales.mjs",
     "qa:apollo-site": "node scripts/qa-apollo-site.mjs",
-    "qa:apollo-instruments": "node scripts/qa-apollo-instruments.mjs"
+    "qa:apollo-instruments": "node scripts/qa-apollo-instruments.mjs",
+    "qa:app-locales": "node scripts/qa-app-locales.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^7.35.1",

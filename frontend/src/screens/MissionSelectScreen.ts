@@ -183,7 +183,7 @@ export class MissionSelectScreen implements Screen {
       );
       const dateLabel = formatStoryDate(story.date);
       if (dateLabel) {
-        copy.append(el("p", { className: "nasa-briefing-date", text: `🗓️ Publicado el ${dateLabel}` }));
+        copy.append(el("p", { className: "nasa-briefing-date", text: `🗓️ ${t('Publicado el')} ${dateLabel}` }));
       }
       copy.append(
         el("p", { className: "nasa-briefing-description", text: summaryText || t("Abre la fuente de NASA para consultar los detalles.") }),
@@ -223,7 +223,7 @@ export class MissionSelectScreen implements Screen {
       if (event.key === "ArrowRight") renderSlide(activeIndex + 1);
     });
     stories.forEach((_, index) => {
-      const dot = el("button", { className: "nasa-carousel-dot", text: "", attrs: { type: "button", "aria-label": `Historia ${index + 1}` } });
+      const dot = el("button", { className: "nasa-carousel-dot", text: "", attrs: { type: "button", "aria-label": `${t('Historia')} ${index + 1}` } });
       dot.addEventListener("click", () => renderSlide(index));
       dots.append(dot);
     });

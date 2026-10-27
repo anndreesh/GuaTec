@@ -4,6 +4,7 @@ import { el } from "@/core/dom";
 import type { GameApp } from "@/core/GameApp";
 import type { Screen } from "@/screens/Screen";
 import { t } from "@/core/i18n";
+import {accountErrorText} from '@/core/apiErrorCopy';
 
 /** Username setup screen, shown once right after auth (any provider). */
 export class UsernameScreen implements Screen {
@@ -11,9 +12,9 @@ export class UsernameScreen implements Screen {
     const panel = el("div", { className: "screen username-screen" });
     const input = el("input", {
       className: "text-input",
-      attrs: { type: "text", placeholder: t("Tu nombre de comandante"), maxlength: "20" },
+      attrs: { type: "text", placeholder: t("Tu nombre de comandante"), 'aria-label':t('Tu nombre de comandante'), maxlength: "20" },
     });
-    const error = el("p", { className: "form-error", text: "" });
+    const error = el("p", { className: "form-error", text: "",attrs:{role:'alert'} });
     const submit = el("button", { className: "btn btn-primary", text: t("Confirmar"), attrs: { type: "button" } });
 
     panel.append(
@@ -28,17 +29,20 @@ export class UsernameScreen implements Screen {
     const cached = AuthStore.getCachedUsername();
     if (cached) input.value = cached;
 
+    let submitting=false;
     const submitHandler = async () => {
+      if(submitting)return;submitting=true;submit.disabled=true;input.disabled=true;
       error.textContent = "";
       const username = input.value.trim();
       try {
         const user = await userApi.setUsername(username);
+        if(!panel.isConnected)return;
         AuthStore.setCachedUsername(username);
         this.app.currentUser = user;
         await this.app.showMissionSelect();
       } catch (err: unknown) {
-        error.textContent = this.extractErrorMessage(err);
-      }
+        error.textContent=accountErrorText(err,'No se pudo guardar el nombre de usuario. Intenta de nuevo.');
+      }finally{submitting=false;submit.disabled=false;input.disabled=false;}
     };
 
     submit.addEventListener("click", () => void submitHandler());
@@ -48,14 +52,6 @@ export class UsernameScreen implements Screen {
   }
 
   constructor(private app: GameApp) {}
-
-  private extractErrorMessage(err: unknown): string {
-    if (err && typeof err === "object" && "body" in err) {
-      const body = (err as { body?: { message?: string } }).body;
-      if (body?.message) return body.message;
-    }
-    return "No se pudo guardar el nombre de usuario. Intenta de nuevo.";
-  }
 
   unmount(): void {
     /* no external listeners/timers to clean up */

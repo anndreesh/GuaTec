@@ -1,4 +1,5 @@
 import { getLanguage, type Language } from './language';
+import {ACCOUNT_TRANSLATIONS} from './AccountCopy';
 export { getLanguage, setLanguage, type Language } from './language';
 
 const translations: Record<string, string> = {
@@ -1487,6 +1488,9 @@ Object.assign(spanishFromEnglish, {
   "The data technician is preparing the outdoor recorders.": "La técnica de datos prepara los registradores exteriores.",
 });
 
+Object.assign(translations,Object.fromEntries(ACCOUNT_TRANSLATIONS.map(([source,en])=>[source,en])));
+Object.assign(frenchTranslations,Object.fromEntries(ACCOUNT_TRANSLATIONS.map(([source,,fr])=>[source,fr])));
+
 export const UI_TRANSLATIONS:Readonly<Record<Language,Readonly<Record<string,string>>>>=Object.freeze({
   es:Object.freeze({...spanishExtra,...spanishFromEnglish}),
   en:Object.freeze({...englishExtra,...translations}),
@@ -1500,7 +1504,7 @@ const fragmentsByLanguage=Object.fromEntries(Object.entries(fragmentSources).map
 
 export function t(text: string): string {
   const currentLanguage=getLanguage(),exact=UI_TRANSLATIONS[currentLanguage][text];
-  if (exact !== undefined) return exact;
+  if (typeof exact === 'string') return exact;
 
   let result = text;
   for (const [source, translated] of fragmentsByLanguage[currentLanguage]) {

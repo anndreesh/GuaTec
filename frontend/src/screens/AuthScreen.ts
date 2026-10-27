@@ -6,11 +6,14 @@ import type { Screen } from "@/screens/Screen";
 import type { Credentials, ProviderInfo } from "@/types";
 import { getLanguage, t } from "@/core/i18n";
 import { API_BASE_URL } from "@/config/gameConfig";
+import {accountErrorText} from '@/core/apiErrorCopy';
 
 /** Provider-choice screen: email/password, Google, GitHub, or Guest. */
 export class AuthScreen implements Screen {
   private container: HTMLElement | null = null;
   private isRegistering = false;
+  private providerPending=false;
+  private passwordPending=false;
 
   constructor(private app: GameApp) {}
 
@@ -31,10 +34,11 @@ export class AuthScreen implements Screen {
       const res = await authApi.listProviders();
       providers = res.providers;
     } catch {
-      providers = [{ id: "guest", label: t("Invitado"), configured: true }];
+      providers = [{ id: "guest", label: "Invitado", configured: true }];
     }
 
     const list = panel.querySelector("#provider-list")!;
+    const providerError=el('p',{className:'form-error',attrs:{role:'alert'}});list.after(providerError);
     for (const provider of providers) {
       const button = el("button", {
         className: `btn provider-btn provider-${provider.id}`,
@@ -42,14 +46,17 @@ export class AuthScreen implements Screen {
         children: [
           this.createProviderIcon(provider.id),
           el("span", {
-            text: provider.configured ? t(`Continuar con ${provider.label}`) : `${t(provider.label)} (${t("no configurado")})`,
+            text: provider.configured ? `${t('Continuar con')} ${t(provider.label)}` : `${t(provider.label)} (${t("no configurado")})`,
           }),
         ],
       });
       if (!provider.configured) {
         button.setAttribute("disabled", "true");
       } else {
-        button.addEventListener("click", () => void this.handleProviderClick(provider.id));
+        button.addEventListener('click',()=>{
+          if(this.providerPending||this.passwordPending)return;this.providerPending=true;button.disabled=true;providerError.textContent='';
+          void this.handleProviderClick(provider.id).catch(error=>{if(panel.isConnected)providerError.textContent=this.extractErrorMessage(error);}).finally(()=>{this.providerPending=false;button.disabled=false;});
+        });
       }
       list.append(button);
     }
@@ -211,18 +218,20 @@ export class AuthScreen implements Screen {
     error: HTMLElement,
     submit: HTMLButtonElement,
   ): Promise<void> {
+    if(this.passwordPending||this.providerPending)return;
     error.textContent = "";
     if (this.isRegistering && credentials.password !== confirmation) {
       error.textContent = t("Las contraseñas no coinciden.");
       return;
     }
 
-    submit.disabled = true;
+    this.passwordPending=true;submit.disabled=true;
     const isRegistering = this.isRegistering;
     try {
       const { token, user } = isRegistering
         ? await authApi.register(credentials)
         : await authApi.login(credentials);
+      if(!this.container?.isConnected)return;
       AuthStore.setToken(token);
       this.app.currentUser = user;
       if (isRegistering) {
@@ -233,13 +242,14 @@ export class AuthScreen implements Screen {
     } catch (err: unknown) {
       error.textContent = this.extractErrorMessage(err);
     } finally {
-      submit.disabled = false;
+      this.passwordPending=false;submit.disabled=false;
     }
   }
 
   private async handleProviderClick(providerId: ProviderInfo["id"]): Promise<void> {
     if (providerId === "guest") {
       const { token, user } = await authApi.loginGuest();
+      if(!this.container?.isConnected)return;
       AuthStore.setToken(token);
       this.app.currentUser = user;
       await this.app.showUsername();
@@ -250,11 +260,7 @@ export class AuthScreen implements Screen {
   }
 
   private extractErrorMessage(err: unknown): string {
-    if (err && typeof err === "object" && "body" in err) {
-      const body = (err as { body?: { message?: string } }).body;
-      if (body?.message) return body.message;
-    }
-    return t("No se pudo completar la autenticación. Intenta de nuevo.");
+    return accountErrorText(err,'No se pudo completar la autenticación. Intenta de nuevo.');
   }
 
   unmount(): void {
