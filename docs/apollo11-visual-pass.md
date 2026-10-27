@@ -2,6 +2,10 @@
 
 Fecha: 26 de octubre de 2026. Motor activo: Three.js 0.186.1.
 
+## Skills verificadas
+
+Se revisaron las instalaciones locales de `game-engine`, `game-ui-ux`, `threejs-aaa-graphics-builder`, `threejs-interaction` y `performance-optimization`. Se aplicaron sus pautas de manipulación, composición, layout responsive, materiales compartidos y medición con GPU. También están instaladas las skills de Babylon.js, Blender y cámaras; el motor activo de esta misión es Three.js y los modelos de esta pasada se construyeron por código.
+
 ## Cambios integrados
 
 Se reconstruyeron las seis estaciones históricas y los siete stands de apoyo mediante un kit procedural compartido. Cada actividad tiene una forma y equipo reconocibles: consolas biseladas, diales, bornes de cobre, cables curvos, herramientas sobre bandeja, archivadores, lámpara articulada, veleta, balizas y cámaras sobre trípodes. Los trípodes quedan junto a la mesa y los gabinetes, postes y equipos laterales tienen colisiones propias.
@@ -86,3 +90,9 @@ Escala interna 0–3 del skill gráfico. El antes se basa en las capturas inicia
 | Evidencia de rendimiento | 0 | 2,5 | Inspector GPU, presupuestos y pruebas de navegador |
 
 El conjunto permanece estilizado. El mayor margen gráfico posterior está en el tratamiento de terreno y edificios lejanos, y en consolidar los materiales del personaje sin perder detalle.
+
+## Publicación
+
+Los cambios están en `origin/main`. El frontend `https://gua-tec.vercel.app` responde HTTP 200; se comprobó que su bundle contiene el kit procedural, los nuevos paneles manipulables y el selector de idioma accesible. La API pública existente devuelve `DEPLOYMENT_NOT_FOUND`, por lo que el flujo de Invitado se ha verificado completo en local.
+
+Los logs del servicio Flask mostraron un fallo al interpretar el include de dependencias y configuración de SPA aplicada al backend. La reparación separa la configuración raíz de Flask de `frontend/vercel.json`, declara su entrypoint y conserva las mismas dependencias. Pasaron las siete pruebas de API y la comparación de versiones entre ambos manifests. Vercel rechazó publicar esta reparación con `api-deployments-free-per-day` (más de 100 despliegues diarios); también queda pendiente publicar el último ajuste de retorno de lente. No se ha dado por verificado un flujo público completo.
