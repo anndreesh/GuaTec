@@ -8,7 +8,7 @@ import { buildBench, type Kit, type StationKind } from './ApolloFurniture';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { apolloText } from './ApolloLocale';
 import { BONUS_CHECKPOINTS, type ApolloBonusCheckpoint } from './ApolloState';
-import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind } from './ApolloStandModels';
+import { buildStandModel, createStandAtlas, standCollisionProxies, type StandModelKind, type StandMovingPart } from './ApolloStandModels';
 import {SITE_BUILDINGS,SITE_PLOTS,SITE_ROADS,SITE_WALKWAYS,SITE_ZONES,zoneBounds} from './ApolloSiteLayout';
 import {standIndicatorPosition,standUsesPower} from './ApolloStandDesigns';
 
@@ -99,6 +99,8 @@ export class ApolloWorld {
   private localizedSigns: { title: string; subtitle: string; planes: THREE.Mesh[]; width: number }[] = [];
   private bonusAccents: { mesh: THREE.Mesh; phase: number; id: string }[] = [];
   private standAtlas: THREE.CanvasTexture | null = null;
+  private movingStandParts:StandMovingPart[]=[];
+  private activeStation='';
   private environmentTarget: THREE.WebGLRenderTarget | null = null;
 
   constructor(private host: HTMLElement, private callbacks: { onInteract: () => void; onMap: () => void; onPause?: () => void }) {
@@ -242,6 +244,9 @@ export class ApolloWorld {
   }
   private addStaticModel(root: THREE.Group): void {
     root.updateMatrixWorld(true);
+    for(const part of (root.userData.movingParts??[]) as StandMovingPart[]){
+      this.scene.attach(part.node);this.mergeAuthored(part.node);this.movingStandParts.push(part);
+    }
     root.traverse(node=>{
       if(!(node instanceof THREE.Mesh)||Array.isArray(node.material))return;
       const geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
@@ -522,7 +527,7 @@ export class ApolloWorld {
     const atlas = this.standAtlas ??= createStandAtlas();
     BONUS_CHECKPOINTS.forEach((bonus, index) => {
       const { x, z } = bonus.target;
-      const model = buildStandModel(bonus.kind, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, index);
+      const model = buildStandModel(bonus.kind, (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, index, true);
       model.position.set(x, 0, z); this.addStaticModel(model);
       this.colliders.push(...standCollisionProxies(bonus.kind,x,z));
       const indicator=standIndicatorPosition(bonus.kind);
@@ -534,7 +539,7 @@ export class ApolloWorld {
   private station(x: number, z: number, title: string, subtitle: string, type: StationKind): void {
     const atlas = this.standAtlas ??= createStandAtlas();
     const kinds: Record<string, StandModelKind> = { map: 'orientation', camera: z > 300 ? 'tracking' : 'survey', desk: 'records', radio: 'radio', crew: 'crew' };
-    const model = buildStandModel(kinds[type] ?? 'records', (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, 0);
+    const model = buildStandModel(kinds[type] ?? 'records', (name, color, roughness, metalness) => this.material(name, color, roughness, metalness), atlas, 0, true);
     model.position.set(x, 0, z); this.addStaticModel(model);
     this.colliders.push(...standCollisionProxies(kinds[type] ?? 'records',x,z));
     // Keep the existing authored mission names visible above the shared instrument kit.
@@ -857,7 +862,7 @@ export class ApolloWorld {
     }
     return nearest ? { ...nearest.bonus, distance: nearest.distance } : null;
   }
-  setStationStatus(_completed:string[],_active:string):void { /* station furniture is static; minigame state remains in ApolloScreen. */ }
+  setStationStatus(_completed:string[],active:string):void { this.activeStation=active; }
   setInspectionTarget(kind:'rocket'|'tower'|'vab'|null):void { this.inspectionTarget=kind; }
   setStandFocus(target: { x: number; z: number } | null): void { this.standFocus = target; }
   projectDestination(target: {x:number;z:number}): {x:number;y:number;behind:boolean} {
@@ -930,6 +935,10 @@ export class ApolloWorld {
   /** Small, frame-independent life pass for support hardware and field staff. */
   private updateActors(dt: number): void {
     if (this.suspended && !this.mode) return;
+    for(const part of this.movingStandParts){
+      if(this.reducedMotion || (part.activity==='tracking' && this.activeStation!=='observation'))continue;
+      part.node.rotation[part.axis]=(part.node.rotation[part.axis]+dt*part.speed)%(Math.PI*2);
+    }
     for (const technician of this.technicians) {
       const phase = this.clock * technician.speed + technician.phase;
       // Station work is planted: feet and collider stay together while the upper

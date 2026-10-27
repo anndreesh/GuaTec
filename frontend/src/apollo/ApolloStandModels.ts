@@ -5,6 +5,7 @@ import {CABLE_CHANNELS,CABLE_TARGET_ORDER} from './ApolloStandRules';
 export type {StandModelKind} from './ApolloStandDesigns';
 
 export type StandMaterialFactory = (name: string, color: number, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial;
+export interface StandMovingPart { node:THREE.Group; axis:'y'|'z'; speed:number; activity:'weather'|'tracking' }
 
 /** Ground-plane proxies are kept separate from the visual mesh batches. */
 export function standCollisionProxies(kind: StandModelKind, x: number, z: number): {x:number;z:number;w:number;d:number}[] {
@@ -79,8 +80,9 @@ export function createStandAtlas(): THREE.CanvasTexture {
 
 /** Human-scale authored stations. Static parts are merged per shared material; each
  * station retains its own bounds so distant desks can be culled independently. */
-export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory, atlas: THREE.Texture, index: number): THREE.Group {
+export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory, atlas: THREE.Texture, index: number, animated = false): THREE.Group {
   const root = new THREE.Group(); root.name = `apollo-stand-${kind}`;
+  const movingParts:StandMovingPart[]=[];root.userData.movingParts=movingParts;
   const design=STAND_DESIGNS[kind];root.userData.silhouette=design.silhouette;
   const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
   const paint = mat('stand-painted-enamel', 0x627c73, .57, .12);
@@ -308,7 +310,15 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
     cyl(.11,.44,cream,.83,1.4,.05);cyl(.025,.52,steel,.83,1.44,.05);
     tube([[.82,1.18,.15],[.95,1.24,.4],[.55,1.22,.50],[.38,1.24,.24]],.018,red);
     cyl(.045, 3.9, steel, 2.35, 2.05, -.72); cyl(.16, .18, dark, 2.35, 3.8, -.72);
-    for (let a = 0; a < 3; a++) { const angle = a * Math.PI * 2 / 3; const x = 2.35 + Math.cos(angle) * .65, z = -.72 + Math.sin(angle) * .65; tube([[2.35, 3.86, -.72], [x, 3.86, z]], .025, steel); put(new THREE.SphereGeometry(.14, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), cream, x, 3.86, z, Math.PI / 2, angle); }
+    if(animated){
+      const rotor=new THREE.Group();rotor.name='weather-anemometer-rotor';rotor.position.set(2.35,3.86,-.72);root.add(rotor);
+      for(let a=0;a<3;a++){
+        const angle=a*Math.PI*2/3,x=Math.cos(angle)*.65,z=Math.sin(angle)*.65;
+        const arm=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.65,8),steel);arm.position.set(x/2,0,z/2);arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(x,0,z).normalize());rotor.add(arm);
+        const cup=new THREE.Mesh(new THREE.SphereGeometry(.14,10,6,0,Math.PI*2,0,Math.PI/2),cream);cup.rotation.set(Math.PI/2,angle,0);cup.position.set(x,0,z);rotor.add(cup);
+      }
+      movingParts.push({node:rotor,axis:'y',speed:1.7,activity:'weather'});
+    }else for (let a = 0; a < 3; a++) { const angle = a * Math.PI * 2 / 3; const x = 2.35 + Math.cos(angle) * .65, z = -.72 + Math.sin(angle) * .65; tube([[2.35, 3.86, -.72], [x, 3.86, z]], .025, steel); put(new THREE.SphereGeometry(.14, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), cream, x, 3.86, z, Math.PI / 2, angle); }
     for(let i=0;i<5;i++)box(.59,.035,.52,cream,-2.35,1.25+i*.085,-.55);
     box(.7,.065,.63,cream,-2.35,1.67,-.55);box(.53,.36,.34,dark,-2.35,1.44,-.60);
     for(const dx of[-.22,.22])for(const dz of[-.18,.18])box(.045,1.12,.045,steel,-2.35+dx,.66,-.55+dz);
@@ -365,6 +375,13 @@ export function buildStandModel(kind: StandModelKind, mat: StandMaterialFactory,
       for(const dx of[-.20,.20]){
         cyl(.22,.13,dark,cx+dx,2.22,.03,Math.PI/2);cyl(.175,.018,steel,cx+dx,2.22,.105,Math.PI/2);
         cyl(.045,.035,copper,cx+dx,2.22,.12,Math.PI/2);
+        if(animated){
+          const reel=new THREE.Group();reel.name='tracking-film-reel';reel.position.set(cx+dx,2.22,.12);root.add(reel);
+          for(let spoke=0;spoke<3;spoke++){
+            const mesh=new THREE.Mesh(new THREE.BoxGeometry(.025,.30,.008),dark);mesh.rotation.z=spoke*Math.PI/3;reel.add(mesh);
+          }
+          movingParts.push({node:reel,axis:'z',speed:dx<0?.8:1.1,activity:'tracking'});
+        }
       }
       box(.40,.055,.07,dark,cx,2.08,-.27);
     }else{

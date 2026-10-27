@@ -21,13 +21,16 @@ try{
  await page.goto(new URL('/apollo-actor-acceptance',base).href);await page.waitForFunction(()=>window.ready);
  assert.deepEqual(await page.evaluate(()=>world.assetErrors),[]);
  await page.evaluate(()=>{world.player.set(-70,0,179);world.yaw=0;world.setSuspended(false)});
+ const instrumentBefore=await page.evaluate(()=>world.movingStandParts.map(p=>({activity:p.activity,axis:p.axis,angle:p.node.rotation[p.axis],position:p.node.position.toArray(),attached:p.node.parent===world.scene})));
+ assert.equal(instrumentBefore.length,3);assert.ok(instrumentBefore.every(p=>p.attached&&p.position.every(Number.isFinite)));
  const before=await pose();assert.equal(before.length,4);await page.waitForTimeout(800);const after=await pose();
+ const instrumentAfter=await page.evaluate(()=>world.movingStandParts.map(p=>p.node.rotation[p.axis]));const weather=instrumentBefore.findIndex(p=>p.activity==='weather');assert.notEqual(instrumentAfter[weather],instrumentBefore[weather].angle);checks.push('Weather rotor survives static batching at its world placement and advances independently.');
  assert.ok(after.every((t,i)=>t.x===before[i].x&&t.z===before[i].z&&t.collider));
  assert.ok(after.some((t,i)=>Math.abs(t.arm-before[i].arm)>.001));checks.push('Four working technicians animate with feet and colliders planted.');
  await page.evaluate(()=>{const t=world.technicians[0];world.setStandFocus({x:t.baseX,z:t.baseZ})});await page.waitForTimeout(1000);
  await page.screenshot({path:resolve(out,'technicians-motion-a.png')});await page.waitForTimeout(700);await page.screenshot({path:resolve(out,'technicians-motion-b.png')});
  const exploration=await page.evaluate(()=>world.diagnostics());
- await page.evaluate(()=>world.setSuspended(true));const paused=await pose();await page.waitForTimeout(400);assert.deepEqual(await pose(),paused);checks.push('Pause freezes technician gestures.');
+ await page.evaluate(()=>world.setSuspended(true));const paused=await pose();const pausedInstruments=await page.evaluate(()=>world.movingStandParts.map(p=>p.node.rotation[p.axis]));await page.waitForTimeout(400);assert.deepEqual(await pose(),paused);assert.deepEqual(await page.evaluate(()=>world.movingStandParts.map(p=>p.node.rotation[p.axis])),pausedInstruments);checks.push('Pause freezes technician gestures and station mechanisms.');
  await page.evaluate(()=>{window.animate=false;world.setCinematic('crew',4);world.update(1/60)});
  const first=await page.evaluate(()=>({wheel:world.van.userData.vehicleRig.wheels[0].rotation.x,z:world.van.position.z,parked:world.vehicleRigs[1].userData.vehicleRig.headlamp.emissiveIntensity}));
  await page.evaluate(()=>{world.setCinematic('crew',8);world.update(1/60)});
